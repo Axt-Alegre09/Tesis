@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Diagnóstico Supabase</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 800px; margin: 30px auto; padding: 0 16px; }
+    pre { background:#111; color:#0f0; padding:12px; border-radius:8px; overflow:auto; }
+    input, button { padding:10px; margin:6px 0; width:100%; }
+    .row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  </style>
+</head>
+<body>
+  <h1>Diagnóstico Supabase</h1>
+
+  <div class="row">
+    <div>
+      <label>Email de prueba</label>
+      <input id="email" type="email" placeholder="tu-correo@ejemplo.com" />
+    </div>
+    <div>
+      <label>Contraseña</label>
+      <input id="password" type="password" placeholder="mínimo 6 caracteres" />
+    </div>
+  </div>
+
+  <button id="btnSdk">1) Probar SDK / conexión</button>
+  <button id="btnSession">2) Probar auth.getSession()</button>
+  <button id="btnSignUp">3) Probar signUp (registro)</button>
+  <button id="btnSignIn">4) Probar signInWithPassword (login)</button>
+
+  <h3>Salida</h3>
+  <pre id="log"></pre>
+
+  <script type="module">
+    import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+    // ⚠️ Pega TUS valores reales aquí (los mismos que ya usas):
+    const supabaseUrl = "https://jyygevitfnbwrvxrjexp.supabase.co";
+    const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5eWdldml0Zm5id3J2eHJqZXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2OTQ2OTYsImV4cCI6MjA3MTI3MDY5Nn0.St0IiSZSeELESshctneazCJHXCDBi9wrZ28UkiEDXYo";
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    const $ = (id) => document.getElementById(id);
+    const log = (label, val) => {
+      const msg = typeof val === "string" ? val : JSON.stringify(val, null, 2);
+      $("log").textContent += `\n[${new Date().toLocaleTimeString()}] ${label}:\n${msg}\n`;
+    };
+
+    $("btnSdk").onclick = async () => {
+      $("log").textContent = "";
+      try {
+        log("SDK cargado", { hasAuth: !!supabase.auth, hasFrom: !!supabase.from });
+        log("URL", supabaseUrl);
+        log("Key (prefijo)", supabaseKey.slice(0, 12) + "...");
+      } catch (e) {
+        log("SDK error", e.message || e.toString());
+      }
+    };
+
+    $("btnSession").onclick = async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) log("auth.getSession() error", error.message);
+        else log("auth.getSession() OK", data);
+      } catch (e) {
+        log("auth.getSession() exception", e.message || e.toString());
+      }
+    };
+
+    $("btnSignUp").onclick = async () => {
+      const email = $("email").value.trim();
+      const password = $("password").value;
+      if (!email || !password) return log("signUp", "Completa email y password");
+
+      try {
+        const { data, error } = await supabase.auth.signUp({ email, password });
+        if (error) log("signUp error", error.message);
+        else log("signUp OK", data);
+      } catch (e) {
+        log("signUp exception", e.message || e.toString());
+      }
+    };
+
+    $("btnSignIn").onclick = async () => {
+      const email = $("email").value.trim();
+      const password = $("password").value;
+      if (!email || !password) return log("signIn", "Completa email y password");
+
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) log("signIn error", error.message);
+        else log("signIn OK", data);
+      } catch (e) {
+        log("signIn exception", e.message || e.toString());
+      }
+    };
+  </script>
+</body>
+</html>
