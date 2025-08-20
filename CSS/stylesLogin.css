@@ -82,7 +82,7 @@ h1 {
 .wrapper.active .form-box.register {
   opacity: 1;
   visibility: visible;
-  top: -30px; /* 🔼 Ajusta la distancia al toggle */
+  top: -30px;
 }
 
 form {
@@ -273,7 +273,7 @@ form {
   }
 
   .wrapper.active .form-box.register {
-    top: -15px; /* 🔼 Un pequeño ajuste en móviles */
+    top: -15px; 
   }
 
   .toggle-box::before {

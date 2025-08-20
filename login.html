@@ -1,92 +1,86 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="shortcut icon" href="IMG/PaniquiñosIco.ico" type="image/x-icon">
+<html lang="es">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="shortcut icon" href="IMG/PaniquiñosIco.ico" type="image/x-icon" />
+<!-- Bootstrap -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet" />
 
-  <!-- Bootstrap -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
-
-  <!-- Estilos -->
-  <link rel="stylesheet" href="CSS/stylesLogin.css">
-
-  <style>
+<link rel="stylesheet" href="CSS/stylesLogin.css?v=1" />
+<style>
     @import url('https://fonts.googleapis.com/css2?family=Devonshire&family=Poppins:wght@100;200;300;400;500;600;700;800;900&display=swap');
-  </style>
+</style>
 
-  <title>Paniquiños</title>
+
+<title>Paniquiños</title>
 </head>
+
 <body>
-  <div class="wrapper">
+    <div class="wrapper">
+        <div class="form-box login">
+            <form id="loginForm">
+                <h1>Acceso</h1>
+                <div class="input-box">
+                    <input id="loginEmail" name="email" type="email" placeholder="Correo" required />
+                    <i class="bi bi-person-circle"></i>
+                </div>
+                <div class="input-box">
+                    <input id="loginPassword" name="password" type="password" placeholder="Contraseña" required />
+                    <i class="bi bi-lock-fill"></i>
+                </div>
+                <div class="forgot-link">
+                    <a href="#" id="forgotLink">¿Olvidaste tu contraseña?</a>
+                </div>
+                <button type="submit" class="btn" id="loginSubmit">Ingresar</button>
 
-    <!-- FORM LOGIN -->
-    <div class="form-box login">
-      <form id="loginForm">
-        <h1>Acceso</h1>
-        <div class="input-box">
-          <input type="email" placeholder="Correo" required>
-          <i class="bi bi-person-circle"></i>
-        </div>
-        <div class="input-box">
-          <input type="password" placeholder="Contraseña" required>
-          <i class="bi bi-lock-fill"></i>
-        </div>
-        <div class="forgot-link">
-          <a href="#">¿Olvidaste tu contraseña?</a>
-        </div>
-        <button type="submit" class="btn">Ingresar</button>
 
-        <p>Nuestras Redes Sociales</p>
-        <div class="social-icons">
-          <a href="#"><i class="bi bi-google"></i></a>
-          <a href="#"><i class="bi bi-facebook"></i></a>
-          <a href="#"><i class="bi bi-instagram"></i></a>
+                <p>Nuestras Redes Sociales</p>
+                <div class="social-icons">
+                    <a href="#"><i class="bi bi-google"></i></a>
+                    <a href="#"><i class="bi bi-facebook"></i></a>
+                    <a href="#"><i class="bi bi-instagram"></i></a>
+                </div>
+            </form>
         </div>
-      </form>
+        <div class="form-box register">
+            <form id="registerForm">
+                <h1>Registrarse</h1>
+                <div class="input-box">
+                    <input id="registerEmail" name="email" type="email" placeholder="Correo" required />
+                    <i class="bi bi-envelope-fill"></i>
+                </div>
+                <div class="input-box">
+                    <input id="registerPassword" name="password" type="password" placeholder="Contraseña" required />
+                    <i class="bi bi-lock-fill"></i>
+                </div>
+                <button type="submit" class="btn" id="registerSubmit">Registrarse</button>
+
+
+                <p>Registrarse con</p>
+                <div class="social-icons">
+                    <a href="#"><i class="bi bi-google"></i></a>
+                    <a href="#"><i class="bi bi-facebook"></i></a>
+                    <a href="#"><i class="bi bi-instagram"></i></a>
+                </div>
+            </form>
+        </div>
+        <div class="toggle-box">
+            <div class="toggle-panel toggle-left">
+                <h1>¡Bienvenido de nuevo!</h1>
+                <p>¿No tienes una cuenta?</p>
+                <button class="btn register-btn" type="button">Registrarme</button>
+
+
+            </div>
+            <div class="toggle-panel toggle-right">
+                <h1>¡Hola, Bienvenido!</h1>
+                <p>¿Ya tienes una cuenta?</p>
+                <button class="btn login-btn" type="button">Iniciar Sesión</button>
+            </div>
+        </div>
     </div>
-
-    <!-- FORM REGISTRO -->
-    <div class="form-box register">
-      <form id="registerForm">
-        <h1>Registrarse</h1>
-        <div class="input-box">
-          <input type="email" placeholder="Correo" required>
-          <i class="bi bi-envelope-fill"></i>
-        </div>
-        <div class="input-box">
-          <input type="password" placeholder="Contraseña" required>
-          <i class="bi bi-lock-fill"></i>
-        </div>
-        <button type="submit" class="btn">Registrarse</button>
-
-        <p>Registrarse con</p>
-        <div class="social-icons">
-          <a href="#"><i class="bi bi-google"></i></a>
-          <a href="#"><i class="bi bi-facebook"></i></a>
-          <a href="#"><i class="bi bi-instagram"></i></a>
-        </div>
-      </form>
-    </div>
-
-    <!-- TOGGLE PANELES -->
-    <div class="toggle-box">
-      <div class="toggle-panel toggle-left">
-        <h1>¡Bienvenido de nuevo!</h1>
-        <p>¿No tienes una cuenta?</p>
-        <button class="btn register-btn" type="button">Registrarme</button>
-
-      </div>
-      <div class="toggle-panel toggle-right">
-        <h1>¡Hola, Bienvenido!</h1>
-        <p>¿Ya tienes una cuenta?</p>
-        <button class="btn login-btn">Iniciar Sesión</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Script de Login -->
-  <script type="module" src="ScriptLogin.js"></script>
+    <div id="msg" class="container mt-3" style="max-width:850px;"></div>
+    <script type="module" src="JS/ScriptLogin.js"></script>
 </body>
 </html>
