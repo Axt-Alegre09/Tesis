@@ -60,7 +60,8 @@ aside{
     border-radius: 1rem;
     padding: .5rem;
     margin-right: 1rem;
-    font-size: .95rem;
+    font-size: 1.1rem;
+    width: 100%;
 }
 .boton-menu.active{
     background-color: var(--clr-blanco);
@@ -120,10 +121,7 @@ main{
     border-radius: 2rem;
     padding: 3rem;
     border-radius: 0;
-    border-radius: 2rem ;
-
-
-    
+    border-radius: 2rem ;   
 }
 .titulo-principal{
     color: var(--clr-main);
@@ -150,6 +148,9 @@ main{
     display: flex;
     flex-direction: column;
     gap: .25rem;
+}
+.producto-imagen{
+    max-width: auto;     
 }
 .producto-titulo{
     font-size: 1rem;
