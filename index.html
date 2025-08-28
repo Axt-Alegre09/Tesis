@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Panaderia el pan</title>
-  <link rel="shortcut icon" href="IMG/PaniquiñosIco.ico" type="image/x-icon">
+  <link rel="shortcut icon" href="/img/paniquinos.ico" type="image/x-icon">
   <!-- Bootstrap -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet" />
@@ -15,26 +15,16 @@
     <aside>
       <header>
         <h1 class="logo">
-          <img class="logo-principal" src="IMG/Paniquiños.png" alt="logo">
+          <img class="logo-principal" src="/img/paniquinos.png" alt="logo">
         </h1>
       </header>
       <nav>
         <ul class="menu">
-          <li>
-            <button id="todos" class="boton-menu boton-categoria active"><i class="bi bi-hand-index-fill"></i>   Todos los productos</button>
-          </li>
-          <li>
-            <button id="bocaditos" class="boton-menu boton-categoria"><i class="bi bi-hand-index"></i> Bocaditos</button>
-          </li>
-          <li>
-            <button id="confiteria" class="boton-menu boton-categoria"><i class="bi bi-hand-index"></i> Confitería</button>
-          </li>
-          <li>
-            <button id="panificados" class="boton-menu boton-categoria"><i class="bi bi-hand-index"></i> Panificados</button>
-          </li>
-          <li>
-            <button id="rostisería" class="boton-menu boton-categoria"><i class="bi bi-hand-index"></i> Rostisería</button>
-          </li>
+          <li><button id="todos" class="boton-menu boton-categoria active"><i class="bi bi-hand-index-fill"></i>   Todos los productos</button></li>
+          <li><button id="bocaditos" class="boton-menu boton-categoria"><i class="bi bi-hand-index"></i> Bocaditos</button></li>
+          <li><button id="confiteria" class="boton-menu boton-categoria"><i class="bi bi-hand-index"></i> Confitería</button></li>
+          <li><button id="panificados" class="boton-menu boton-categoria"><i class="bi bi-hand-index"></i> Panificados</button></li>
+          <li><button id="rostisería" class="boton-menu boton-categoria"><i class="bi bi-hand-index"></i> Rostisería</button></li>
           <li>
             <a class="boton-menu boton-carrito" href="carrito.html">
               <i class="bi bi-cart-fill"></i>
@@ -43,23 +33,19 @@
           </li>
         </ul>
       </nav>
-      <footer>
-        <p class="texto-footer">© Paniquiños</p>
-      </footer>
+      <footer><p class="texto-footer">© Paniquiños</p></footer>
     </aside>
 
     <main>
       <h2 id="titulo-principal" class="titulo-principal">Todos los productos</h2>
-      <div class="contenedor-productos" id="contenedor-productos">
-          <!--Esta parte se va completa con Js-->
-      </div>
+      <div class="contenedor-productos" id="contenedor-productos"></div>
     </main>
   </div>
 
-    <script type="module">
-      import { logout } from "./ScriptLogin.js";
-      document.getElementById("logoutBtn").addEventListener("click", logout);
-    </script>
-    <script src="JS/main.js"></script>
+  <script type="module">
+    import { logout } from "./ScriptLogin.js";
+    document.getElementById("logoutBtn")?.addEventListener("click", logout);
+  </script>
+  <script src="JS/main.js"></script>
 </body>
 </html>

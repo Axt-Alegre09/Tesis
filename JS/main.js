@@ -1,201 +1,40 @@
 const productos = [
   // bocaditos
-  {
-    id: "Bocaditos_Ct_01",
-    titulo: "Bocaditos Combo 1",
-    imagen: "./img/bocaditos/ServicioCathering1.jpg",
-    categoria: { nombre: "Bocaditos", id: "bocaditos" },
-    precio: 55000
-  },
-  {
-    id: "Bocaditos_Ct_02",
-    titulo: "Bocaditos Combo 2",
-    imagen: "./img/bocaditos/ServicioCathering2.jpeg",
-    categoria: { nombre: "Bocaditos", id: "bocaditos" },
-    precio: 50000
-  },
-  {
-    id: "Bocaditos_Ct_03",
-    titulo: "Bocaditos Combo 3",
-    imagen: "./img/bocaditos/ServicioCathering3.jpeg",
-    categoria: { nombre: "Bocaditos", id: "bocaditos" },
-    precio: 150000
-  },
-  {
-    id: "Bocaditos_Ct_04",
-    titulo: "Bocaditos Combo 4",
-    imagen: "./img/bocaditos/ServicioCathering4.jpeg",
-    categoria: { nombre: "Bocaditos", id: "bocaditos" },
-    precio: 75000
-  },
-  {
-    id: "Bocaditos_Ct_Pareja",
-    titulo: "Bocadito en Pareja",
-    imagen: "./img/bocaditos/ServicioCatheringPareja.jpg",
-    categoria: { nombre: "Bocaditos", id: "bocaditos" },
-    precio: 65000
-  },
-  {
-    id: "Bocaditos_Ct_Personal",
-    titulo: "Bocadito Personal",
-    imagen: "./img/bocaditos/ServicioCatheringPersonal.jpg",
-    categoria: { nombre: "Bocaditos", id: "bocaditos" },
-    precio: 35000
-  },
+  { id:"Bocaditos_Ct_01", titulo:"Bocaditos Combo 1", imagen:"/img/bocaditos/ServicioCathering1.jpg", categoria:{ nombre:"Bocaditos", id:"bocaditos" }, precio:55000 },
+  { id:"Bocaditos_Ct_02", titulo:"Bocaditos Combo 2", imagen:"/img/bocaditos/ServicioCathering2.jpeg", categoria:{ nombre:"Bocaditos", id:"bocaditos" }, precio:50000 },
+  { id:"Bocaditos_Ct_03", titulo:"Bocaditos Combo 3", imagen:"/img/bocaditos/ServicioCathering3.jpeg", categoria:{ nombre:"Bocaditos", id:"bocaditos" }, precio:150000 },
+  { id:"Bocaditos_Ct_04", titulo:"Bocaditos Combo 4", imagen:"/img/bocaditos/ServicioCathering4.jpeg", categoria:{ nombre:"Bocaditos", id:"bocaditos" }, precio:75000 },
+  { id:"Bocaditos_Ct_Pareja", titulo:"Bocadito en Pareja", imagen:"/img/bocaditos/ServicioCatheringPareja.jpg", categoria:{ nombre:"Bocaditos", id:"bocaditos" }, precio:65000 },
+  { id:"Bocaditos_Ct_Personal", titulo:"Bocadito Personal", imagen:"/img/bocaditos/ServicioCatheringPersonal.jpg", categoria:{ nombre:"Bocaditos", id:"bocaditos" }, precio:35000 },
 
   // confiteria
-  {
-    id: "Confiteria_Alfajores",
-    titulo: "Alfajores",
-    imagen: "./img/Confiteria/Alfajores.jpg",
-    categoria: { nombre: "Confiteria", id: "confiteria" },
-    precio: 25000
-  },
-  {
-    id: "Confiteria_Croisant",
-    titulo: "Coisant",
-    imagen: "./img/Confiteria/Croisant.jpg",
-    categoria: { nombre: "Confiteria", id: "confiteria" },
-    precio: 30000
-  },
-  {
-    id: "Confiteria_Dulces",
-    titulo: "Dulces",
-    imagen: "./img/Confiteria/Dulces.jpg",
-    categoria: { nombre: "Confiteria", id: "confiteria" },
-    precio: 25000
-  },
-  {
-    id: "Confiteria_Flanes",
-    titulo: "Flan",
-    imagen: "./img/Confiteria/Flanes.jpg",
-    categoria: { nombre: "Confiteria", id: "confiteria" },
-    precio: 20000
-  },
-  {
-    id: "Confiteria_Pais",
-    titulo: "Pais de Manzana",
-    imagen: "./img/Confiteria/Pais.jpg",
-    categoria: { nombre: "Confiteria", id: "confiteria" },
-    precio: 35000
-  },
-  {
-    id: "Confiteria_PastaFloras",
-    titulo: "Pasta Floras",
-    imagen: "./img/Confiteria/PastaFloras.jpg",
-    categoria: { nombre: "Confiteria", id: "confiteria" },
-    precio: 20000
-  },
-  {
-    id: "Confiteria_Tortas",
-    titulo: "Torta",
-    imagen: "./img/Confiteria/Tortas.jpg",
-    categoria: { nombre: "Confiteria", id: "confiteria" },
-    precio: 45000
-  },
+  { id:"Confiteria_Alfajores", titulo:"Alfajores", imagen:"/img/confiteria/Alfajores.jpg", categoria:{ nombre:"Confiteria", id:"confiteria" }, precio:25000 },
+  { id:"Confiteria_Croisant", titulo:"Coisant", imagen:"/img/confiteria/Croisant.jpg", categoria:{ nombre:"Confiteria", id:"confiteria" }, precio:30000 },
+  { id:"Confiteria_Dulces", titulo:"Dulces", imagen:"/img/confiteria/Dulces.jpg", categoria:{ nombre:"Confiteria", id:"confiteria" }, precio:25000 },
+  { id:"Confiteria_Flanes", titulo:"Flan", imagen:"/img/confiteria/Flanes.jpg", categoria:{ nombre:"Confiteria", id:"confiteria" }, precio:20000 },
+  { id:"Confiteria_Pais", titulo:"Pais de Manzana", imagen:"/img/confiteria/Pais.jpg", categoria:{ nombre:"Confiteria", id:"confiteria" }, precio:35000 },
+  { id:"Confiteria_PastaFloras", titulo:"Pasta Floras", imagen:"/img/confiteria/PastaFloras.jpg", categoria:{ nombre:"Confiteria", id:"confiteria" }, precio:20000 },
+  { id:"Confiteria_Tortas", titulo:"Torta", imagen:"/img/confiteria/Tortas.jpg", categoria:{ nombre:"Confiteria", id:"confiteria" }, precio:45000 },
 
-  // Panificados
-  {
-    id: "P_PanCaceroPremiun",
-    titulo: "Pan Cacero de la casa",
-    imagen: "./img/Panificados/PanCaceroPremiun.jpg",
-    categoria: { nombre: "Panificados", id: "panificados" },
-    precio: 20000
-  },
-  {
-    id: "P_PanChipp",
-    titulo: "Pan Chip",
-    imagen: "./img/Panificados/PanChipp.webp",
-    categoria: { nombre: "Panificados", id: "panificados" },
-    precio: 15000
-  },
-  {
-    id: "P_Panes",
-    titulo: "Pan Gallego",
-    imagen: "./img/Panificados/Panes.jpg",
-    categoria: { nombre: "Panificados", id: "panificados" },
-    precio: 19000
-  },
-  {
-    id: "P_PanFelipe",
-    titulo: "Pan Felipe",
-    imagen: "./img/Panificados/PanFelipe.jpg",
-    categoria: { nombre: "Panificados", id: "panificados" },
-    precio: 20000
-  },
-  {
-    id: "P_PanFuncional",
-    titulo: "Pan Buguete",
-    imagen: "./img/Panificados/PanFuncional.jpg",
-    categoria: { nombre: "Panificados", id: "panificados" },
-    precio: 15000
-  },
-  {
-    id: "P_PaDelCampo",
-    titulo: "Pan del Campo",
-    imagen: "./img/Panificados/PanDelCampo.jpg",
-    categoria: { nombre: "Panificados", id: "panificados" },
-    precio: 22000
-  },
+  // panificados
+  { id:"P_PanCaceroPremiun", titulo:"Pan Cacero de la casa", imagen:"/img/panificados/PanCaceroPremiun.jpg", categoria:{ nombre:"Panificados", id:"panificados" }, precio:20000 },
+  { id:"P_PanChipp", titulo:"Pan Chip", imagen:"/img/panificados/PanChipp.webp", categoria:{ nombre:"Panificados", id:"panificados" }, precio:15000 },
+  { id:"P_Panes", titulo:"Pan Gallego", imagen:"/img/panificados/Panes.jpg", categoria:{ nombre:"Panificados", id:"panificados" }, precio:19000 },
+  { id:"P_PanFelipe", titulo:"Pan Felipe", imagen:"/img/panificados/PanFelipe.jpg", categoria:{ nombre:"Panificados", id:"panificados" }, precio:20000 },
+  { id:"P_PanFuncional", titulo:"Pan Buguete", imagen:"/img/panificados/PanFuncional.jpg", categoria:{ nombre:"Panificados", id:"panificados" }, precio:15000 },
+  { id:"P_PaDelCampo", titulo:"Pan del Campo", imagen:"/img/panificados/PanDelCampo.jpg", categoria:{ nombre:"Panificados", id:"panificados" }, precio:22000 },
 
-  // Rosticeria
-  {
-    id: "ComboEmpanada_CocaCola",
-    titulo: "Combo Empanada + Coca",
-    imagen: "./img/Rostiseria/ComboEmpanada_CocaCola.jpg",
-    categoria: { nombre: "Rosticeria", id: "rostisería" },
-    precio: 24000
-  },
-  {
-    id: "EmpanadaCarne",
-    titulo: "Empanada de Carne",
-    imagen: "./img/Rostiseria/EmpanadaCarne.jpg",
-    categoria: { nombre: "Rosticeria", id: "rostisería" },
-    precio: 19000
-  },
-  {
-    id: "EmpanadaHuevo",
-    titulo: "Empanada de Huevo",
-    imagen: "./img/Rostiseria/EmpanadaHuevo.jpg",
-    categoria: { nombre: "Rosticeria", id: "rostisería" },
-    precio: 17000
-  },
-  {
-    id: "EmpanadaJamonYQueso",
-    titulo: "Empanada Jamon Y Queso",
-    imagen: "./img/Rostiseria/EmpanadaJamonYQueso.jpg",
-    categoria: { nombre: "Rosticeria", id: "rostisería" },
-    precio: 17000
-  },
-  {
-    id: "Mbeju",
-    titulo: "Mbeju",
-    imagen: "./img/Rostiseria/Mbeju.jpg",
-    categoria: { nombre: "Rosticeria", id: "rostisería" },
-    precio: 14000
-  },
-  {
-    id: "ComboSandMilanesa_ConCoca",
-    titulo: "Combo Sanwich de Milanesa",
-    imagen: "./img/Rostiseria/ComboSandMilanesa_ConCoca.jpg",
-    categoria: { nombre: "Rosticeria", id: "rostisería" },
-    precio: 25000
-  },
-  {
-    id: "EmpanadaMandioca",
-    titulo: "Empanada de Mandioca",
-    imagen: "./img/Rostiseria/EmpanadaMandioca.jpg",
-    categoria: { nombre: "Rosticeria", id: "rostisería" },
-    precio: 10000
-  },
-  {
-    id: "EmpanadaSalteña_ConGaseosa",
-    titulo: "Combo Empanada Salteña",
-    imagen: "./img/Rostiseria/EmpanadaSalteña_ConGaseosa.jpg",
-    categoria: { nombre: "Rosticeria", id: "rostisería" },
-    precio: 26000
-  }
+  // rostiseria
+  { id:"ComboEmpanada_CocaCola", titulo:"Combo Empanada + Coca", imagen:"/img/rostiseria/ComboEmpanada_CocaCola.jpg", categoria:{ nombre:"Rosticeria", id:"rostisería" }, precio:24000 },
+  { id:"EmpanadaCarne", titulo:"Empanada de Carne", imagen:"/img/rostiseria/EmpanadaCarne.jpg", categoria:{ nombre:"Rosticeria", id:"rostisería" }, precio:19000 },
+  { id:"EmpanadaHuevo", titulo:"Empanada de Huevo", imagen:"/img/rostiseria/EmpanadaHuevo.jpg", categoria:{ nombre:"Rosticeria", id:"rostisería" }, precio:17000 },
+  { id:"EmpanadaJamonYQueso", titulo:"Empanada Jamon Y Queso", imagen:"/img/rostiseria/EmpanadaJamonYQueso.jpg", categoria:{ nombre:"Rosticeria", id:"rostisería" }, precio:17000 },
+  { id:"Mbeju", titulo:"Mbeju", imagen:"/img/rostiseria/Mbeju.jpg", categoria:{ nombre:"Rosticeria", id:"rostisería" }, precio:14000 },
+  { id:"ComboSandMilanesa_ConCoca", titulo:"Combo Sanwich de Milanesa", imagen:"/img/rostiseria/ComboSandMilanesa_ConCoca.jpg", categoria:{ nombre:"Rosticeria", id:"rostisería" }, precio:25000 },
+  { id:"EmpanadaMandioca", titulo:"Empanada de Mandioca", imagen:"/img/rostiseria/EmpanadaMandioca.jpg", categoria:{ nombre:"Rosticeria", id:"rostisería" }, precio:10000 },
+  { id:"EmpanadaSalteña_ConGaseosa", titulo:"Combo Empanada Salteña", imagen:"/img/rostiseria/EmpanadaSaltena_ConGaseosa.jpg", categoria:{ nombre:"Rosticeria", id:"rostisería" }, precio:26000 }
 ];
+
 
 
 const contenedorProductos = document.querySelector("#contenedor-productos");
@@ -212,7 +51,7 @@ const numerito = document.querySelector("#numerito");
             const div = document.createElement("div");
             div.classList.add("producto");
             div.innerHTML=`
-                                <img class="producto-imagen" src="${producto.imagen}" alt=${producto.titulo} />
+                                <img class="producto-imagen" src="${producto.imagen}" alt="${producto.titulo}" />
                                 <div class="producto-detalles">
                                 <h3 class="producto-titulo">${producto.titulo}</h3>
                                 <b><p class="producto-precio">${formatearGs(producto.precio)}</p></b>

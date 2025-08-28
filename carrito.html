@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Panaderia el pan</title>
-  <link rel="shortcut icon" href="IMG/PaniquiñosIco.ico" type="image/x-icon">
+  <link rel="shortcut icon" href="/img/paniquinos.ico" type="image/x-icon">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
   <link rel="stylesheet" href="CSS/main.css">
@@ -14,68 +14,40 @@
     <aside>
       <header>
         <h1 class="logo">
-          <img class="logo-principal" src="IMG/Paniquiños.png" alt="logo">
+          <img class="logo-principal" src="/img/paniquinos.png" alt="logo">
         </h1>
       </header>
 
       <nav>
         <ul>
-          <li>
-            <a class="boton-menu boton-volver" href="index.html">
-              <i class="bi bi-arrow-return-left"></i>
-              Seguir comprando
-            </a>
-          </li>
-          <li>
-            <a class="boton-menu active boton-carrito" href="carrito.html">
-              <i class="bi bi-cart-fill"></i>
-              Carrito
-            </a>
-          </li>
+          <li><a class="boton-menu boton-volver" href="index.html"><i class="bi bi-arrow-return-left"></i> Seguir comprando</a></li>
+          <li><a class="boton-menu active boton-carrito" href="carrito.html"><i class="bi bi-cart-fill"></i> Carrito</a></li>
         </ul>
       </nav>
 
-      <footer>
-        <p class="texto-footer">© Paniquiños</p>
-      </footer>
+      <footer><p class="texto-footer">© Paniquiños</p></footer>
     </aside>
 
     <main>
       <h2 class="titulo-principal">Carrito</h2>
 
-      <!-- Mensaje de carrito vacío -->
       <div class="contenedor-carrito">
-        <p id="carrito-vacio" class="carrito-vacio">
-          Tu carrito está vacío. <i class="bi bi-emoji-frown"></i>
-        </p>
+        <p id="carrito-vacio" class="carrito-vacio">Tu carrito está vacío. <i class="bi bi-emoji-frown"></i></p>
       </div>
 
-      <!-- Lista de productos -->
-      <div id="carrito-productos" class="carrito-productos disabled">
-        <!-- Se llena dinámicamente -->
-      </div>
+      <div id="carrito-productos" class="carrito-productos disabled"></div>
 
-      <!-- Acciones -->
       <div id="carrito-acciones" class="carrito-acciones disabled">
         <div class="carrito-acciones-izquierda">
-          <button id="carrito-acciones-vaciar" class="carrito-acciones-vaciar">
-            Vaciar carrito
-          </button>
+          <button id="carrito-acciones-vaciar" class="carrito-acciones-vaciar">Vaciar carrito</button>
         </div>
         <div class="carrito-acciones-derecha">
-          <div class="carrito-acciones-total">
-            Total: <p id="total">0 Gs</p>
-          </div>
-          <button id="carrito-acciones-comprar" class="carrito-acciones-comprar">
-            Comprar ahora
-          </button>
+          <div class="carrito-acciones-total">Total: <p id="total">0 Gs</p></div>
+          <button id="carrito-acciones-comprar" class="carrito-acciones-comprar">Comprar ahora</button>
         </div>
       </div>
 
-      <!-- Mensaje de compra -->
-      <p id="carrito-comprado" class="carrito-comprado disabled">
-        Muchas gracias por tu compra <i class="bi bi-emoji-laughing"></i>
-      </p>
+      <p id="carrito-comprado" class="carrito-comprado disabled">Muchas gracias por tu compra <i class="bi bi-emoji-laughing"></i></p>
     </main>
   </div>
 
