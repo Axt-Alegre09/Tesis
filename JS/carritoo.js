@@ -89,10 +89,14 @@ botonVaciar?.addEventListener("click", () => {
 });
 
 botonComprar?.addEventListener("click", () => {
-  productosEnCarrito = [];
-  localStorage.setItem("productos-en-carrito", JSON.stringify(productosEnCarrito));
-  setEstado("comprado");
+  if (!productosEnCarrito || productosEnCarrito.length === 0) {
+    alert("Tu carrito está vacío.");
+    return;
+  }
+  // No vaciamos el carrito: lo usamos en pago.html
+  window.location.href = "pasarelaPagos.html";
 });
+
 
 function actualizarTotal() {
   if (!totalEl) return;
