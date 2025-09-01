@@ -181,8 +181,9 @@ main{
 }
 
 /* ¡No ocultar por CSS! El estado se maneja con .disabled en JS */
-.carrito-vacio{
+.{carrito-vacio}{
   color: var(--clr-main);
+  font-size: 3rem;
 }
 
 .carrito-productos{
@@ -401,3 +402,22 @@ main{
 /* Responsive */
 @media (max-width: 1200px){ .checkout-form{ grid-template-columns: 1fr 1fr; } }
 @media (max-width: 900px){ .checkout-form{ grid-template-columns: 1fr; } }
+
+
+
+.carrito-vacio{
+  margin-left: 205px;
+  font-size: 2rem;
+  color: var(--clr-main);
+  font-weight: 700;
+  position: absolute;
+  display: flex;
+  align-items: center;
+}
+
+.img-carrito-vacio{
+  width: 300px;
+  margin-top: 500px;
+  margin: auto;
+  padding: 15px;
+}
