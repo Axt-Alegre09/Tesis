@@ -351,7 +351,7 @@ main{
 }
 .form-input:focus{ box-shadow: 0 0 0 3px rgba(111,92,56,.15); }
 
-.grid-2{ display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+.grid-2{ display: flex; grid-template-columns: 1fr 1fr; gap: .75rem; }
 
 .metodos{ display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: .75rem; }
 .metodo-chip{

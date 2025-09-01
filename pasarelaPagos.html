@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Paniquiños</title>
-  <link rel="shortcut icon" href="/img/paniquinos.ico" type="image/x-icon">
+  <link rel="shortcut icon" href="/img/paniquinosico.ico" type="image/x-icon">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
   <link rel="stylesheet" href="CSS/main.css">
@@ -30,15 +30,18 @@
 
     <main>
       <h2 class="titulo-principal">Datos de Facturación y Envío</h2>
-
       <!-- ÉXITO -->
       <section id="checkout-success" class="checkout-success disabled">
         <h3>¡Pedido confirmado! 🎉</h3>
-        <div class="acciones-checkout">
+        <div class="acciones-checkout" style="gap:.5rem; flex-wrap: wrap;">
+          <button id="btn-descargar-factura" class="carrito-acciones-comprar" type="button">
+            Descargar factura (PDF)
+          </button>
           <a class="carrito-acciones-comprar" href="index.html">Volver al inicio</a>
           <a class="carrito-acciones-vaciar" href="carrito.html">Ver carrito</a>
         </div>
       </section>
+
 
       <!-- FORMULARIO -->
       <form id="checkout-form" class="checkout-form" action="#" method="post" novalidate>
@@ -124,24 +127,18 @@
           <div class="metodo-panel" data-metodo="transferencia">
             <p class="hint">Transferí y subí tu comprobante. Estos son los datos:</p>
             <ul class="list">
+               <li><strong>Alias:</strong> Ci 5.773.660</li>
               <li><strong>Banco:</strong> Ueno Bank</li>
               <li><strong>Cuenta:</strong> 61967185</li>
               <li><strong>Titular:</strong> Marcos Alegre</li>
               <li><strong>Concepto:</strong> Pedido #0001</li>
             </ul>
 
-            <!-- Imagen de referencia (opcional) -->
-            <img src="/img/transferencia_instrucciones.png" alt="Instrucciones de transferencia" class="transfer-img">
-
             <!-- Subida de comprobante -->
             <div class="grid-2" style="margin-top:.5rem;">
               <div>
-                <label class="form-label" for="comprobante">Subir comprobante (PDF o imagen)</label>
+                <label class="form-label" for="comprobante">Subir comprobante (PDF o imagen)</label><br>
                 <input class="form-input" id="comprobante" name="comprobante" type="file" accept=".pdf,image/*" required>
-              </div>
-              <div>
-                <label class="form-label" for="comprobante-nota">Nota (opcional)</label>
-                <input class="form-input" id="comprobante-nota" name="comprobante-nota" type="text" placeholder="Últimos 4 del RUC, etc.">
               </div>
             </div>
           </div>
@@ -191,7 +188,9 @@
       </form>
     </main>
   </div>
+          <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+          <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
+          <script src="JS/checkout.js"></script>
 
-  <script src="JS/checkout.js"></script>
 </body>
 </html>
