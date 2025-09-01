@@ -29,7 +29,7 @@
     </aside>
 
     <main>
-      <h2 class="titulo-principal">Pasarela de pago</h2>
+      <h2 class="titulo-principal">Datos de Facturación y Envío</h2>
 
       <!-- ÉXITO -->
       <section id="checkout-success" class="checkout-success disabled">
@@ -47,15 +47,15 @@
           <h3 class="checkout-title">Datos de Facturación</h3>
           <div class="form-col">
             <label class="form-label" for="ruc">RUC</label>
-            <input class="form-input" id="ruc" name="ruc" type="text" placeholder="Ej: 800000-1">
+            <input class="form-input" id="ruc" name="ruc" type="text" placeholder="Ej: 800000-1" required>
             <label class="form-label" for="razon">Razón Social</label>
-            <input class="form-input" id="razon" name="razon" type="text" placeholder="Tu empresa o nombre">
+            <input class="form-input" id="razon" name="razon" type="text" placeholder="Tu empresa o nombre" required>
             <label class="form-label" for="tel">Teléfono</label>
-            <input class="form-input" id="tel" name="tel" type="tel" placeholder="+595 ...">
+            <input class="form-input" id="tel" name="tel" type="tel" placeholder="+595 ..." required>
             <label class="form-label" for="mail">Mail</label>
-            <input class="form-input" id="mail" name="mail" type="email" placeholder="tucorreo@ejemplo.com">
+            <input class="form-input" id="mail" name="mail" type="email" placeholder="tucorreo@ejemplo.com" required>
             <label class="form-label" for="contacto">Contacto</label>
-            <input class="form-input" id="contacto" name="contacto" type="text" placeholder="Persona de contacto">
+            <input class="form-input" id="contacto" name="contacto" type="text" placeholder="Persona de contacto" required>
           </div>
         </section>
 
@@ -64,18 +64,18 @@
           <h3 class="checkout-title">Datos de envío</h3>
           <div class="form-col">
             <label class="form-label" for="ciudad">Ciudad</label>
-            <input class="form-input" id="ciudad" name="ciudad" type="text">
+            <input class="form-input" id="ciudad" name="ciudad" type="text" required>
             <label class="form-label" for="barrio">Barrio</label>
-            <input class="form-input" id="barrio" name="barrio" type="text">
+            <input class="form-input" id="barrio" name="barrio" type="text" required>
             <label class="form-label" for="depto">Departamento</label>
-            <input class="form-input" id="depto" name="depto" type="text">
+            <input class="form-input" id="depto" name="depto" type="text" required>
             <label class="form-label" for="postal">Dirección postal</label>
-            <input class="form-input" id="postal" name="postal" type="text">
+            <input class="form-input" id="postal" name="postal" type="text" required>
 
             <div class="grid-2">
               <div>
                 <label class="form-label" for="calle1">Calle 1</label>
-                <input class="form-input" id="calle1" name="calle1" type="text">
+                <input class="form-input" id="calle1" name="calle1" type="text" required>
               </div>
               <div>
                 <label class="form-label" for="calle2">Calle 2</label>
@@ -89,11 +89,11 @@
             <div class="grid-2">
               <div>
                 <label class="form-label" for="hora-desde">Hora disponible (desde)</label>
-                <input class="form-input" id="hora-desde" name="hora-desde" type="time">
+                <input class="form-input" id="hora-desde" name="hora-desde" type="time" required>
               </div>
               <div>
                 <label class="form-label" for="hora-hasta">Hora disponible (hasta)</label>
-                <input class="form-input" id="hora-hasta" name="hora-hasta" type="time">
+                <input class="form-input" id="hora-hasta" name="hora-hasta" type="time" required>
               </div>
             </div>
           </div>
@@ -120,43 +120,68 @@
             </label>
           </div>
 
-          <!-- Panel TRANSFERENCIA (imagen) -->
+          <!-- TRANSFERENCIA -->
           <div class="metodo-panel" data-metodo="transferencia">
-            <p class="hint">Transferí y sube tu comprobante. Estos son los datos:</p>
+            <p class="hint">Transferí y subí tu comprobante. Estos son los datos:</p>
             <ul class="list">
               <li><strong>Banco:</strong> Ueno Bank</li>
               <li><strong>Cuenta:</strong> 61967185</li>
               <li><strong>Titular:</strong> Marcos Alegre</li>
               <li><strong>Concepto:</strong> Pedido #0001</li>
             </ul>
+
+            <!-- Imagen de referencia (opcional) -->
+            <img src="/img/transferencia_instrucciones.png" alt="Instrucciones de transferencia" class="transfer-img">
+
+            <!-- Subida de comprobante -->
+            <div class="grid-2" style="margin-top:.5rem;">
+              <div>
+                <label class="form-label" for="comprobante">Subir comprobante (PDF o imagen)</label>
+                <input class="form-input" id="comprobante" name="comprobante" type="file" accept=".pdf,image/*" required>
+              </div>
+              <div>
+                <label class="form-label" for="comprobante-nota">Nota (opcional)</label>
+                <input class="form-input" id="comprobante-nota" name="comprobante-nota" type="text" placeholder="Últimos 4 del RUC, etc.">
+              </div>
+            </div>
           </div>
 
-          <!-- Panel TARJETA (campos) -->
+          <!-- TARJETA -->
           <div class="metodo-panel disabled" data-metodo="tarjeta">
             <div class="grid-2">
               <div>
                 <label class="form-label" for="card-name">Nombre en la tarjeta</label>
-                <input class="form-input" id="card-name" name="card-name" type="text" placeholder="Juan Pérez">
+                <input class="form-input" id="card-name" name="card-name" type="text" placeholder="Juan Pérez" required>
               </div>
               <div>
                 <label class="form-label" for="card-number">N° de tarjeta</label>
-                <input class="form-input" id="card-number" name="card-number" inputmode="numeric" maxlength="19" placeholder="0000 0000 0000 0000">
+                <input class="form-input" id="card-number" name="card-number" inputmode="numeric" maxlength="19" placeholder="0000 0000 0000 0000" required>
               </div>
               <div>
                 <label class="form-label" for="card-exp">Vencimiento</label>
-                <input class="form-input" id="card-exp" name="card-exp" type="text" placeholder="MM/AA">
+                <input class="form-input" id="card-exp" name="card-exp" type="text" placeholder="MM/AA" required>
               </div>
               <div>
                 <label class="form-label" for="card-cvv">CVV</label>
-                <input class="form-input" id="card-cvv" name="card-cvv" type="password" maxlength="4" placeholder="***">
+                <input class="form-input" id="card-cvv" name="card-cvv" type="password" maxlength="4" placeholder="***" required>
               </div>
             </div>
             <p class="hint">Es un simulador: no se procesa el pago real.</p>
           </div>
 
-          <!-- Panel EFECTIVO -->
+          <!-- EFECTIVO -->
           <div class="metodo-panel disabled" data-metodo="efectivo">
-            <p class="hint">Pagarás al momento de la entrega. ¡Listo!</p>
+            <p class="hint">Pagarás al momento de la entrega.</p>
+            <div class="grid-2">
+              <div>
+                <label class="form-label" for="efectivo-monto">Monto con el que pagás</label>
+                <input class="form-input" id="efectivo-monto" name="efectivo-monto" type="number" min="0" step="1000" placeholder="100000" required>
+              </div>
+              <div>
+                <label class="form-label">Total de tu pedido</label>
+                <input class="form-input" id="efectivo-total" type="text" value="0 Gs" disabled>
+              </div>
+            </div>
           </div>
 
           <div class="acciones-checkout">
