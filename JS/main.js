@@ -25,7 +25,7 @@ const productos = [
   { id:"P_PaDelCampo", titulo:"Pan del Campo", imagen:"https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/PanDelCampo.jpg", categoria:{ nombre:"Panificados", id:"panificados" }, precio:22000 },
 
   // rostiseria
-  { id:"ComboEmpanada_CocaCola", titulo:"Combo Empanada + Coca", imagen:"/img/rostiseria/ComboEmpanada_CocaCola.jpg", categoria:{ nombre:"Rosticeria", id:"rostisería" }, precio:24000 },
+  { id:"ComboEmpanada_CocaCola", titulo:"Combo Empanada + Coca", imagen:"https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/ComboEmpanada_CocaCola.jpg", categoria:{ nombre:"Rosticeria", id:"rostisería" }, precio:24000 },
   { id:"EmpanadaCarne", titulo:"Empanada de Carne", imagen:"https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/EmpanadaCarne.jpg", categoria:{ nombre:"Rosticeria", id:"rostisería" }, precio:19000 },
   { id:"EmpanadaHuevo", titulo:"Empanada de Huevo", imagen:"https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/EmpanadaHuevo.jpg", categoria:{ nombre:"Rosticeria", id:"rostisería" }, precio:17000 },
   { id:"EmpanadaJamonYQueso", titulo:"Empanada Jamon Y Queso", imagen:"https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/EmpanadaJamonYQueso.jpg", categoria:{ nombre:"Rosticeria", id:"rostisería" }, precio:17000 },
