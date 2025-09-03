@@ -8,7 +8,7 @@ const productos = [
   { id:"Bocaditos_Ct_Personal", titulo:"Bocadito Personal", imagen:"/img/bocaditos/ServicioCatheringPersonal.jpg", categoria:{ nombre:"Bocaditos", id:"bocaditos" }, precio:35000 },
 
   // confiteria
-  { id:"Confiteria_Alfajores", titulo:"Alfajores", imagen:"/img/confiteria/Alfajores.jpg", categoria:{ nombre:"Confiteria", id:"confiteria" }, precio:25000 },
+  { id:"Confiteria_Alfajores", titulo:"Alfajores", imagen:"https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/Alfajores.jpg", categoria:{ nombre:"Confiteria", id:"confiteria" }, precio:25000 },
   { id:"Confiteria_Croisant", titulo:"Coisant", imagen:"/img/confiteria/Croisant.jpg", categoria:{ nombre:"Confiteria", id:"confiteria" }, precio:30000 },
   { id:"Confiteria_Dulces", titulo:"Dulces", imagen:"/img/confiteria/Dulces.jpg", categoria:{ nombre:"Confiteria", id:"confiteria" }, precio:25000 },
   { id:"Confiteria_Flanes", titulo:"Flan", imagen:"/img/confiteria/Flanes.jpg", categoria:{ nombre:"Confiteria", id:"confiteria" }, precio:20000 },
@@ -136,4 +136,29 @@ if (productosEnCarritoLS) {   // si traemos algo del localstorage y no es null, 
         let nuevoNumerito = productosEnCarrito.reduce((acc, producto) => acc+producto.cantidad, 0);
         numerito.innerHTML=nuevoNumerito;
     }
+
+
+    
+  // Toggle visual del menú de usuario
+  const userBtn = document.getElementById('userMenuBtn');
+  const dropdown = document.getElementById('userDropdown');
+
+  function closeMenu(e) {
+    if (!dropdown.contains(e.target) && !userBtn.contains(e.target)) {
+      dropdown.classList.remove('open');
+      userBtn.setAttribute('aria-expanded', 'false');
+      document.removeEventListener('click', closeMenu);
+    }
+  }
+  userBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    dropdown.classList.toggle('open');
+    userBtn.setAttribute('aria-expanded', dropdown.classList.contains('open') ? 'true' : 'false');
+    if (dropdown.classList.contains('open')) {
+      setTimeout(() => document.addEventListener('click', closeMenu), 0);
+    }
+  });
+
+  // (La lógica real de búsqueda y actualizar datos la vemos después)
+
 
