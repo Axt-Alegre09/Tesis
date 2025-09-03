@@ -219,7 +219,7 @@
 
     // Logo (ojo con mayúsculas/minúsculas en ruta)
     try {
-      const logoDataURL = await toDataURL('/img/paniquinos.png');
+      const logoDataURL = await toDataURL('https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinos.png');
       doc.addImage(logoDataURL, 'PNG', 32, 28, 90, 90);
     } catch {}
 
@@ -304,7 +304,7 @@
     // Pie + QR con imagen genérica
     y += 40;
     try {
-      const qrDataURL = await toDataURL('/IMG/QrGenerico.jpg'); // respeta mayúsculas/minúsculas
+      const qrDataURL = await toDataURL('https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/QrGenerico.jpg'); // respeta mayúsculas/minúsculas
       const qrSize = 120;
       doc.addImage(qrDataURL, 'PNG', 28, y, qrSize, qrSize);
     } catch {
