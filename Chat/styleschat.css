@@ -31,7 +31,13 @@ body{
     color: var(--clr-blanco);
     background:var(--clr-main);
     cursor: pointer;
+        transition: all 0.2s ease;
 }
+.show-chatbot .chatbot-toggler{
+    transform: rotate(90deg);
+}
+
+
 .chatbot-toggler i{
     position:absolute ;
 }
@@ -52,8 +58,10 @@ body{
     pointer-events: none;
     background:var(--clr-blanco);
     border-radius: 15px;
+    transform-origin: bottom right;
     box-shadow: 0 0 128px 0 rgba(0,0,0,0.1),
                 0 32px 64px -48px rgba(0,0,0,0.1);
+    transition: all 0.1s ease;
 }
 header{
     border-top-left-radius:15px ;
@@ -139,6 +147,7 @@ header{
     width: 100%;
     border: none;
     outline: none;
+    max-height: 180px;
     font-size: 0.95rem;
     resize: none;
     padding: 16px 15px 16px 0;
