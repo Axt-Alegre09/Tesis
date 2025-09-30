@@ -1,0 +1,15 @@
+{
+  "name": "tesis",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "ScriptLogin.js",
+  "scripts": {
+    "build": "echo \"no build step\"",
+    "vercel-build": "npm run build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.55.0",
+    "vercel": "^48.1.6"
+  }
+}

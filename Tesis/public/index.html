@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Paniquiños</title>
+  <link rel="shortcut icon" href="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinosico.ico" type="image/x-icon">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet" />
+  <link rel="stylesheet" href="CSS/main.css" />
+  <link rel="stylesheet" href="CSS/styleschat.css" />
+</head>
+<body>
+  <div class="wrapper has-topbar">
+    <aside>
+      <header>
+        <h1 class="logo">
+          <img class="logo-principal" src="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinos.png" alt="logo">
+        </h1>
+      </header>
+      <nav>
+        <ul class="menu">
+          <li><button id="todos" class="boton-menu boton-categoria active"><i class="bi bi-hand-index-fill"></i>   Todos los productos</button></li>
+          <li><button id="bocaditos" class="boton-menu boton-categoria"><i class="bi bi-hand-index"></i> Bocaditos</button></li>
+          <li><button id="confiteria" class="boton-menu boton-categoria"><i class="bi bi-hand-index"></i> Confitería</button></li>
+          <li><button id="panificados" class="boton-menu boton-categoria"><i class="bi bi-hand-index"></i> Panificados</button></li>
+          <li><button id="rostisería" class="boton-menu boton-categoria"><i class="bi bi-hand-index"></i> Rostisería</button></li>
+          <li>
+            <a class="boton-menu boton-carrito" href="carrito.html">
+              <i class="bi bi-cart-fill"></i>
+              Carrito <span id="numerito" class="numerito">0</span>
+            </a>
+          </li>
+        </ul>
+      </nav>
+      <footer><p class="texto-footer">© Paniquiños</p></footer>
+    </aside>
+
+    <!-- TOPBAR -->
+    <div class="site-topbar within">
+      <div class="topbar-inner">
+        <form class="searchbar" id="searchForm" role="search">
+          <i class="bi bi-search"></i>
+          <input type="search" id="searchInput" placeholder="Buscar productos…" aria-label="Buscar productos" autocomplete="off" />
+          <button class="searchbar-btn" type="submit">Buscar</button>
+        </form>
+      
+        <div class="user-menu">
+          <button class="user-chip" id="userMenuBtn" aria-haspopup="true" aria-expanded="false" aria-controls="userDropdown" type="button">
+            <i class="bi bi-person"></i>
+            <span class="user-name">Cuenta</span>
+            <i class="bi bi-chevron-down chevron"></i>
+          </button>
+          <div class="user-dropdown" id="userDropdown">
+            <button class="dropdown-item" id="updateProfileBtn" type="button">
+              <i class="bi bi-gear"></i> Actualizar datos
+            </button>
+            <button class="dropdown-item" id="logoutBtn" type="button">
+              <i class="bi bi-box-arrow-right"></i> Cerrar sesión
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- FIN TOPBAR -->
+
+    <main>
+      <h2 id="titulo-principal" class="titulo-principal">Todos los productos</h2>
+      <div class="contenedor-productos" id="contenedor-productos"></div>
+    </main>
+  </div>
+
+  <!-- Import correcto del módulo -->
+  <script type="module">
+    import { logout } from "./JS/ScriptLogin.js";
+    document.getElementById("logoutBtn")?.addEventListener("click", logout);
+    document.getElementById('searchForm')?.addEventListener('submit', (e) => e.preventDefault());
+  </script>
+
+  <script type="module" src="JS/main.js"></script>
+  <script type="module" src="JS/catalogo.js"></script>
+
+
+  <!-- Encapsulado para evitar redeclaraciones -->
+  <script>
+    (() => {
+      const userBtn = document.getElementById('userMenuBtn');
+      const dropdown = document.getElementById('userDropdown');
+      function closeMenu(e) {
+        if (!dropdown.contains(e.target) && !userBtn.contains(e.target)) {
+          dropdown.classList.remove('open');
+          userBtn.setAttribute('aria-expanded', 'false');
+          document.removeEventListener('click', closeMenu);
+        }
+      }
+      userBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dropdown.classList.toggle('open');
+        userBtn.setAttribute('aria-expanded', dropdown.classList.contains('open') ? 'true' : 'false');
+        if (dropdown.classList.contains('open')) {
+          setTimeout(() => document.addEventListener('click', closeMenu), 0);
+        }
+      });
+    })();
+  </script>
+
+
+<!-- Chatbot (flotante) -->
+                  <button class="chatbot-toggler" aria-label="Abrir chat">
+                    <i class="bi bi-chat-left-fill"></i>
+                    <i class="bi bi-x-lg"></i>
+                  </button>
+
+                  <div class="chatbot" role="dialog" aria-modal="true" aria-label="Paniquiños Bot">
+                    <header>
+                      <h2>
+                        <img class="paniImg" src="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinosico.ico" alt="" />
+                        Paniquiños Bot
+                      </h2>
+                      <i class="close-btn bi bi-x-lg" role="button" aria-label="Cerrar"></i>
+                    </header>
+
+                    <ul class="chatbox" id="chatbox">
+                      <li class="chat incoming">
+                        <img class="paniImg" src="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinosico.ico" alt="" />
+                        <p>¡Hola! 👋🏼 ¿En qué puedo ayudarte hoy?</p>
+                      </li>
+                    </ul>
+
+                    <div class="chat-input">
+                      <textarea id="chatInput" placeholder="Escribe tu mensaje…" required></textarea>
+                      <i class="bi bi-send-fill" id="sendChatBtn" role="button" aria-label="Enviar"></i>
+                    </div>
+                  </div>
+
+                  <!-- JS del chatbot -->
+                  <script src="JS/script-chatbot.js" defer></script>
+
+</body>
+</html>
