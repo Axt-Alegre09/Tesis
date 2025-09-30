@@ -14,10 +14,10 @@
 <body>
   <div class="wrapper has-topbar">
     <!-- ASIDE (off-canvas en móvil) -->
-    <aside id="mobileAside">
-      <header>
+    <aside id="mobileAside" aria-label="Menú lateral">
+      <header class="aside-header">
         <h1 class="logo">
-          <img class="logo-principal" src="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinos.png" alt="logo">
+          <img class="logo-principal" src="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinos.png" alt="Paniquiños">
         </h1>
         <!-- Botón cerrar SOLO móvil -->
         <button class="mobile-close" id="menuClose" aria-label="Cerrar menú">
@@ -25,8 +25,8 @@
         </button>
       </header>
 
-      <nav>
-        <ul class="menu">
+      <nav aria-label="Categorías">
+        <ul class="menu" id="menuList">
           <li><button id="todos" class="boton-menu boton-categoria active"><i class="bi bi-hand-index-fill"></i>   Todos los productos</button></li>
           <li><button id="bocaditos" class="boton-menu boton-categoria"><i class="bi bi-hand-index"></i> Bocaditos</button></li>
           <li><button id="confiteria" class="boton-menu boton-categoria"><i class="bi bi-hand-index"></i> Confitería</button></li>
@@ -40,6 +40,7 @@
           </li>
         </ul>
       </nav>
+
       <footer><p class="texto-footer">© Paniquiños</p></footer>
     </aside>
 
@@ -64,7 +65,7 @@
             <span class="user-name">Cuenta</span>
             <i class="bi bi-chevron-down chevron"></i>
           </button>
-          <div class="user-dropdown" id="userDropdown">
+          <div class="user-dropdown" id="userDropdown" role="menu">
             <button class="dropdown-item" id="updateProfileBtn" type="button">
               <i class="bi bi-gear"></i> Actualizar datos
             </button>
@@ -86,27 +87,19 @@
   <!-- Backdrop para el menú móvil -->
   <div id="backdrop" class="backdrop" aria-hidden="true"></div>
 
-  <!-- Auth (import de utilidades y protección) -->
+  <!-- Auth -->
   <script type="module">
     import { logout, autoWireAuthMenu, requireAuth } from "./JS/ScriptLogin.js";
-
-    // Proteger la página si no hay sesión
-    requireAuth();
-
-    // Botones del menú usuario
-    autoWireAuthMenu();
-
-    // (extra) botón logout en el topbar
+    requireAuth();              // proteger la página
+    autoWireAuthMenu();         // cablear menú usuario
     document.getElementById("logoutBtn")?.addEventListener("click", logout);
-
-    // evitar submit de la búsqueda por ahora
     document.getElementById('searchForm')?.addEventListener('submit', (e) => e.preventDefault());
   </script>
 
   <!-- Catálogo -->
   <script type="module" src="JS/main.js"></script>
 
-  <!-- Encapsulado: dropdown usuario (como ya tenías) -->
+  <!-- Dropdown usuario -->
   <script>
     (() => {
       const userBtn = document.getElementById('userMenuBtn');
@@ -136,21 +129,32 @@
       const toggle = document.getElementById('menuToggle');
       const closeBtn = document.getElementById('menuClose');
       const backdrop = document.getElementById('backdrop');
+      const menuList = document.getElementById('menuList');
 
-      function openAside() {
+      const openAside = () => {
         body.classList.add('aside-open');
         toggle?.setAttribute('aria-expanded', 'true');
         backdrop?.setAttribute('aria-hidden', 'false');
-      }
-      function closeAside() {
+      };
+      const closeAside = () => {
         body.classList.remove('aside-open');
         toggle?.setAttribute('aria-expanded', 'false');
         backdrop?.setAttribute('aria-hidden', 'true');
-      }
+      };
 
       toggle?.addEventListener('click', openAside);
       closeBtn?.addEventListener('click', closeAside);
       backdrop?.addEventListener('click', closeAside);
+
+      // Cerrar al elegir una opción del menú
+      menuList?.querySelectorAll('a,button').forEach(el => {
+        el.addEventListener('click', closeAside);
+      });
+
+      // Cerrar con ESC
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeAside();
+      });
     })();
   </script>
 
@@ -182,7 +186,6 @@
     </div>
   </div>
 
-  <!-- JS del chatbot -->
   <script src="JS/script-chatbot.js" defer></script>
 </body>
 </html>

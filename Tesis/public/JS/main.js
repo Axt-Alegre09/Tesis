@@ -7,7 +7,7 @@ const tituloPrincipal = document.querySelector("#titulo-principal");
 const numerito = document.querySelector("#numerito");
 
 let CATALOGO = [];
-let productosEnCarrito = []; // usado solo como fallback local
+let productosEnCarrito = []; // fallback local
 
 // -------- Utils --------
 function formatearGs(n) {
@@ -82,7 +82,6 @@ async function fetchProductos() {
   }));
 }
 
-
 // -------- Buscar en BD --------
 async function buscarProductos(q) {
   if (!q || q.trim() === "") {
@@ -113,7 +112,6 @@ async function buscarProductos(q) {
   tituloPrincipal.textContent = `Resultados para "${q}" (${resultados.length})`;
   cargarProductos(resultados);
 }
-
 
 // -------- Render catálogo --------
 function cargarProductos(productosElegidos) {
@@ -223,22 +221,19 @@ async function iniciarCatalogo() {
   activarBotonesCategorias();
   await actualizarNumerito();
 
+  // Búsqueda
+  const inputBusqueda = document.getElementById("searchInput");
+  const formBusqueda = document.getElementById("searchForm");
 
-    // activar búsqueda de nuestra barra de busqueda en index
-    const inputBusqueda = document.getElementById("searchInput");
-    const formBusqueda = document.getElementById("searchForm");
+  formBusqueda?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    buscarProductos(inputBusqueda.value);
+  });
 
-    formBusqueda?.addEventListener("submit", (e) => {
-        e.preventDefault();
-        buscarProductos(inputBusqueda.value);
-    });
-
-    inputBusqueda?.addEventListener("keyup", (e) => {
-        if (e.key === "Enter") buscarProductos(inputBusqueda.value);
-        if (inputBusqueda.value === "") renderTodos(); // reset si borras texto
-    });
-
-
+  inputBusqueda?.addEventListener("keyup", (e) => {
+    if (e.key === "Enter") buscarProductos(inputBusqueda.value);
+    if (inputBusqueda.value === "") renderTodos(); // reset si borras texto
+  });
 }
 
 iniciarCatalogo();
