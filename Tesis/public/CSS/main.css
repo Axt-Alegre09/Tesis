@@ -27,7 +27,7 @@ body{ background-color: var(--clr-main); }
   background-color: var(--clr-main);
 }
 
-/* Aside por defecto: misma fila que el main */
+/* Aside por defecto: misma fila que el main (desktop) */
 aside{
   grid-column: 1 / 2;
   padding: 2rem;
@@ -41,10 +41,10 @@ aside{
   justify-content: space-between;
 }
 
-/* Topbar (no reserva fila por defecto) */
+/* Topbar */
 .site-topbar.within{ margin: 1rem; }
 
-/* Main por defecto: MISMA FILA del aside */
+/* Main por defecto (desktop) */
 main{
   grid-column: 2 / -1;
   grid-row: 1;
@@ -57,15 +57,15 @@ main{
 /* =========================
    Layout SOLO para páginas con topbar (index)
 ========================= */
-.wrapper.has-topbar aside{ grid-row: 1 / span 2; } /* aside ocupa ambas filas */
+.wrapper.has-topbar aside{ grid-row: 1 / span 2; }
 .wrapper.has-topbar .site-topbar.within{
   grid-column: 2 / -1;
-  grid-row: 1;                         /* topbar arriba */
+  grid-row: 1;
   margin: 1rem;
 }
 .wrapper.has-topbar main{
   grid-column: 2 / -1;
-  grid-row: 2;                         /* main debajo de la topbar */
+  grid-row: 2;
 }
 
 /* =========================
@@ -134,19 +134,19 @@ main{
   object-fit: cover;
   object-position: center;
   height: var(--card-img-h);
-  border-radius: 0; /* ya controla el contenedor */
+  border-radius: 0;
 }
 @supports (aspect-ratio: 1){
   .producto-imagen{ height: auto; aspect-ratio: 1 / 1; }
 }
 
-/* Panel inferior (sin margen negativo) */
+/* Panel inferior */
 .producto-detalles{
   background-color: var(--clr-main);
   color: var(--clr-blanco);
   padding: .75rem .8rem;
   border-radius: 0 0 1rem 1rem;
-  margin-top: 0;     /* ← antes había -2rem, causaba el salto */
+  margin-top: 0;
   display: flex;
   flex-direction: column;
   gap: .35rem;
@@ -329,6 +329,49 @@ main{
 .img-carrito-vacio{ width: 300px; margin-top: 500px; margin: auto; padding: 15px; }
 
 /* =========================
+   Botón hamburguesa / cerrar / backdrop
+========================= */
+
+/* Botón hamburguesa (oculto en desktop) */
+.mobile-toggle{
+  display: none;
+  border: none;
+  background: #fff;
+  border-radius: 12px;
+  padding: .45rem .65rem;
+  font-size: 1.25rem;
+  line-height: 1;
+  box-shadow: 0 2px 8px rgba(0,0,0,.08);
+}
+.mobile-toggle i{ vertical-align: middle; }
+
+/* Botón cerrar dentro del aside (solo móvil) */
+.mobile-close{
+  display: none;
+  position: absolute;
+  top: .75rem;
+  right: .75rem;
+  border: none;
+  background: #fff;
+  color: var(--clr-main);
+  border-radius: 10px;
+  width: 36px; height: 36px;
+  font-size: 1rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,.15);
+  cursor: pointer;
+}
+
+/* Backdrop del menú móvil */
+.backdrop{
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.35);
+  display: none;
+  z-index: 90;
+}
+.aside-open .backdrop{ display: block; }
+
+/* =========================
    Responsive
 ========================= */
 @media (max-width: 1200px){
@@ -336,18 +379,12 @@ main{
   .logo-principal{ max-width: 16vw; }
   .checkout-form{ grid-template-columns: 1fr 1fr; }
 }
+
+/* ====== MÓVIL / TABLET ====== */
 @media (max-width: 900px){
   .wrapper{ grid-template-columns: 1fr; }
 
-  /* aside y contenido en pila */
-  aside{
-    grid-column: 1 / -1;
-    grid-row: auto;
-    position: static;
-    height: auto;
-  }
-
-  /* topbar y main ocupan todo el ancho en móviles */
+  /* Topbar ocupa todo el ancho */
   .site-topbar.within{
     grid-column: 1 / -1;
     grid-row: auto;
@@ -356,10 +393,40 @@ main{
   .wrapper.has-topbar aside{ grid-row: auto; }
   .wrapper.has-topbar main{ grid-row: auto; }
 
+  /* Main a ancho completo */
   main{ grid-column: 1 / -1; grid-row: auto; }
   .contenedor-productos{ grid-template-columns: repeat(2, 1fr); }
   .checkout-form{ grid-template-columns: 1fr; }
+
+  /* Mostrar botón hamburguesa */
+  .mobile-toggle{ display: inline-flex; align-items: center; justify-content: center; }
+
+  /* Aside como panel deslizante (oculto por defecto) */
+  aside{
+    position: fixed;
+    left: -280px;                /* oculto */
+    top: 0;
+    width: 260px;
+    height: 100vh;
+    z-index: 100;                /* por encima del backdrop */
+    background: var(--clr-main);
+    box-shadow: 2px 0 18px rgba(0,0,0,.25);
+    transition: left .28s ease-in-out;
+    padding-right: 1rem;
+  }
+  .aside-open aside{ left: 0; }  /* visible cuando body tiene la clase */
+
+  /* Botón cerrar dentro del aside */
+  .mobile-close{ display: inline-flex; align-items:center; justify-content:center; }
+
+  /* Ajustes de logo en móvil */
+  .logo-principal{
+    max-width: 36vw;
+    margin-left: 0;
+  }
 }
+
+/* Teléfonos pequeños: 1 columna de productos */
 @media (max-width: 600px){
   .contenedor-productos{ grid-template-columns: 1fr; }
   :root{ --card-img-h: 200px; }

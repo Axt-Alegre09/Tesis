@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Paniquiños</title>
+
   <link rel="shortcut icon" href="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinosico.ico" type="image/x-icon">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet" />
@@ -12,12 +13,18 @@
 </head>
 <body>
   <div class="wrapper has-topbar">
-    <aside>
+    <!-- ASIDE (off-canvas en móvil) -->
+    <aside id="mobileAside">
       <header>
         <h1 class="logo">
           <img class="logo-principal" src="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinos.png" alt="logo">
         </h1>
+        <!-- Botón cerrar SOLO móvil -->
+        <button class="mobile-close" id="menuClose" aria-label="Cerrar menú">
+          <i class="bi bi-x-lg"></i>
+        </button>
       </header>
+
       <nav>
         <ul class="menu">
           <li><button id="todos" class="boton-menu boton-categoria active"><i class="bi bi-hand-index-fill"></i>   Todos los productos</button></li>
@@ -39,6 +46,12 @@
     <!-- TOPBAR -->
     <div class="site-topbar within">
       <div class="topbar-inner">
+
+        <!-- Botón hamburguesa SOLO móvil -->
+        <button class="mobile-toggle" id="menuToggle" aria-label="Abrir menú" aria-controls="mobileAside" aria-expanded="false">
+          <i class="bi bi-list"></i>
+        </button>
+
         <form class="searchbar" id="searchForm" role="search">
           <i class="bi bi-search"></i>
           <input type="search" id="searchInput" placeholder="Buscar productos…" aria-label="Buscar productos" autocomplete="off" />
@@ -70,84 +83,106 @@
     </main>
   </div>
 
-  <!-- Import correcto del módulo -->
+  <!-- Backdrop para el menú móvil -->
+  <div id="backdrop" class="backdrop" aria-hidden="true"></div>
+
+  <!-- Auth (import de utilidades y protección) -->
   <script type="module">
-    import { logout } from "./JS/ScriptLogin.js";
+    import { logout, autoWireAuthMenu, requireAuth } from "./JS/ScriptLogin.js";
+
+    // Proteger la página si no hay sesión
+    requireAuth();
+
+    // Botones del menú usuario
+    autoWireAuthMenu();
+
+    // (extra) botón logout en el topbar
     document.getElementById("logoutBtn")?.addEventListener("click", logout);
+
+    // evitar submit de la búsqueda por ahora
     document.getElementById('searchForm')?.addEventListener('submit', (e) => e.preventDefault());
   </script>
 
+  <!-- Catálogo -->
   <script type="module" src="JS/main.js"></script>
 
+  <!-- Encapsulado: dropdown usuario (como ya tenías) -->
+  <script>
+    (() => {
+      const userBtn = document.getElementById('userMenuBtn');
+      const dropdown = document.getElementById('userDropdown');
+      function closeMenu(e) {
+        if (!dropdown.contains(e.target) && !userBtn.contains(e.target)) {
+          dropdown.classList.remove('open');
+          userBtn.setAttribute('aria-expanded', 'false');
+          document.removeEventListener('click', closeMenu);
+        }
+      }
+      userBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dropdown.classList.toggle('open');
+        userBtn.setAttribute('aria-expanded', dropdown.classList.contains('open') ? 'true' : 'false');
+        if (dropdown.classList.contains('open')) {
+          setTimeout(() => document.addEventListener('click', closeMenu), 0);
+        }
+      });
+    })();
+  </script>
 
-            <!-- Encapsulado para evitar redeclaraciones -->
-      <script>
-          (() => {
-            const userBtn = document.getElementById('userMenuBtn');
-            const dropdown = document.getElementById('userDropdown');
-            function closeMenu(e) {
-              if (!dropdown.contains(e.target) && !userBtn.contains(e.target)) {
-                dropdown.classList.remove('open');
-                userBtn.setAttribute('aria-expanded', 'false');
-                document.removeEventListener('click', closeMenu);
-              }
-            }
-            userBtn?.addEventListener('click', (e) => {
-              e.stopPropagation();
-              dropdown.classList.toggle('open');
-              userBtn.setAttribute('aria-expanded', dropdown.classList.contains('open') ? 'true' : 'false');
-              if (dropdown.classList.contains('open')) {
-                setTimeout(() => document.addEventListener('click', closeMenu), 0);
-              }
-            });
-          })();
-      </script>
-      <script type="module">
-        import { logout, autoWireAuthMenu, requireAuth } from "./JS/ScriptLogin.js";
+  <!-- Control off-canvas móvil -->
+  <script>
+    (function () {
+      const body = document.body;
+      const toggle = document.getElementById('menuToggle');
+      const closeBtn = document.getElementById('menuClose');
+      const backdrop = document.getElementById('backdrop');
 
-        requireAuth();
+      function openAside() {
+        body.classList.add('aside-open');
+        toggle?.setAttribute('aria-expanded', 'true');
+        backdrop?.setAttribute('aria-hidden', 'false');
+      }
+      function closeAside() {
+        body.classList.remove('aside-open');
+        toggle?.setAttribute('aria-expanded', 'false');
+        backdrop?.setAttribute('aria-hidden', 'true');
+      }
 
-        autoWireAuthMenu();
+      toggle?.addEventListener('click', openAside);
+      closeBtn?.addEventListener('click', closeAside);
+      backdrop?.addEventListener('click', closeAside);
+    })();
+  </script>
 
-        document.getElementById("logoutBtn")?.addEventListener("click", logout);
-        document.getElementById('searchForm')?.addEventListener('submit', (e) => e.preventDefault());
-      </script>
+  <!-- Chatbot (flotante) -->
+  <button class="chatbot-toggler" aria-label="Abrir chat">
+    <i class="bi bi-chat-left-fill"></i>
+    <i class="bi bi-x-lg"></i>
+  </button>
 
+  <div class="chatbot" role="dialog" aria-modal="true" aria-label="Paniquiños Bot">
+    <header>
+      <h2>
+        <img class="paniImg" src="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinosico.ico" alt="" />
+        Paniquiños Bot
+      </h2>
+      <i class="close-btn bi bi-x-lg" role="button" aria-label="Cerrar"></i>
+    </header>
 
+    <ul class="chatbox" id="chatbox">
+      <li class="chat incoming">
+        <img class="paniImg" src="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinosico.ico" alt="" />
+        <p>¡Hola! 👋🏼 ¿En qué puedo ayudarte hoy?</p>
+      </li>
+    </ul>
 
+    <div class="chat-input">
+      <textarea id="chatInput" placeholder="Escribe tu mensaje…" required></textarea>
+      <i class="bi bi-send-fill" id="sendChatBtn" role="button" aria-label="Enviar"></i>
+    </div>
+  </div>
 
-<!-- Chatbot (flotante) -->
-                  <button class="chatbot-toggler" aria-label="Abrir chat">
-                    <i class="bi bi-chat-left-fill"></i>
-                    <i class="bi bi-x-lg"></i>
-                  </button>
-
-                  <div class="chatbot" role="dialog" aria-modal="true" aria-label="Paniquiños Bot">
-                    <header>
-                      <h2>
-                        <img class="paniImg" src="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinosico.ico" alt="" />
-                        Paniquiños Bot
-                      </h2>
-                      <i class="close-btn bi bi-x-lg" role="button" aria-label="Cerrar"></i>
-                    </header>
-
-                    <ul class="chatbox" id="chatbox">
-                      <li class="chat incoming">
-                        <img class="paniImg" src="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinosico.ico" alt="" />
-                        <p>¡Hola! 👋🏼 ¿En qué puedo ayudarte hoy?</p>
-                      </li>
-                    </ul>
-
-                    <div class="chat-input">
-                      <textarea id="chatInput" placeholder="Escribe tu mensaje…" required></textarea>
-                      <i class="bi bi-send-fill" id="sendChatBtn" role="button" aria-label="Enviar"></i>
-                    </div>
-                  </div>
-
-                  <!-- JS del chatbot -->
-                  <script src="JS/script-chatbot.js" defer></script>
-                  <!--<script type="module" src="JS/migrar-productos.js"></script>  -->
-
-
+  <!-- JS del chatbot -->
+  <script src="JS/script-chatbot.js" defer></script>
 </body>
 </html>
