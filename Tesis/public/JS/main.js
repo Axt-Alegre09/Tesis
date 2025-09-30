@@ -7,7 +7,7 @@ const tituloPrincipal = document.querySelector("#titulo-principal");
 const numerito = document.querySelector("#numerito");
 
 let CATALOGO = [];
-let productosEnCarrito = [];
+let productosEnCarrito = []; // usado solo como fallback local
 
 // -------- Utils --------
 function formatearGs(n) {
@@ -19,39 +19,48 @@ function slugFix(s) {
     .toLowerCase().replace(/\s+/g, "-");
 }
 
-// Fallback estable
 const IMG_FALLBACK = "https://placehold.co/512x512?text=Imagen";
+const STORAGE_BASE = "https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/";
 
-// TU base URL del proyecto (ajústala si tu ref cambiara)
-const STORAGE_BASE =
-  "https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/";
-
-/**
- * Convierte lo que haya en BD a una URL pública válida:
- * - Si ya es http(s) → la devuelve tal cual
- * - Si comienza con "productos/" → lo recorta
- * - Si es solo el archivo → lo concatena a STORAGE_BASE
- * - Siempre hace encodeURIComponent del nombre (por si acaso)
- */
 function toPublicImageUrl(value) {
   if (!value) return IMG_FALLBACK;
-
   let v = String(value).trim();
-
-  // ya es una URL completa
   if (/^https?:\/\//i.test(v)) return v;
-
-  // si vino con prefijo 'productos/...', lo retiro
-  if (v.toLowerCase().startsWith("productos/")) {
-    v = v.slice("productos/".length);
-  }
-
-  // encode del nombre (por si hay espacios u otros chars)
-  const encoded = encodeURIComponent(v);
-  return STORAGE_BASE + encoded;
+  if (v.toLowerCase().startsWith("productos/")) v = v.slice("productos/".length);
+  return STORAGE_BASE + encodeURIComponent(v);
 }
 
-// -------- Fetch desde BD --------
+// -------- Auth helpers --------
+async function obtenerUsuarioId() {
+  const { data } = await supabase.auth.getUser();
+  return data?.user?.id || null;
+}
+
+// -------- RPC carrito (remoto) --------
+async function agregarAlCarritoRemoto(productoId, delta = 1) {
+  const { error } = await supabase.rpc("carrito_agregar_item", {
+    p_producto_id: productoId,
+    p_delta: delta
+  });
+  if (error) {
+    console.error("carrito_agregar_item error:", error);
+    return false;
+  }
+  return true;
+}
+
+async function contarCarritoRemoto() {
+  const uid = await obtenerUsuarioId();
+  if (!uid) return null; // sin sesión → usar local
+  const { data, error } = await supabase.rpc("carrito_contar");
+  if (error) {
+    console.error("carrito_contar error:", error);
+    return 0;
+  }
+  return data ?? 0;
+}
+
+// -------- Fetch catálogo desde BD --------
 async function fetchProductos() {
   const { data, error } = await supabase
     .from("v_productos_publicos")
@@ -63,22 +72,50 @@ async function fetchProductos() {
     return [];
   }
 
-  const normalizados = (data || []).map(p => ({
+  return (data || []).map(p => ({
     id: p.id,
     sku: p.sku ?? null,
     titulo: p.nombre,
-    imagen: toPublicImageUrl(p.imagen), // <- construimos URL pública robusta
+    imagen: toPublicImageUrl(p.imagen),
+    precio: p.precio,
+    categoria: { id: p.categoria_slug, nombre: p.categoria_nombre }
+  }));
+}
+
+
+// -------- Buscar en BD --------
+async function buscarProductos(q) {
+  if (!q || q.trim() === "") {
+    renderTodos();
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from("v_productos_publicos")
+    .select("*")
+    .or(`nombre.ilike.%${q}%, descripcion.ilike.%${q}%, categoria_nombre.ilike.%${q}%`)
+    .order("nombre");
+
+  if (error) {
+    console.error("❌ Error en búsqueda:", error.message);
+    return;
+  }
+
+  const resultados = (data || []).map(p => ({
+    id: p.id,
+    sku: p.sku ?? null,
+    titulo: p.nombre,
+    imagen: toPublicImageUrl(p.imagen),
     precio: p.precio,
     categoria: { id: p.categoria_slug, nombre: p.categoria_nombre }
   }));
 
-  // 👀 debug: imprime 3 URLs para revisar rápidamente en la consola
-  console.log("Ejemplos de URLs de imagen:", normalizados.slice(0, 3).map(x => x.imagen));
-
-  return normalizados;
+  tituloPrincipal.textContent = `Resultados para "${q}" (${resultados.length})`;
+  cargarProductos(resultados);
 }
 
-// -------- Render --------
+
+// -------- Render catálogo --------
 function cargarProductos(productosElegidos) {
   contenedorProductos.innerHTML = "";
 
@@ -135,7 +172,7 @@ function activarBotonesCategorias() {
   });
 }
 
-// -------- Carrito --------
+// -------- Carrito (agregar) --------
 function actualizarBotonesAgregar() {
   const botonesAgregar = document.querySelectorAll(".producto-agregar");
   botonesAgregar.forEach(boton => {
@@ -144,29 +181,38 @@ function actualizarBotonesAgregar() {
 }
 
 function cargarCarritoLS() {
-  const productosEnCarritoLS = localStorage.getItem("productos-en-carrito");
-  productosEnCarrito = productosEnCarritoLS ? JSON.parse(productosEnCarritoLS) : [];
-  actualizarNumerito();
+  const ls = localStorage.getItem("productos-en-carrito");
+  productosEnCarrito = ls ? JSON.parse(ls) : [];
 }
 
-function agregarAlCarrito(e) {
+async function agregarAlCarrito(e) {
   const id = e.currentTarget.dataset.id;
-  const productoAgregado = CATALOGO.find(p => p.id === id);
-  if (!productoAgregado) return;
+  const prod = CATALOGO.find(p => p.id === id);
+  if (!prod) return;
 
-  const yaEsta = productosEnCarrito.find(p => p.id === id);
-  if (yaEsta) {
-    yaEsta.cantidad += 1;
+  const uid = await obtenerUsuarioId();
+  if (uid) {
+    const ok = await agregarAlCarritoRemoto(id, 1);
+    if (!ok) return;
   } else {
-    productosEnCarrito.push({ ...productoAgregado, cantidad: 1 });
+    // fallback local
+    const ya = productosEnCarrito.find(p => p.id === id);
+    if (ya) ya.cantidad += 1;
+    else productosEnCarrito.push({ ...prod, cantidad: 1 });
+    localStorage.setItem("productos-en-carrito", JSON.stringify(productosEnCarrito));
   }
-  actualizarNumerito();
-  localStorage.setItem("productos-en-carrito", JSON.stringify(productosEnCarrito));
+
+  await actualizarNumerito();
 }
 
-function actualizarNumerito() {
-  const nuevoNumerito = productosEnCarrito.reduce((acc, p) => acc + (p.cantidad || 0), 0);
-  numerito.textContent = String(nuevoNumerito);
+async function actualizarNumerito() {
+  const remoto = await contarCarritoRemoto();
+  if (remoto !== null) {
+    numerito.textContent = String(remoto);
+  } else {
+    const totalLocal = productosEnCarrito.reduce((a, p) => a + (p.cantidad || 0), 0);
+    numerito.textContent = String(totalLocal);
+  }
 }
 
 // -------- Inicio --------
@@ -175,6 +221,24 @@ async function iniciarCatalogo() {
   CATALOGO = await fetchProductos();
   renderTodos();
   activarBotonesCategorias();
+  await actualizarNumerito();
+
+
+    // activar búsqueda de nuestra barra de busqueda en index
+    const inputBusqueda = document.getElementById("searchInput");
+    const formBusqueda = document.getElementById("searchForm");
+
+    formBusqueda?.addEventListener("submit", (e) => {
+        e.preventDefault();
+        buscarProductos(inputBusqueda.value);
+    });
+
+    inputBusqueda?.addEventListener("keyup", (e) => {
+        if (e.key === "Enter") buscarProductos(inputBusqueda.value);
+        if (inputBusqueda.value === "") renderTodos(); // reset si borras texto
+    });
+
+
 }
 
 iniciarCatalogo();

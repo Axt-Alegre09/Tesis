@@ -80,28 +80,40 @@
   <script type="module" src="JS/main.js"></script>
 
 
-  <!-- Encapsulado para evitar redeclaraciones -->
-  <script>
-    (() => {
-      const userBtn = document.getElementById('userMenuBtn');
-      const dropdown = document.getElementById('userDropdown');
-      function closeMenu(e) {
-        if (!dropdown.contains(e.target) && !userBtn.contains(e.target)) {
-          dropdown.classList.remove('open');
-          userBtn.setAttribute('aria-expanded', 'false');
-          document.removeEventListener('click', closeMenu);
-        }
-      }
-      userBtn?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        dropdown.classList.toggle('open');
-        userBtn.setAttribute('aria-expanded', dropdown.classList.contains('open') ? 'true' : 'false');
-        if (dropdown.classList.contains('open')) {
-          setTimeout(() => document.addEventListener('click', closeMenu), 0);
-        }
-      });
-    })();
-  </script>
+            <!-- Encapsulado para evitar redeclaraciones -->
+      <script>
+          (() => {
+            const userBtn = document.getElementById('userMenuBtn');
+            const dropdown = document.getElementById('userDropdown');
+            function closeMenu(e) {
+              if (!dropdown.contains(e.target) && !userBtn.contains(e.target)) {
+                dropdown.classList.remove('open');
+                userBtn.setAttribute('aria-expanded', 'false');
+                document.removeEventListener('click', closeMenu);
+              }
+            }
+            userBtn?.addEventListener('click', (e) => {
+              e.stopPropagation();
+              dropdown.classList.toggle('open');
+              userBtn.setAttribute('aria-expanded', dropdown.classList.contains('open') ? 'true' : 'false');
+              if (dropdown.classList.contains('open')) {
+                setTimeout(() => document.addEventListener('click', closeMenu), 0);
+              }
+            });
+          })();
+      </script>
+      <script type="module">
+        import { logout, autoWireAuthMenu, requireAuth } from "./JS/ScriptLogin.js";
+
+        requireAuth();
+
+        autoWireAuthMenu();
+
+        document.getElementById("logoutBtn")?.addEventListener("click", logout);
+        document.getElementById('searchForm')?.addEventListener('submit', (e) => e.preventDefault());
+      </script>
+
+
 
 
 <!-- Chatbot (flotante) -->
