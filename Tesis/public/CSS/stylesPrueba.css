@@ -338,6 +338,10 @@ form { width: 100%; }
     background-color: var(--clr-main-claro) !important;
     color: var(--clr-main);
   }
+  .register-btn{
+    background-color: var(--clr-main-claro) !important;
+    color: var(--clr-main);
+  }
 }
 
 /* Accesibilidad */
@@ -360,4 +364,26 @@ form { width: 100%; }
     border-radius: 12px;                    /* quítalo si no querés bordes */
   }
 }
+/* Móvil: levantar el logo sobre el título */
+@media (max-width:650px){
+  /* un poco menos de aire arriba del form */
+  .form-box{
+    padding-top: 12px !important; /* antes ~24px */
+  }
+
+  /* logo más arriba y un toque más chico */
+  .form-box form::before{
+    width: min(55vw, 200px);   /* antes 60vw/220px */
+    margin: -18px auto 10px;   /* ↑ súbelo más con -24px o -30px si querés */
+  }
+}
+
+/* afinado para teléfonos muy chicos */
+@media (max-width:380px){
+  .form-box form::before{
+    width: min(58vw, 180px);
+    margin: -22px auto 8px;
+  }
+}
+
 
