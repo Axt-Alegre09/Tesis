@@ -15,6 +15,9 @@
   </style>
 </head>
 <body>
+  <!-- Contenedor de alertas (necesario para showMsg) -->
+  <div id="msg" aria-live="polite" role="region"></div>
+
   <div class="wrapper" id="authWrapper">
     <!-- Login -->
     <div class="form-box login">
@@ -22,12 +25,12 @@
         <h1>Acceso</h1>
 
         <div class="input-box">
-          <input id="loginEmail" name="email" type="email" placeholder="Correo" required />
+          <input id="loginEmail" name="email" type="email" placeholder="Correo" required autocomplete="email" />
           <i class="bi bi-person-circle" aria-hidden="true"></i>
         </div>
 
         <div class="input-box">
-          <input id="loginPassword" name="password" type="password" placeholder="Contraseña" required />
+          <input id="loginPassword" name="password" type="password" placeholder="Contraseña" required autocomplete="current-password" />
           <i class="bi bi-lock-fill" aria-hidden="true"></i>
         </div>
 
@@ -45,12 +48,12 @@
         <h1>Registrarse</h1>
 
         <div class="input-box">
-          <input id="registerEmail" name="email" type="email" placeholder="Correo" required />
+          <input id="registerEmail" name="email" type="email" placeholder="Correo" required autocomplete="email" />
           <i class="bi bi-envelope-fill" aria-hidden="true"></i>
         </div>
 
         <div class="input-box">
-          <input id="registerPassword" name="password" type="password" placeholder="Contraseña" required />
+          <input id="registerPassword" name="password" type="password" placeholder="Contraseña" required autocomplete="new-password" />
           <i class="bi bi-lock-fill" aria-hidden="true"></i>
         </div>
 
@@ -72,6 +75,7 @@
       </div>
     </div>
   </div>
+
   <!-- Lógica (un solo archivo) -->
   <script type="module" src="JS/ScriptLogin.js"></script>
 </body>

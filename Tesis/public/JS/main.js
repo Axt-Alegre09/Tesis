@@ -232,7 +232,7 @@ async function iniciarCatalogo() {
 
   inputBusqueda?.addEventListener("keyup", (e) => {
     if (e.key === "Enter") buscarProductos(inputBusqueda.value);
-    if (inputBusqueda.value === "") renderTodos(); // reset si borras texto
+    if (inputBusqueda.value === "") renderTodos(); 
   });
 }
 

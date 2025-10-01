@@ -358,7 +358,7 @@ form { width: 100%; }
                      /* mantiene proporción cuadrada */
     margin:0 auto 50px;   
     margin-bottom: 20px;                 /* centrado + espacio inferior */
-    background: url("https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinos.png")
+    background: url("https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinosico.ico")
                 center / contain no-repeat;
     filter: drop-shadow(0 6px 16px rgba(0,0,0,.12));
     border-radius: 12px;                    /* quítalo si no querés bordes */
