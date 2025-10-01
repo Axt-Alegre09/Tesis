@@ -222,156 +222,114 @@ form { width: 100%; }
 .toggle-panel.toggle-left { left: 0; transition-delay: 1.2s; }
 .wrapper.active .toggle-panel.toggle-left { left: -50%; transition-delay: .6s; }
 
-/* =================================================================
-   RESPONSIVE (≤650px) — Mismo diseño, sin distorsión ni superposiciones
-   - Formularios apilados (solo 1 visible)
-   - Neutraliza offsets desktop (top:-30px)
-   - Óvalo tipo Codehal que sube/baja sin tapar el formulario
-================================================================= */
+
+
+
+
+
+/* ===============================================
+   MÓVILES FULLSCREEN + FOOTER DE TOGGLE FIJO
+   (Añadir al final; desktop queda igual)
+=============================================== */
 @media (max-width:650px){
 
-  /* Vista tipo app */
+
+
+  /* Robustez extra en móvil */
+html, body{ overscroll-behavior: contain; }       /* evita rebotes raros */
+.wrapper{ min-height: 0; }                        /* corrige flex overflows en iOS */
+.form-box{ -webkit-overflow-scrolling: touch; }   /* scroll suave cuando aparece el teclado */
+.toggle-box{ padding-bottom: calc(14px + env(safe-area-inset-bottom)); } /* ya lo tienes, refuerza safe areas */
+
+
+  /* Fondo app, sin scroll lateral */
+  html, body{ height:100%; overflow-x:hidden; }
   body{
-    padding: 0 !important;
+    padding:0 !important;
     background: var(--clr-main-claro) !important;
-    min-height: 100dvh !important;
-    overflow-x: hidden !important;
+    min-height:100svh !important; /* mejor con barras/teclado */
   }
 
+  /* Tarjeta a pantalla completa, sin bordes/sombra */
   .wrapper{
-    width: 100% !important;
-    height: auto !important;
-    margin: 0 !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    position: relative !important;
-    overflow: hidden !important;
+    width:100% !important;
+    height:100svh !important;   /* ocupa la pantalla */
+    margin:0 !important;
+    border-radius:0 !important;
+    box-shadow:none !important;
+    display:flex !important;
+    flex-direction:column !important;
+    position:relative !important;
+    overflow:hidden !important;
   }
 
-  /* ---- Formularios (flujo normal, sin offsets heredados) ---- */
+  /* FORM: ocupa todo; deja espacio para el footer fijo */
   .form-box{
-    position: relative !important;
-    left: auto !important;
-    right: auto !important;
-    top: auto !important;
-
-    width: 100% !important;
-    height: auto !important;
-    display: block !important;
-
-    padding: 28px 18px 22px !important;
-    background: #fff !important;
-
-    z-index: 1 !important;            /* por encima del óvalo */
-    transform: none !important;
-    opacity: 1 !important;
-    pointer-events: auto !important;
-    visibility: visible !important;
+    position:relative !important;
+    left:auto !important; right:auto !important; top:auto !important; /* neutraliza desktop */
+    width:100% !important; height:auto !important;
+    flex:1 1 auto !important;
+    display:block !important;
+    padding:24px 16px calc(120px + env(safe-area-inset-bottom)) !important; /* reserva para footer */
+    background:#fff !important;
+    z-index:1 !important;
+    transform:none !important; opacity:1 !important; visibility:visible !important; pointer-events:auto !important;
+    overflow:auto; /* permite scroll si el teclado cubre parte */
   }
-  .form-box.register{ top: auto !important; } /* <— neutraliza el -30px de desktop */
+  .form-box.register{ top:auto !important; } /* quita el -30px del desktop */
 
-  /* Solo un formulario visible (controlado por .active desde tu JS) */
-  .form-box.login{ display: block !important; }
-  .form-box.register{ display: none !important; }
-  .wrapper.active .form-box.login{ display: none !important; }
-  .wrapper.active .form-box.register{ display: block !important; }
+  /* Mostrar solo uno según .active (tu JS) */
+  .form-box.login{ display:block !important; }
+  .form-box.register{ display:none !important; }
+  .wrapper.active .form-box.login{ display:none !important; }
+  .wrapper.active .form-box.register{ display:block !important; }
 
-  /* Tipografías/inputs algo más compactos */
-  .wrapper h1{ font-size: clamp(22px, 6vw, 28px) !important; margin: 8px 0 12px !important; }
-  .input-box{ margin: 14px 0 !important; }
-  .input-box input{ font-size: 16px !important; padding: 12px 40px 12px 12px !important; }
-  .input-box i{ font-size: 20px !important; }
-  .btn{ height: 46px !important; font-size: 15px !important; }
+  /* Tipografías/inputs un poco más compactos */
+  .wrapper h1{ font-size:28px !important; margin:8px 0 12px !important; text-align:left; }
+  .input-box{ margin:14px 0 !important; }
+  .input-box input{ font-size:16px !important; padding:12px 40px 12px 12px !important; }
+  .input-box i{ font-size:20px !important; }
+  .btn{ height:48px !important; font-size:16px !important; }
 
-  /* ---- Toggle móvil con óvalo que sube/baja (no tapa el form) ---- */
+  /* FOOTER: pregunta + botón para alternar (fijo abajo) */
   .toggle-box{
-    position: relative !important;
-    width: 100% !important;
-
-    /* Reserva visible para el óvalo y el CTA */
-    height: 360px !important;
-    margin-top: 10px !important;
-
-    /* Tamaño/posiciones del óvalo (ajustables) */
-    --oval-w: 160%;
-    --oval-h: 64%;
-    --oval-top-login: 58%;  /* óvalo abajo (estado login) */
-    --oval-top-reg:  -12%;  /* óvalo arriba (estado registro) */
-
-    z-index: 0 !important;
-  }
-
-  /* Reescritura completa del pseudo para evitar conflictos desktop */
-  .toggle-box::before{
-    all: unset !important;
-    content: "" !important;
-    position: absolute !important;
-    left: 50% !important;
-    top: var(--oval-top-login) !important;
-    transform: translate(-50%, -50%) !important;
-    width: var(--oval-w) !important;
-    height: var(--oval-h) !important;
+    position:fixed !important;
+    left:0 !important; right:0 !important; bottom:0 !important;
+    width:100% !important; margin:0 !important;
+    padding:14px 16px calc(14px + env(safe-area-inset-bottom)) !important;
     background: var(--clr-main-claro) !important;
-    border-radius: 50% !important;
-    box-shadow: 0 12px 28px rgba(0,0,0,.10) !important;
-    transition: top .9s ease !important;
-    z-index: 0 !important;      /* detrás del texto del panel */
-  }
-  .wrapper.active .toggle-box::before{
-    top: var(--oval-top-reg) !important;
+    border-top:1px solid var(--clr-gris) !important;
+    box-shadow: 0 -8px 24px rgba(0,0,0,.12) !important;
+    z-index:3 !important;
+    height:auto !important;
   }
 
-  /* Texto + botón del toggle (encima del óvalo, debajo del form) */
+  /* Desactiva el óvalo en móvil para que no tape nada */
+  .toggle-box::before{ display:none !important; content:none !important; }
+
+  /* Solo muestra el panel correspondiente */
   .toggle-panel{
-    position: absolute !important;
-    left: 0 !important; right: 0 !important;
-    width: 100% !important;
-    text-align: center !important;
-    padding: 0 12px !important;
-    z-index: 1 !important;
-    display: none !important;
+    position:relative !important;
+    width:100% !important; height:auto !important;
+    text-align:center !important;
+    padding:0 !important; margin:0 !important;
+    display:none !important;
   }
-
-  /* Estado login → muestra panel izquierdo (“Registrarme”) */
-  .toggle-panel.toggle-left{
-    display: block !important;
-    top: calc(50% + 6px) !important;   /* sube/baja el CTA del login acá */
-  }
-  .wrapper.active .toggle-panel.toggle-left{ display: none !important; }
-
-  /* Estado registro → muestra panel derecho (“Iniciar sesión”) */
-  .wrapper.active .toggle-panel.toggle-right{
-    display: block !important;
-    top: 10% !important;               /* altura del CTA en registro */
-  }
+  .toggle-panel.toggle-left{ display:block !important; }              /* Acceso -> "Registrarme" */
+  .wrapper.active .toggle-panel.toggle-left{ display:none !important; }
+  .wrapper.active .toggle-panel.toggle-right{ display:block !important; } /* Registro -> "Iniciar sesión" */
 
   .toggle-panel h1{
-    font-size: clamp(22px, 6vw, 28px) !important;
-    margin-bottom: 8px !important;
-    color: var(--clr-main) !important;
+    font-size:20px !important; margin-bottom:6px !important; color:var(--clr-main) !important;
   }
-  .toggle-panel p{ font-size: 14px !important; margin-bottom: 10px !important; }
+  .toggle-panel p{ font-size:14px !important; margin-bottom:8px !important; }
   .toggle-panel .btn{
-    width: min(100%, 260px) !important;
-    height: 46px !important;
-    font-size: 15px !important;
+    width:100% !important; max-width:280px !important;
+    height:46px !important; font-size:15px !important;
   }
 }
 
-/* =========================================================
-   Ajuste fino para teléfonos muy chicos (≤430px)
-   (mismo efecto, CTA un toque más alto y óvalo un pelín menor)
-========================================================= */
-@media (max-width:430px){
-  .toggle-box{
-    --oval-w: 150%;
-    --oval-h: 60%;
-  }
-  .toggle-panel.toggle-left{ top: calc(50% - 2px) !important; }
-  .wrapper.active .toggle-panel.toggle-right{ top: 8% !important; }
-}
-
-/* Accesibilidad: usuarios que prefieren menos movimiento */
+/* Accesibilidad: menos movimiento si el usuario lo prefiere */
 @media (prefers-reduced-motion: reduce){
-  *{ transition: none !important; animation: none !important; }
+  *{ transition:none !important; animation:none !important; }
 }
