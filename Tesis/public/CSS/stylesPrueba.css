@@ -242,3 +242,61 @@ form { width: 100%; }
 .toggle-panel.toggle-left { left: 0; transition-delay: 1.2s; }
 .wrapper.active .toggle-panel.toggle-left { left: -50%; transition-delay: .6s; }
 
+/* =========================
+   RESPONSIVE: MISMO DISEÑO, SOLO MÁS CHICO
+   - No cambia estructura ni animaciones
+   - Escala proporcionalmente la tarjeta completa
+========================= */
+
+/*/* =========================
+   RESPONSIVE ESCALADO + GRANDE
+   Mantiene el mismo diseño, solo más grande en móviles
+========================= */
+
+.wrapper{
+  transform-origin: top center;
+}
+
+/* 1024px ↓ */
+@media (max-width:1024px){
+  .wrapper{ transform: scale(.96); }   /* antes .92 */
+}
+
+/* 900px ↓ */
+@media (max-width:900px){
+  .wrapper{ transform: scale(.90); }   /* antes .84 */
+  .toggle-panel h1{ font-size: 34px; }
+  .toggle-panel p{ font-size: 16px; }
+  .input-box input{ font-size: 18px; }
+}
+
+/* 768px ↓ */
+@media (max-width:768px){
+  .wrapper{ transform: scale(.82); }   /* antes .74 */
+  .form-box{ padding: 42px; }
+  .wrapper h1{ font-size: 38px; }
+  .btn{ height: 50px; font-size: 17px; }
+}
+
+/* 650px ↓ */
+@media (max-width:650px){
+  .wrapper{ transform: scale(.75); }   /* antes .66 */
+  .form-box{ padding: 36px; }
+  .wrapper h1{ font-size: 34px; }
+  .input-box input{ font-size: 17px; }
+  .btn{ height: 48px; font-size: 16px; }
+}
+
+/* 520px ↓ */
+@media (max-width:520px){
+  .wrapper{ transform: scale(.68); }   /* antes .58 */
+  .wrapper h1{ font-size: 30px; }
+  .input-box input{ font-size: 16px; }
+}
+
+/* 420px ↓ */
+@media (max-width:420px){
+  .wrapper{ transform: scale(.60); }   /* antes .50 */
+  .wrapper h1{ font-size: 28px; }
+  .btn{ height: 46px; font-size: 15px; }
+}
