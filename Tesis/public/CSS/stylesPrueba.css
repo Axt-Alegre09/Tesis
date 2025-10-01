@@ -247,56 +247,109 @@ form { width: 100%; }
    - No cambia estructura ni animaciones
    - Escala proporcionalmente la tarjeta completa
 ========================= */
-
-/*/* =========================
-   RESPONSIVE ESCALADO + GRANDE
-   Mantiene el mismo diseño, solo más grande en móviles
-========================= */
-
-.wrapper{
-  transform-origin: top center;
-}
-
-/* 1024px ↓ */
-@media (max-width:1024px){
-  .wrapper{ transform: scale(.96); }   /* antes .92 */
-}
-
-/* 900px ↓ */
-@media (max-width:900px){
-  .wrapper{ transform: scale(.90); }   /* antes .84 */
-  .toggle-panel h1{ font-size: 34px; }
-  .toggle-panel p{ font-size: 16px; }
-  .input-box input{ font-size: 18px; }
-}
-
-/* 768px ↓ */
-@media (max-width:768px){
-  .wrapper{ transform: scale(.82); }   /* antes .74 */
-  .form-box{ padding: 42px; }
-  .wrapper h1{ font-size: 38px; }
-  .btn{ height: 50px; font-size: 17px; }
-}
-
-/* 650px ↓ */
+//* =======================================================
+   PARCHE MÓVIL DEFINITIVO (≤650px)
+   - Form arriba, toggle como footer fijo elevado
+   - Solo un formulario visible (login ↔ registro)
+   - Rompe conflictos previos con !important
+======================================================= */
 @media (max-width:650px){
-  .wrapper{ transform: scale(.75); }   /* antes .66 */
-  .form-box{ padding: 36px; }
-  .wrapper h1{ font-size: 34px; }
-  .input-box input{ font-size: 17px; }
-  .btn{ height: 48px; font-size: 16px; }
-}
 
-/* 520px ↓ */
-@media (max-width:520px){
-  .wrapper{ transform: scale(.68); }   /* antes .58 */
-  .wrapper h1{ font-size: 30px; }
-  .input-box input{ font-size: 16px; }
-}
+  /* Vista “app” */
+  body{
+    padding: 0 !important;
+    background: var(--clr-main-claro) !important;
+    min-height: 100dvh !important;
+    overflow-x: hidden !important;
+  }
 
-/* 420px ↓ */
-@media (max-width:420px){
-  .wrapper{ transform: scale(.60); }   /* antes .50 */
-  .wrapper h1{ font-size: 28px; }
-  .btn{ height: 46px; font-size: 15px; }
+  .wrapper{
+    width: 100% !important;
+    height: 100dvh !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    display: flex !important;
+    flex-direction: column !important;
+    position: relative !important;
+    overflow: hidden !important;
+  }
+
+  /* ---- FORM: visible y ocupando la pantalla (menos el footer) ---- */
+  .form-box{
+    position: relative !important;
+    left: auto !important;
+    right: auto !important;
+    top: auto !important;
+
+    width: 100% !important;
+    height: auto !important;
+    flex: 1 1 auto !important;
+
+    display: block !important;
+    padding: 28px 18px 110px !important; /* espacio para que el footer no tape */
+    background: #fff !important;
+    z-index: 1 !important;
+    transform: none !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    visibility: visible !important;
+  }
+  /* Mostrar solo uno según el estado */
+  .form-box.login{ display: block !important; }
+  .form-box.register{ display: none !important; }
+  .wrapper.active .form-box.login{ display: none !important; }
+  .wrapper.active .form-box.register{ display: block !important; }
+
+  /* Tipos algo más compactos en móvil */
+  .wrapper h1{ font-size: 28px !important; margin: 6px 0 12px !important; text-align: left !important; }
+  .input-box{ margin: 14px 0 !important; }
+  .input-box input{ font-size: 16px !important; padding: 12px 40px 12px 12px !important; }
+  .input-box i{ font-size: 20px !important; }
+  .btn{ height: 48px !important; font-size: 16px !important; }
+
+  /* ---- TOGGLE: footer fijo y elevado ---- */
+  .toggle-box{
+    position: fixed !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 24px !important;          /* ← más alto del borde, ajústalo a gusto */
+    margin: 0 auto !important;
+    width: 100% !important;
+    max-width: 950px !important;       /* igual al ancho lógico del desktop */
+    height: auto !important;
+    padding: 14px 16px 16px !important;
+    background: var(--clr-main-claro) !important;
+    border: 1px solid var(--clr-gris) !important;
+    border-radius: 14px !important;
+    box-shadow: 0 8px 22px rgba(0,0,0,.14) !important;
+    z-index: 3 !important;
+  }
+  .toggle-box::before{ display: none !important; } /* sin elipse en móvil */
+
+  .toggle-panel{
+    position: relative !important;
+    width: 100% !important;
+    height: auto !important;
+    text-align: center !important;
+    padding: 0 !important;
+    display: none !important;
+  }
+  /* Login: muestra “Registrarme”; Registro: muestra “Iniciar sesión” */
+  .toggle-panel.toggle-left{ display: block !important; }
+  .wrapper.active .toggle-panel.toggle-left{ display: none !important; }
+  .wrapper.active .toggle-panel.toggle-right{ display: block !important; }
+
+  .toggle-panel h1{
+    font-size: 20px !important;
+    margin-bottom: 6px !important;
+    color: var(--clr-main) !important;
+  }
+  .toggle-panel p{ font-size: 14px !important; margin-bottom: 8px !important; }
+  .toggle-panel .btn{
+    width: 100% !important;
+    max-width: 260px !important;
+    height: 44px !important;
+    font-size: 15px !important;
+  }
 }
