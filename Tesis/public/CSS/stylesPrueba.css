@@ -1,3 +1,4 @@
+/* ===================== Tipografías y colores ===================== */
 .devonshire-regular {
   font-family: "Devonshire", cursive;
   font-weight: 400;
@@ -13,6 +14,7 @@
   --clr-negro: #000;
 }
 
+/* Reset básico */
 * {
   margin: 0;
   padding: 0;
@@ -22,6 +24,7 @@
   font-style: normal;
 }
 
+/* ===================== Body / fondo ===================== */
 body {
   display: flex;
   justify-content: center;
@@ -30,9 +33,10 @@ body {
   background: linear-gradient(90deg, #816854, #a3846a, #f0c39d);
   padding: 20px;
   position: relative;
+  overflow-x: hidden;
 }
 
-/* ===================== ALERTAS ARRIBA ===================== */
+/* ===================== Alertas arriba ===================== */
 #msg {
   position: fixed;
   top: 20px;
@@ -43,13 +47,13 @@ body {
   z-index: 1000;
 }
 
-/* ===================== CONTENEDOR PRINCIPAL ===================== */
+/* ===================== Contenedor principal (Desktop) ===================== */
 .wrapper {
   position: relative;
   border-radius: 30px;
-  width: 950px;              /* más ancho */
+  width: 950px;             /* ancho desktop */
   max-width: 100%;
-  height: 600px;             /* más alto */
+  height: 600px;            /* alto desktop */
   margin: 20px auto;
   background-color: var(--clr-blanco);
   box-shadow: 0 0 20px rgba(0,0,0,.4);
@@ -57,10 +61,10 @@ body {
   transition: all 0.4s ease;
 }
 
-/* ===================== FORM BOX ===================== */
+/* ===================== Formularios (Desktop) ===================== */
 .form-box {
   position: absolute;
-  padding: 50px;             /* más espacio interno */
+  padding: 50px;
   right: 0;
   width: 50%;
   height: 100%;
@@ -73,28 +77,25 @@ body {
   z-index: 1;
   transition: .6s ease-in-out, visibility 0s 1s;
 }
+.wrapper.active .form-box { right: 50%; }
 
-.wrapper.active .form-box {
-  right: 50%;
-}
-
+/* Registro animación desktop */
 .form-box.register {
   opacity: 0;
   visibility: hidden;
   top: 0;
   transition: opacity 0.6s ease, visibility 0.6s ease, top 0.6s ease;
 }
-
 .wrapper.active .form-box.register {
   opacity: 1;
   visibility: visible;
-  top: -30px;
+  top: -30px; /* (neutralizado en móvil) */
 }
 
 form { width: 100%; }
 
 .wrapper h1 {
-  font-size: 42px;           /* título más grande */
+  font-size: 42px;
   margin: -10px 0 20px;
   font-weight: 800;
   color: var(--clr-main);
@@ -154,10 +155,7 @@ form { width: 100%; }
   color: var(--clr-blanco);
   transition: background 0.3s ease;
 }
-
-.btn:hover {
-  background: #5c4630;
-}
+.btn:hover { background: #5c4630; }
 
 .wrapper p {
   font-size: 15px;
@@ -176,17 +174,14 @@ form { width: 100%; }
   margin: 0 10px;
   transition: all 0.3s ease;
 }
-.social-icons a:hover {
-  background: var(--clr-main-claro);
-}
+.social-icons a:hover { background: var(--clr-main-claro); }
 
-/* ===================== TOGGLE ===================== */
+/* ===================== Toggle (Desktop) ===================== */
 .toggle-box {
   position: absolute;
   width: 100%;
   height: 100%;
 }
-
 .toggle-box::before {
   content: '';
   position: absolute;
@@ -198,7 +193,6 @@ form { width: 100%; }
   z-index: 2;
   transition: 1.8s ease-in-out;
 }
-
 .wrapper.active .toggle-box::before { left: 50%; }
 
 .toggle-panel {
@@ -215,47 +209,28 @@ form { width: 100%; }
   text-align: center;
   padding: 40px;
 }
-
 .toggle-panel h1 {
   margin-bottom: 25px;
   color: var(--clr-main);
   font-size: 36px;
 }
-
-.toggle-panel p {
-  margin-bottom: 30px;
-  color: var(--clr-negro);
-  font-size: 16px;
-}
-
-.toggle-panel .btn {
-  width: 180px;
-  height: 50px;
-  background-color: var(--clr-main);
-  color: var(--clr-blanco);
-  border-radius: 10px;
-  font-size: 16px;
-}
+.toggle-panel p { margin-bottom: 30px; color: var(--clr-negro); font-size: 16px; }
+.toggle-panel .btn { width: 180px; height: 50px; border-radius: 10px; font-size: 16px; }
 
 .toggle-panel.toggle-right { right: -50%; transition-delay: .6s; }
 .wrapper.active .toggle-panel.toggle-right { right: 0; transition-delay: 1.2s; }
 .toggle-panel.toggle-left { left: 0; transition-delay: 1.2s; }
 .wrapper.active .toggle-panel.toggle-left { left: -50%; transition-delay: .6s; }
 
-/* =========================
-   RESPONSIVE: MISMO DISEÑO, SOLO MÁS CHICO
-   - No cambia estructura ni animaciones
-   - Escala proporcionalmente la tarjeta completa
-========================= */
-//* =======================================================
-   PARCHE MÓVIL DEFINITIVO (≤650px)
-   - Form arriba, toggle como footer fijo elevado
-   - Solo un formulario visible (login ↔ registro)
-   - Rompe conflictos previos con !important
-======================================================= */
+/* =================================================================
+   RESPONSIVE (≤650px) — Mismo diseño, sin distorsión ni superposiciones
+   - Formularios apilados (solo 1 visible)
+   - Neutraliza offsets desktop (top:-30px)
+   - Óvalo tipo Codehal que sube/baja sin tapar el formulario
+================================================================= */
 @media (max-width:650px){
 
-  /* Vista “app” */
+  /* Vista tipo app */
   body{
     padding: 0 !important;
     background: var(--clr-main-claro) !important;
@@ -265,17 +240,15 @@ form { width: 100%; }
 
   .wrapper{
     width: 100% !important;
-    height: 100dvh !important;
+    height: auto !important;
     margin: 0 !important;
     border-radius: 0 !important;
     box-shadow: none !important;
-    display: flex !important;
-    flex-direction: column !important;
     position: relative !important;
     overflow: hidden !important;
   }
 
-  /* ---- FORM: visible y ocupando la pantalla (menos el footer) ---- */
+  /* ---- Formularios (flujo normal, sin offsets heredados) ---- */
   .form-box{
     position: relative !important;
     left: auto !important;
@@ -284,72 +257,121 @@ form { width: 100%; }
 
     width: 100% !important;
     height: auto !important;
-    flex: 1 1 auto !important;
-
     display: block !important;
-    padding: 28px 18px 110px !important; /* espacio para que el footer no tape */
+
+    padding: 28px 18px 22px !important;
     background: #fff !important;
-    z-index: 1 !important;
+
+    z-index: 1 !important;            /* por encima del óvalo */
     transform: none !important;
     opacity: 1 !important;
     pointer-events: auto !important;
     visibility: visible !important;
   }
-  /* Mostrar solo uno según el estado */
+  .form-box.register{ top: auto !important; } /* <— neutraliza el -30px de desktop */
+
+  /* Solo un formulario visible (controlado por .active desde tu JS) */
   .form-box.login{ display: block !important; }
   .form-box.register{ display: none !important; }
   .wrapper.active .form-box.login{ display: none !important; }
   .wrapper.active .form-box.register{ display: block !important; }
 
-  /* Tipos algo más compactos en móvil */
-  .wrapper h1{ font-size: 28px !important; margin: 6px 0 12px !important; text-align: left !important; }
+  /* Tipografías/inputs algo más compactos */
+  .wrapper h1{ font-size: clamp(22px, 6vw, 28px) !important; margin: 8px 0 12px !important; }
   .input-box{ margin: 14px 0 !important; }
   .input-box input{ font-size: 16px !important; padding: 12px 40px 12px 12px !important; }
   .input-box i{ font-size: 20px !important; }
-  .btn{ height: 48px !important; font-size: 16px !important; }
+  .btn{ height: 46px !important; font-size: 15px !important; }
 
-  /* ---- TOGGLE: footer fijo y elevado ---- */
+  /* ---- Toggle móvil con óvalo que sube/baja (no tapa el form) ---- */
   .toggle-box{
-    position: fixed !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 24px !important;          /* ← más alto del borde, ajústalo a gusto */
-    margin: 0 auto !important;
-    width: 100% !important;
-    max-width: 950px !important;       /* igual al ancho lógico del desktop */
-    height: auto !important;
-    padding: 14px 16px 16px !important;
-    background: var(--clr-main-claro) !important;
-    border: 1px solid var(--clr-gris) !important;
-    border-radius: 14px !important;
-    box-shadow: 0 8px 22px rgba(0,0,0,.14) !important;
-    z-index: 3 !important;
-  }
-  .toggle-box::before{ display: none !important; } /* sin elipse en móvil */
-
-  .toggle-panel{
     position: relative !important;
     width: 100% !important;
-    height: auto !important;
+
+    /* Reserva visible para el óvalo y el CTA */
+    height: 360px !important;
+    margin-top: 10px !important;
+
+    /* Tamaño/posiciones del óvalo (ajustables) */
+    --oval-w: 160%;
+    --oval-h: 64%;
+    --oval-top-login: 58%;  /* óvalo abajo (estado login) */
+    --oval-top-reg:  -12%;  /* óvalo arriba (estado registro) */
+
+    z-index: 0 !important;
+  }
+
+  /* Reescritura completa del pseudo para evitar conflictos desktop */
+  .toggle-box::before{
+    all: unset !important;
+    content: "" !important;
+    position: absolute !important;
+    left: 50% !important;
+    top: var(--oval-top-login) !important;
+    transform: translate(-50%, -50%) !important;
+    width: var(--oval-w) !important;
+    height: var(--oval-h) !important;
+    background: var(--clr-main-claro) !important;
+    border-radius: 50% !important;
+    box-shadow: 0 12px 28px rgba(0,0,0,.10) !important;
+    transition: top .9s ease !important;
+    z-index: 0 !important;      /* detrás del texto del panel */
+  }
+  .wrapper.active .toggle-box::before{
+    top: var(--oval-top-reg) !important;
+  }
+
+  /* Texto + botón del toggle (encima del óvalo, debajo del form) */
+  .toggle-panel{
+    position: absolute !important;
+    left: 0 !important; right: 0 !important;
+    width: 100% !important;
     text-align: center !important;
-    padding: 0 !important;
+    padding: 0 12px !important;
+    z-index: 1 !important;
     display: none !important;
   }
-  /* Login: muestra “Registrarme”; Registro: muestra “Iniciar sesión” */
-  .toggle-panel.toggle-left{ display: block !important; }
+
+  /* Estado login → muestra panel izquierdo (“Registrarme”) */
+  .toggle-panel.toggle-left{
+    display: block !important;
+    top: calc(50% + 6px) !important;   /* sube/baja el CTA del login acá */
+  }
   .wrapper.active .toggle-panel.toggle-left{ display: none !important; }
-  .wrapper.active .toggle-panel.toggle-right{ display: block !important; }
+
+  /* Estado registro → muestra panel derecho (“Iniciar sesión”) */
+  .wrapper.active .toggle-panel.toggle-right{
+    display: block !important;
+    top: 10% !important;               /* altura del CTA en registro */
+  }
 
   .toggle-panel h1{
-    font-size: 20px !important;
-    margin-bottom: 6px !important;
+    font-size: clamp(22px, 6vw, 28px) !important;
+    margin-bottom: 8px !important;
     color: var(--clr-main) !important;
   }
-  .toggle-panel p{ font-size: 14px !important; margin-bottom: 8px !important; }
+  .toggle-panel p{ font-size: 14px !important; margin-bottom: 10px !important; }
   .toggle-panel .btn{
-    width: 100% !important;
-    max-width: 260px !important;
-    height: 44px !important;
+    width: min(100%, 260px) !important;
+    height: 46px !important;
     font-size: 15px !important;
   }
+}
+
+/* =========================================================
+   Ajuste fino para teléfonos muy chicos (≤430px)
+   (mismo efecto, CTA un toque más alto y óvalo un pelín menor)
+========================================================= */
+@media (max-width:430px){
+  .toggle-box{
+    --oval-w: 150%;
+    --oval-h: 60%;
+  }
+  .toggle-panel.toggle-left{ top: calc(50% - 2px) !important; }
+  .wrapper.active .toggle-panel.toggle-right{ top: 8% !important; }
+}
+
+/* Accesibilidad: usuarios que prefieren menos movimiento */
+@media (prefers-reduced-motion: reduce){
+  *{ transition: none !important; animation: none !important; }
 }
