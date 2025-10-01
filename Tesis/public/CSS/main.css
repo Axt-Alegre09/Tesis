@@ -386,8 +386,12 @@ main{
     z-index: 800;
     background: var(--clr-main);
   }
-  .topbar-inner{ background: var(--clr-main); }
-  .searchbar{ background:#e9ecef; }
+  .topbar-inner{
+    background: var(--clr-main);
+    padding: .5rem .75rem;          /* más compacto */
+    gap: .75rem;
+  }
+  .searchbar{ background:#e9ecef; padding: .4rem .6rem; gap: .35rem; }
 
   .wrapper.has-topbar aside{ grid-row: auto; }
   .wrapper.has-topbar main{ grid-row: auto; }
@@ -396,11 +400,16 @@ main{
   main{
     grid-column: 1 / -1;
     grid-row: auto;
-    margin: 0.75rem;
+    margin: .75rem;
     padding: 1rem;
   }
 
-  .contenedor-productos{ grid-template-columns: repeat(2, 1fr); }
+  /* Grid fluido para cards en móvil/tablet */
+  .contenedor-productos{
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: .75rem;
+  }
+
   .checkout-form{ grid-template-columns: 1fr; }
 
   /* Mostrar botón hamburguesa */
@@ -432,10 +441,26 @@ main{
     margin-left: 0;
     box-shadow: 0 0 12px rgba(0,0,0,.25);
   }
+
+  /* Imágenes cuadradas y consistentes */
+  .producto-imagen{ aspect-ratio: 1 / 1; height: auto; }
 }
 
-/* Teléfonos pequeños: 1 columna de productos */
+/* Teléfonos pequeños: afinado extra */
 @media (max-width: 600px){
-  .contenedor-productos{ grid-template-columns: 1fr; }
   :root{ --card-img-h: 200px; }
+  .contenedor-productos{ grid-template-columns: 1fr; }
+
+  /* Buscador minimalista (sin botón de texto) */
+  .searchbar{ padding: .35rem .5rem; gap: .25rem; }
+  .searchbar-btn{ display: none; }
+
+  .titulo-principal{ margin: 1rem 0; }
+  main{ margin: .5rem; padding: .75rem; }
+}
+
+/* Ultra pequeño */
+@media (max-width: 360px){
+  .contenedor-productos{ gap: .6rem; }
+  .producto-detalles{ padding: .6rem .65rem; }
 }
