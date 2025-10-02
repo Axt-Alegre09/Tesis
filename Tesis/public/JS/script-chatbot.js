@@ -55,7 +55,7 @@
       console.error("[chatbot] Error:", err);
       messageElement.textContent = "Oops, ocurrió un error. Intenta de nuevo.";
     } finally {
-      chatbox?.scrollTo(0, chatbox.scrollHeight);
+      chatbox.scrollTop = chatbox.scrollHeight;
       // Rehabilitamos el botón enviar si lo deshabilitamos
       sendChatBtn?.removeAttribute("aria-disabled");
       sendChatBtn?.classList.remove("disabled");
@@ -74,7 +74,7 @@
 
     // Muestra el mensaje del usuario
     chatbox?.append(createChatLi(userMessage, "outgoing"));
-    chatbox?.scrollTo(0, chatbox.scrollHeight);
+    chatbox.scrollTop = chatbox.scrollHeight;
 
     // Guarda en historial (limitamos a últimas 20 entradas por prolijidad)
     MESSAGES.push({ role: "user", content: userMessage });
@@ -88,7 +88,7 @@
     setTimeout(() => {
       const incomingLi = createChatLi("Cargando...", "incoming");
       chatbox?.appendChild(incomingLi);
-      chatbox?.scrollTo(0, chatbox.scrollHeight);
+      chatbox.scrollTop = chatbox.scrollHeight;
       generateResponse(incomingLi);
     }, 200);
   }
@@ -96,7 +96,8 @@
   // Auto-resize del textarea
   chatInput?.addEventListener("input", () => {
     chatInput.style.height = `${inputIniHeight}px`;
-    chatInput.style.height = `${chatInput.scrollHeight}px`;
+    chatInput.style.height = `${Math.min(chatInput.scrollHeight, 120)}px`;
+    chatbox.scrollTop = chatbox.scrollHeight;  // asegura que el foco quede abajo
   });
 
   // Enviar con Enter (sin Shift) en pantallas > 800px

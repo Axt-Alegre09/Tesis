@@ -269,3 +269,9 @@
     padding-bottom: max(0px, env(safe-area-inset-bottom));
   }
 }
+
+.chat-input textarea {
+  max-height: 120px;     /* límite para no tapar todo el chat */
+  overflow-y: auto;      /* si se pasa, aparece scroll */
+  resize: none;          /* que no se pueda redimensionar manualmente */
+}
