@@ -366,6 +366,9 @@ form { width: 100%; }
 }
 /* Móvil: levantar el logo sobre el título */
 @media (max-width:650px){
+  .imagen_login{
+  visibility: hidden;
+}
   /* un poco menos de aire arriba del form */
   .form-box{
     padding-top: 12px !important; /* antes ~24px */
@@ -384,7 +387,15 @@ form { width: 100%; }
     width: min(58vw, 180px);
     margin: -22px auto 8px;
   }
+  .toggle-panel p{
+  color: var(--clr-negro);
 }
+.imagen_login{
+  visibility: hidden;
+}
+}
+
+
 .toggle-panel p{
   color: var(--clr-negro);
 }
