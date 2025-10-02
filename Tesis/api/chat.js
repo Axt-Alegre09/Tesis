@@ -1,5 +1,5 @@
 // api/chat.js
-// Bot de reservas Paniquiños — Vercel Serverless (Node runtime)
+// Bot de reservas Paniquiños — Vercel Serverless (Node runtime / ESM)
 import { createClient } from "@supabase/supabase-js";
 
 export default async function handler(req, res) {
@@ -11,6 +11,7 @@ export default async function handler(req, res) {
     return res.status(204).end();
   }
   if (req.method !== "POST") {
+    res.setHeader("Access-Control-Allow-Origin", "*");
     return res.status(405).json({ error: "Method not allowed" });
   }
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -19,12 +20,16 @@ export default async function handler(req, res) {
   const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE;
+
   if (!OPENAI_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE) {
-    return res.status(500).json({ error: "Faltan variables de entorno" });
+    return res.status(500).json({ error: "Faltan variables de entorno (OPENAI_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE)" });
   }
 
-  // --- Supabase ---
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
+  // --- Supabase (service role) ---
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE, {
+    auth: { persistSession: false },
+    global: { headers: { "x-client-info": "paniquinos-bot/1.0" } }
+  });
 
   // --- Config ---
   const TZ_OFFSET = "-03:00";                 // Asunción
@@ -35,7 +40,7 @@ Eres "Paniquiños Bot", asistente de reservas de catering.
 — Hablas en español (Paraguay).
 — Aceptas fechas y horas en lenguaje natural (ej: "3 de octubre", "10 de la mañana", "7/10 a las 15", "5pm").
 — Cuando el usuario te da varios datos en una sola frase, transformalos a: fecha AAAA-MM-DD y hora HH:MM (24h).
-— Datos necesarios (en una sola pregunta si faltan): nombre, teléfono, dirección, email (opcional), tipo_servicio, menú/pedido (texto libre), invitados (>0), fecha y hora.
+— Datos necesarios (si faltan, pedilos en una sola pregunta): nombre, teléfono, dirección, email (opcional), tipo_servicio, menú/pedido (texto libre), invitados (>0), fecha y hora.
 — Validar: fecha futura; hora entre ${HOURS_OPEN.min} y ${HOURS_OPEN.max}; invitados > 0.
 — Si están todos los datos, usá "crear_reserva". Si piden disponibilidad, usá "ver_disponibilidad".
 — Confirmá SOLO con el resultado real de la herramienta. Formato:
@@ -103,7 +108,7 @@ Eres "Paniquiños Bot", asistente de reservas de catering.
     const isoLocal = `${fecha}T${hhmm}:00${TZ_OFFSET}`; // local -03:00
     const d = new Date(isoLocal);
     if (isNaN(d.getTime())) return null;
-    return d.toISOString(); // timestamptz
+    return d.toISOString(); // timestamptz en UTC
   }
 
   const isFuture = isoUtc => new Date(isoUtc).getTime() > Date.now();
@@ -114,8 +119,7 @@ Eres "Paniquiños Bot", asistente de reservas de catering.
     const thisYear = now.getFullYear();
 
     let dd, mm, yyyy, hh = 0, mi = 0, gotTime = false;
-
-    const t = text.toLowerCase();
+    const t = (text || "").toLowerCase();
 
     // dd/mm[/yyyy] o dd-mm
     let m = t.match(/(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/);
@@ -147,9 +151,9 @@ Eres "Paniquiños Bot", asistente de reservas de catering.
     }
 
     if (!dd || !mm || !yyyy) return null;
-    // Si no viene año y la fecha ya pasó, poner año siguiente
+    if (!gotTime) { hh = 12; mi = 0; } // por seguridad si no detectamos hora, 12:00
+
     const candidate = new Date(`${yyyy}-${pad2(mm)}-${pad2(dd)}T00:00:00${TZ_OFFSET}`);
-    if (!gotTime) { hh = 12; mi = 0; } // por seguridad si no detectamos hora, fijamos 12:00
     let F = { fecha: `${candidate.getFullYear()}-${pad2(candidate.getMonth()+1)}-${pad2(candidate.getDate())}`, hora: `${pad2(hh)}:${pad2(mi)}` };
 
     // Si año omitido y la fecha “este año” ya pasó, pasa al siguiente
@@ -170,7 +174,7 @@ Eres "Paniquiños Bot", asistente de reservas de catering.
     // email
     const email = (text.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/) || [])[0];
 
-    // teléfono (toma dígitos de +595…, 0999…, etc.)
+    // teléfono
     const telMatch = text.match(/(\+?\d[\d\s\-]{6,}\d)/);
     const telefono = telMatch ? telMatch[1].replace(/[^\d+]/g,"") : undefined;
 
@@ -178,7 +182,7 @@ Eres "Paniquiños Bot", asistente de reservas de catering.
     const inv = text.match(/(\d{1,3})\s*(personas?|invitad[oa]s?)/i);
     const invitados = inv ? parseInt(inv[1], 10) : undefined;
 
-    // nombre: "me llamo …" / "mi nombre es …"
+    // nombre
     let nombre;
     const n1 = text.match(/me\s+llamo\s+([^,\.]+)/i);
     const n2 = text.match(/mi\s+nombre\s+es\s+([^,\.]+)/i);
@@ -234,6 +238,7 @@ Eres "Paniquiños Bot", asistente de reservas de catering.
     if (!isWithinHours(hhmm)) return { ok:false, error:`Horario fuera de franja ${HOURS_OPEN.min}-${HOURS_OPEN.max}` };
     if (!args.invitados || args.invitados <= 0) return { ok:false, error:"Invitados debe ser > 0" };
 
+    // Chequeo de choque
     const { data: clash, error: errClash } = await supabase
       .from("reservas")
       .select("id")
@@ -270,14 +275,17 @@ Eres "Paniquiños Bot", asistente de reservas de catering.
   }
 
   try {
-    const { messages = [] } = req.body || {};
+    // Body robusto (string u objeto)
+    const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
+    const { messages = [] } = body;
+
     const rawMsgs = Array.isArray(messages) ? messages : [];
     const safeMsgs = rawMsgs.slice(-20).map(m => ({
       role: m?.role === "assistant" ? "assistant" : "user",
       content: typeof m?.content === "string" ? m.content.slice(0, 4000) : ""
     }));
 
-    // ==================  MODO EXPRÉS (parseo local)  ==================
+    // ====== MODO EXPRÉS (parseo local sin modelo) ======
     const lastUserText = [...safeMsgs].reverse().find(m => m.role === "user")?.content || "";
     const parsed = parseNaturalES(lastUserText);
 
@@ -306,15 +314,14 @@ Eres "Paniquiños Bot", asistente de reservas de catering.
         const reply = `✅ Reserva confirmada: ${fechaStr} ${horaStr}, ${fast.reserva.invitados} invitados, ${fast.reserva.tipo_servicio ?? "servicio"}. Nº: ${fast.reserva.id}`;
         return res.status(200).json({ reply, toolResult: fast, mode: "fast" });
       } else {
-        // Si falló el insert, seguimos con el flujo "normal" para explicar/recabar lo que falte
         safeMsgs.push({ role:"assistant", content:`Nota del sistema: el intento exprés falló (${fast.error}). Continuemos por pasos:` });
       }
     }
 
-    // ==================  FLUJO NORMAL (OpenAI + tools)  ==================
+    // ====== FLUJO NORMAL (OpenAI + tools) ======
     const r1 = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_API_KEY}` },
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${OPENAI_API_KEY}` },
       body: JSON.stringify({
         model: "gpt-4o-mini",
         messages: [{ role: "system", content: SYSTEM }, ...safeMsgs],
@@ -352,7 +359,7 @@ Eres "Paniquiños Bot", asistente de reservas de catering.
 
     const r2 = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_API_KEY}` },
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${OPENAI_API_KEY}` },
       body: JSON.stringify({
         model: "gpt-4o-mini",
         messages: [
