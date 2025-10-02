@@ -15,6 +15,20 @@ const totalEl      = document.querySelector("#total");
 const IMG_FALLBACK = "https://placehold.co/256x256?text=Imagen";
 const STORAGE_BASE = "https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/";
 
+// Helper para loguear errores de Supabase bien detallados
+function logSupabaseError(prefix, err) {
+  const out = {
+    message: err?.message ?? String(err),
+    details: err?.details,
+    hint: err?.hint,
+    code: err?.code,
+    name: err?.name
+  };
+  console.error(prefix, out);
+  return out;
+}
+
+
 function toPublicImageUrl(value) {
   if (!value) return IMG_FALLBACK;
   let v = String(value).trim();
@@ -54,30 +68,26 @@ async function obtenerUsuarioId() {
 
 // ------ Remoto: leer carrito + productos ------
 async function fetchCarritoRemoto() {
-  // 1) asegurar carrito y obtener id
   const { data: carritoId, error: errEns } = await supabase.rpc("asegurar_carrito");
-  if (errEns) throw errEns;
+  if (errEns) { logSupabaseError("[carrito] asegurar_carrito", errEns); throw errEns; }
 
-  // 2) ítems
   const { data: items, error: errItems } = await supabase
     .from("carrito_items")
     .select("id, producto_id, cantidad")
     .eq("carrito_id", carritoId);
 
-  if (errItems) throw errItems;
+  if (errItems) { logSupabaseError("[carrito] items", errItems); throw errItems; }
 
   if (!items || items.length === 0) return [];
 
-  // 3) traer productos
   const ids = items.map(i => i.producto_id);
   const { data: prods, error: errProds } = await supabase
     .from("v_productos_publicos")
     .select("id, nombre, precio, imagen")
     .in("id", ids);
 
-  if (errProds) throw errProds;
+  if (errProds) { logSupabaseError("[carrito] productos", errProds); throw errProds; }
 
-  // 4) merge
   const mapProd = new Map(prods.map(p => [p.id, p]));
   return items.map(i => {
     const p = mapProd.get(i.producto_id);
@@ -87,10 +97,11 @@ async function fetchCarritoRemoto() {
       precio: Number(p?.precio || 0),
       imagen: toPublicImageUrl(p?.imagen || ""),
       cantidad: Number(i.cantidad || 0),
-      _itemId: i.id // para borrar directo el row si quieres
+      _itemId: i.id
     };
   });
 }
+
 
 // ------ Remoto: acciones ------
 async function eliminarItemRemoto(itemId) {
@@ -106,10 +117,12 @@ async function vaciarCarritoRemoto() {
 }
 
 async function checkoutRemoto() {
-  const { data, error } = await supabase.rpc("carrito_checkout");
+  const { data, error } = await supabase.rpc("carrito_checkout_v2");
   if (error) throw error;
-  return data; // pedido_id
+  return data; // <- uuid del pedido
 }
+
+
 
 // ------ Render ------
 function renderLocal() {
@@ -254,22 +267,40 @@ botonVaciar?.addEventListener("click", async () => {
 
 botonComprar?.addEventListener("click", async () => {
   const uid = await obtenerUsuarioId();
+
+  // Deshabilitar mientras procesa (evita doble click)
+  botonComprar.setAttribute("disabled", "true");
+  botonComprar.textContent = "Procesando…";
+
   if (uid) {
     try {
       const pedidoId = await checkoutRemoto();
       console.log("Pedido creado:", pedidoId);
       setEstado("comprado");
+      // TODO: si querés, redirigir a pagina de confirmación:
+      // window.location.href = `confirmacion.html?pedido=${pedidoId}`;
     } catch (e) {
-      console.error(e);
+      logSupabaseError("[checkout] Error final", e);
       alert("No se pudo completar el pedido. Intenta de nuevo.");
+    } finally {
+      // Rehabilitá el botón si no pasaste a “comprado”
+      if (!contenedorCarritoComprado || contenedorCarritoComprado.classList.contains("disabled")) {
+        botonComprar.removeAttribute("disabled");
+        botonComprar.textContent = "Comprar ahora";
+      }
     }
   } else {
-    if (!productosEnCarrito || productosEnCarrito.length === 0) {
-      alert("Tu carrito está vacío.");
-      return;
+    try {
+      if (!productosEnCarrito || productosEnCarrito.length === 0) {
+        alert("Tu carrito está vacío.");
+        return;
+      }
+      // flujo sin login: ejemplo redirigir a pasarela local
+      window.location.href = "pasarelaPagos.html";
+    } finally {
+      botonComprar.removeAttribute("disabled");
+      botonComprar.textContent = "Comprar ahora";
     }
-    // ejemplo: redirigir a una pasarela local
-    window.location.href = "pasarelaPagos.html";
   }
 });
 
