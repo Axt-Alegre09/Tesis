@@ -265,44 +265,51 @@ botonVaciar?.addEventListener("click", async () => {
   }
 });
 
+function calcularTotalLocal() {
+  return (productosEnCarrito || []).reduce(
+    (acc, p) => acc + Number(p.precio) * Number(p.cantidad || 1), 0
+  );
+}
+
 botonComprar?.addEventListener("click", async () => {
   const uid = await obtenerUsuarioId();
 
-  // Deshabilitar mientras procesa (evita doble click)
+  // Bloquear mientras procesa
   botonComprar.setAttribute("disabled", "true");
-  botonComprar.textContent = "Procesando…";
+  botonComprar.textContent = "Redirigiendo…";
 
-  if (uid) {
-    try {
-      const pedidoId = await checkoutRemoto();
-      console.log("Pedido creado:", pedidoId);
-      setEstado("comprado");
-      // TODO: si querés, redirigir a pagina de confirmación:
-      // window.location.href = `confirmacion.html?pedido=${pedidoId}`;
-    } catch (e) {
-      logSupabaseError("[checkout] Error final", e);
-      alert("No se pudo completar el pedido. Intenta de nuevo.");
-    } finally {
-      // Rehabilitá el botón si no pasaste a “comprado”
-      if (!contenedorCarritoComprado || contenedorCarritoComprado.classList.contains("disabled")) {
-        botonComprar.removeAttribute("disabled");
-        botonComprar.textContent = "Comprar ahora";
-      }
-    }
-  } else {
-    try {
+  try {
+    const pasarelaUrl = new URL("./pasarelaPagos.html", window.location.href);
+
+    if (uid) {
+      // Flujo con sesión: primero generamos el pedido en DB
+      const pedidoId = await checkoutRemoto(); // <-- tu RPC
+      // Pasamos el id a la pasarela
+      pasarelaUrl.searchParams.set("pedido", String(pedidoId));
+      window.location.assign(pasarelaUrl.toString());
+      return; // ¡importante! para no ejecutar más UI abajo
+    } else {
+      // Flujo sin sesión: llevamos a pasarela con el total local
       if (!productosEnCarrito || productosEnCarrito.length === 0) {
         alert("Tu carrito está vacío.");
         return;
       }
-      // flujo sin login: ejemplo redirigir a pasarela local
-      window.location.href = "pasarelaPagos.html";
-    } finally {
+      pasarelaUrl.searchParams.set("monto", String(calcularTotalLocal()));
+      window.location.assign(pasarelaUrl.toString());
+      return;
+    }
+  } catch (e) {
+    console.error("[checkout] Error redirigiendo:", e);
+    alert("No se pudo iniciar el pago. Intenta de nuevo.");
+  } finally {
+    // Sólo rehabilitar si NO redirigimos (si llegaste aquí sin return)
+    if (!document.hidden) {
       botonComprar.removeAttribute("disabled");
       botonComprar.textContent = "Comprar ahora";
     }
   }
 });
+
 
 // ------ Carga inicial ------
 async function cargarCarrito() {
