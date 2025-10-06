@@ -1,7 +1,12 @@
 // JS/carritoo.js
 import { supabase } from "./ScriptLogin.js";
 
+/* =========================
+   Estado y elementos
+========================= */
 let productosEnCarrito = JSON.parse(localStorage.getItem("productos-en-carrito") || "[]");
+let ultimoRemoto = [];      // snapshot de items remotos para totales
+let modoActual = "local";   // "local" | "remote"
 
 const contenedorCarritoVacio     = document.querySelector("#carrito-vacio");
 const contenedorCarritoProductos = document.querySelector("#carrito-productos");
@@ -12,10 +17,66 @@ const botonVaciar  = document.querySelector("#carrito-acciones-vaciar");
 const botonComprar = document.querySelector("#carrito-acciones-comprar");
 const totalEl      = document.querySelector("#total");
 
+/* =========================
+   Constantes
+========================= */
 const IMG_FALLBACK = "https://placehold.co/256x256?text=Imagen";
 const STORAGE_BASE = "https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/";
 
-// Helper para loguear errores de Supabase bien detallados
+/* =========================
+   Helpers
+========================= */
+
+function calcularTotal(items) {
+  return (items || []).reduce((acc, p) => acc + Number(p.precio) * Number(p.cantidad || 1), 0);
+}
+
+function buildSnapshotFromItems(items) {
+  const norm = (items || []).map(p => ({
+    id: String(p.id),
+    titulo: p.titulo,
+    precio: Number(p.precio),
+    cantidad: Number(p.cantidad || 1),
+    imagen: p.imagen || null
+  }));
+  return {
+    source: "local",
+    items: norm,
+    total: calcularTotal(norm),
+    ts: Date.now()
+  };
+}
+
+function irPasarelaConItems(pasarelaUrl, items) {
+  const snap = buildSnapshotFromItems(items);
+  pasarelaUrl.searchParams.set("monto", String(snap.total));
+  sessionStorage.setItem("checkout_snapshot", JSON.stringify(snap));
+  window.location.assign(pasarelaUrl.toString());
+}
+
+function buildSnapshotLocal(){
+  const itemsLocal = (productosEnCarrito || []).map(p => ({
+    id: String(p.id),
+    titulo: p.titulo,
+    precio: Number(p.precio),
+    cantidad: Number(p.cantidad || 1),
+    imagen: p.imagen || null
+  }));
+  return {
+    source: "local",
+    items: itemsLocal,
+    total: calcularTotalLocal(),
+    ts: Date.now()
+  };
+}
+
+function irPasarelaLocal(pasarelaUrl){
+  const total = calcularTotalLocal();
+  pasarelaUrl.searchParams.set("monto", String(total));
+  sessionStorage.setItem("checkout_snapshot", JSON.stringify(buildSnapshotLocal()));
+  window.location.assign(pasarelaUrl.toString());
+}
+
 function logSupabaseError(prefix, err) {
   const out = {
     message: err?.message ?? String(err),
@@ -28,7 +89,6 @@ function logSupabaseError(prefix, err) {
   return out;
 }
 
-
 function toPublicImageUrl(value) {
   if (!value) return IMG_FALLBACK;
   let v = String(value).trim();
@@ -38,7 +98,7 @@ function toPublicImageUrl(value) {
 }
 
 function formatearGs(n) {
-  return new Intl.NumberFormat("es-PY").format(Number(n)) + " Gs";
+  return new Intl.NumberFormat("es-PY").format(Number(n || 0)) + " Gs";
 }
 
 function setEstado(estado) {
@@ -60,13 +120,17 @@ function setEstado(estado) {
   }
 }
 
-// ------ Auth ------
+/* =========================
+   Auth
+========================= */
 async function obtenerUsuarioId() {
   const { data } = await supabase.auth.getUser();
   return data?.user?.id || null;
 }
 
-// ------ Remoto: leer carrito + productos ------
+/* =========================
+   Remoto (DB)
+========================= */
 async function fetchCarritoRemoto() {
   const { data: carritoId, error: errEns } = await supabase.rpc("asegurar_carrito");
   if (errEns) { logSupabaseError("[carrito] asegurar_carrito", errEns); throw errEns; }
@@ -77,7 +141,6 @@ async function fetchCarritoRemoto() {
     .eq("carrito_id", carritoId);
 
   if (errItems) { logSupabaseError("[carrito] items", errItems); throw errItems; }
-
   if (!items || items.length === 0) return [];
 
   const ids = items.map(i => i.producto_id);
@@ -96,174 +159,67 @@ async function fetchCarritoRemoto() {
       titulo: p?.nombre || "Producto",
       precio: Number(p?.precio || 0),
       imagen: toPublicImageUrl(p?.imagen || ""),
-      cantidad: Number(i.cantidad || 0),
+      cantidad: Number(i.cantidad || 1),
       _itemId: i.id
     };
   });
 }
 
-
-// ------ Remoto: acciones ------
 async function eliminarItemRemoto(itemId) {
   const { error } = await supabase.from("carrito_items").delete().eq("id", itemId);
-  if (error) { console.error(error); return false; }
+  if (error) { logSupabaseError("[carrito] eliminarItemRemoto", error); return false; }
   return true;
 }
 
 async function vaciarCarritoRemoto() {
   const { error } = await supabase.rpc("carrito_vaciar");
-  if (error) { console.error(error); return false; }
+  if (error) { logSupabaseError("[carrito] vaciar", error); return false; }
   return true;
 }
 
 async function checkoutRemoto() {
   const { data, error } = await supabase.rpc("carrito_checkout_v2");
   if (error) throw error;
-  return data; // <- uuid del pedido
+  return data; // uuid del pedido
 }
 
-
-
-// ------ Render ------
-function renderLocal() {
-  if (!productosEnCarrito || productosEnCarrito.length === 0) {
-    contenedorCarritoProductos.innerHTML = "";
-    totalEl && (totalEl.textContent = formatearGs(0));
-    setEstado("vacio");
-    return;
-  }
-
-  setEstado("conItems");
-  contenedorCarritoProductos.innerHTML = "";
-
-  productosEnCarrito.forEach((producto) => {
-    const precio = Number(producto.precio);
-    const img = producto.imagen || IMG_FALLBACK;
-
-    const div = document.createElement("div");
-    div.classList.add("carrito-producto");
-    div.innerHTML = `
-      <img class="carrito-producto-imagen" src="${img}" alt="${producto.titulo}">
-      <div class="carrito-producto-titulo">
-        <b><h6>Título</h6>
-        <h4>${producto.titulo}</h4></b>
-      </div>
-      <div class="carrito-producto-cantidad">
-        <h6>Cantidad</h6>
-        <p>${producto.cantidad}</p>
-      </div>
-      <div class="carrito-producto-precio">
-        <h6>Precio</h6>
-        <p>${formatearGs(precio)}</p>
-      </div>
-      <div class="carrito-producto-subtotal">
-        <h6>Subtotal</h6>
-        <p>${formatearGs(precio * producto.cantidad)}</p>
-      </div>
-      <button class="carrito-producto-eliminar" data-id="${String(producto.id)}">
-        <i class="bi bi-trash"></i>
-      </button>
-    `;
-    contenedorCarritoProductos.append(div);
-  });
-
-  contenedorCarritoProductos
-    .querySelectorAll(".carrito-producto-eliminar")
-    .forEach(btn => btn.addEventListener("click", eliminarDelCarritoLocal));
-
-  actualizarTotalLocal();
+async function setCantidadRemoto(itemId, nuevaCantidad) {
+  nuevaCantidad = Math.max(1, Number(nuevaCantidad || 1));
+  const { error } = await supabase.from("carrito_items")
+    .update({ cantidad: nuevaCantidad })
+    .eq("id", itemId);
+  if (error) { logSupabaseError("[carrito] setCantidadRemoto", error); return false; }
+  await cargarCarrito(); // refresca UI y total
+  return true;
 }
 
-function renderRemoto(items) {
-  if (!items || items.length === 0) {
-    contenedorCarritoProductos.innerHTML = "";
-    totalEl && (totalEl.textContent = formatearGs(0));
-    setEstado("vacio");
-    return;
-  }
-
-  setEstado("conItems");
-  contenedorCarritoProductos.innerHTML = "";
-
-  items.forEach((producto) => {
-    const precio = Number(producto.precio);
-    const div = document.createElement("div");
-    div.classList.add("carrito-producto");
-    div.innerHTML = `
-      <img class="carrito-producto-imagen" src="${producto.imagen}" alt="${producto.titulo}">
-      <div class="carrito-producto-titulo">
-        <b><h6>Título</h6>
-        <h4>${producto.titulo}</h4></b>
-      </div>
-      <div class="carrito-producto-cantidad">
-        <h6>Cantidad</h6>
-        <p>${producto.cantidad}</p>
-      </div>
-      <div class="carrito-producto-precio">
-        <h6>Precio</h6>
-        <p>${formatearGs(precio)}</p>
-      </div>
-      <div class="carrito-producto-subtotal">
-        <h6>Subtotal</h6>
-        <p>${formatearGs(precio * producto.cantidad)}</p>
-      </div>
-      <button class="carrito-producto-eliminar" data-itemid="${producto._itemId}">
-        <i class="bi bi-trash"></i>
-      </button>
-    `;
-    const img = div.querySelector(".carrito-producto-imagen");
-    img.addEventListener("error", () => { img.src = IMG_FALLBACK; });
-
-    contenedorCarritoProductos.append(div);
-  });
-
-  contenedorCarritoProductos
-    .querySelectorAll(".carrito-producto-eliminar")
-    .forEach(btn => btn.addEventListener("click", eliminarDelCarritoRemoto));
-
-  actualizarTotalRemoto(items);
+/* =========================
+   Local (storage)
+========================= */
+function guardarLocal() {
+  localStorage.setItem("productos-en-carrito", JSON.stringify(productosEnCarrito || []));
 }
 
-// ------ Acciones locales ------
-function eliminarDelCarritoLocal(e) {
-  const id = e.currentTarget.dataset.id;
-  productosEnCarrito = productosEnCarrito.filter(p => String(p.id) !== String(id));
-  localStorage.setItem("productos-en-carrito", JSON.stringify(productosEnCarrito));
+function eliminarDelCarritoLocal(id) {
+  productosEnCarrito = (productosEnCarrito || []).filter(p => String(p.id) !== String(id));
+  guardarLocal();
   renderLocal();
 }
 
-function actualizarTotalLocal() {
-  if (!totalEl) return;
-  const total = productosEnCarrito.reduce((acc, p) => acc + Number(p.precio) * Number(p.cantidad || 1), 0);
-  totalEl.textContent = formatearGs(total);
+function setCantidadLocal(id, nuevaCantidad) {
+  nuevaCantidad = Math.max(1, Number(nuevaCantidad || 1));
+  productosEnCarrito = (productosEnCarrito || []).map(p =>
+    String(p.id) === String(id) ? { ...p, cantidad: nuevaCantidad } : p
+  );
+  guardarLocal();
+  renderLocal();
 }
 
-// ------ Acciones remotas ------
-async function eliminarDelCarritoRemoto(e) {
-  const itemId = e.currentTarget.dataset.itemid;
-  const ok = await eliminarItemRemoto(itemId);
-  if (!ok) return;
-  await cargarCarrito(); // recargar vista
+function deltaCantidadLocal(id, delta) {
+  const item = (productosEnCarrito || []).find(p => String(p.id) === String(id));
+  if (!item) return;
+  setCantidadLocal(id, Number(item.cantidad || 1) + Number(delta || 0));
 }
-
-function actualizarTotalRemoto(items) {
-  if (!totalEl) return;
-  const total = items.reduce((acc, p) => acc + Number(p.precio) * Number(p.cantidad || 1), 0);
-  totalEl.textContent = formatearGs(total);
-}
-
-// ------ Botones ------
-botonVaciar?.addEventListener("click", async () => {
-  const uid = await obtenerUsuarioId();
-  if (uid) {
-    const ok = await vaciarCarritoRemoto();
-    if (ok) await cargarCarrito();
-  } else {
-    productosEnCarrito = [];
-    localStorage.setItem("productos-en-carrito", JSON.stringify(productosEnCarrito));
-    renderLocal();
-  }
-});
 
 function calcularTotalLocal() {
   return (productosEnCarrito || []).reduce(
@@ -271,38 +227,250 @@ function calcularTotalLocal() {
   );
 }
 
+/* =========================
+   Render
+========================= */
+function plantillaItem({ img, titulo, precio, cantidad, idAttrKey, idAttrVal }) {
+  // idAttrKey: "data-id" (local) o "data-itemid" (remoto)
+  return `
+    <img class="carrito-producto-imagen" src="${img}" alt="${titulo}">
+    <div class="carrito-producto-titulo">
+      <h6>Título</h6>
+      <h4>${titulo}</h4>
+    </div>
+
+    <div class="carrito-producto-cantidad">
+      <h6>Cantidad</h6>
+      <div class="qty-ctrl">
+        <button class="qty-btn" data-action="dec" ${idAttrKey}="${idAttrVal}" aria-label="Disminuir">−</button>
+        <span class="qty" data-qty>${Number(cantidad || 1)}</span>
+        <button class="qty-btn" data-action="inc" ${idAttrKey}="${idAttrVal}" aria-label="Aumentar">+</button>
+      </div>
+    </div>
+
+    <div class="carrito-producto-precio">
+      <h6>Precio</h6>
+      <p>${formatearGs(precio)}</p>
+    </div>
+
+    <div class="carrito-producto-subtotal">
+      <h6>Subtotal</h6>
+      <p>${formatearGs(precio * cantidad)}</p>
+    </div>
+
+    <button class="carrito-producto-eliminar" title="Eliminar" ${idAttrKey}="${idAttrVal}">
+      <i class="bi bi-trash"></i>
+    </button>
+  `;
+}
+
+function renderLocal() {
+  modoActual = "local";
+  const items = productosEnCarrito || [];
+
+  if (items.length === 0) {
+    contenedorCarritoProductos.innerHTML = "";
+    if (totalEl) totalEl.textContent = formatearGs(0);
+    setEstado("vacio");
+    return;
+  }
+
+  setEstado("conItems");
+  contenedorCarritoProductos.innerHTML = "";
+
+  items.forEach(producto => {
+    const div = document.createElement("div");
+    div.className = "carrito-producto";
+    div.innerHTML = plantillaItem({
+      img: producto.imagen || IMG_FALLBACK,
+      titulo: producto.titulo,
+      precio: Number(producto.precio),
+      cantidad: Number(producto.cantidad || 1),
+      idAttrKey: "data-id",
+      idAttrVal: String(producto.id)
+    });
+
+    const img = div.querySelector(".carrito-producto-imagen");
+    img.addEventListener("error", () => { img.src = IMG_FALLBACK; });
+
+    contenedorCarritoProductos.appendChild(div);
+  });
+
+  actualizarTotalLocal();
+}
+
+function renderRemoto(items) {
+  modoActual = "remote";
+  ultimoRemoto = items || [];
+
+  if (!items || items.length === 0) {
+    contenedorCarritoProductos.innerHTML = "";
+    if (totalEl) totalEl.textContent = formatearGs(0);
+    setEstado("vacio");
+    return;
+  }
+
+  setEstado("conItems");
+  contenedorCarritoProductos.innerHTML = "";
+
+  items.forEach(producto => {
+    const div = document.createElement("div");
+    div.className = "carrito-producto";
+    div.innerHTML = plantillaItem({
+      img: producto.imagen,
+      titulo: producto.titulo,
+      precio: Number(producto.precio),
+      cantidad: Number(producto.cantidad || 1),
+      idAttrKey: "data-itemid",
+      idAttrVal: String(producto._itemId)
+    });
+
+    const img = div.querySelector(".carrito-producto-imagen");
+    img.addEventListener("error", () => { img.src = IMG_FALLBACK; });
+
+    contenedorCarritoProductos.appendChild(div);
+  });
+
+  actualizarTotalRemoto(ultimoRemoto);
+}
+
+function actualizarTotalLocal() {
+  if (!totalEl) return;
+  totalEl.textContent = formatearGs(calcularTotalLocal());
+}
+
+function actualizarTotalRemoto(items) {
+  if (!totalEl) return;
+  const total = (items || []).reduce((acc, p) => acc + Number(p.precio) * Number(p.cantidad || 1), 0);
+  totalEl.textContent = formatearGs(total);
+}
+
+/* =========================
+   Delegación de eventos (1 sola vez)
+========================= */
+contenedorCarritoProductos.addEventListener("click", async (e) => {
+  const btn = e.target.closest(".qty-btn, .carrito-producto-eliminar");
+  if (!btn) return;
+
+  // Local vs remoto por el atributo presente
+  const isLocal = btn.hasAttribute("data-id");
+  const isRemoto = btn.hasAttribute("data-itemid");
+
+  // Papelera
+  if (btn.classList.contains("carrito-producto-eliminar")) {
+    if (isLocal) {
+      const id = btn.getAttribute("data-id");
+      eliminarDelCarritoLocal(id);
+    } else if (isRemoto) {
+      const itemId = btn.getAttribute("data-itemid");
+      const ok = await eliminarItemRemoto(itemId);
+      if (ok) await cargarCarrito();
+    }
+    return;
+  }
+
+  // Botones +/−
+  if (btn.classList.contains("qty-btn")) {
+    const action = btn.getAttribute("data-action"); // "inc" | "dec"
+    const delta = action === "inc" ? +1 : -1;
+
+    if (isLocal) {
+      const id = btn.getAttribute("data-id");
+      deltaCantidadLocal(id, delta);
+    } else if (isRemoto) {
+      const itemId = btn.getAttribute("data-itemid");
+      // Leer cantidad visible y enviar setCantidadRemoto con la nueva
+      const row = btn.closest(".carrito-producto");
+      const qEl = row?.querySelector("[data-qty]");
+      const qty = Number(qEl?.textContent || "1");
+      await setCantidadRemoto(itemId, qty + delta);
+    }
+  }
+});
+
+/* =========================
+   Botones Vaciar / Comprar
+========================= */
+botonVaciar?.addEventListener("click", async () => {
+  const uid = await obtenerUsuarioId();
+  if (uid) {
+    const ok = await vaciarCarritoRemoto();
+    if (ok) await cargarCarrito();
+  } else {
+    productosEnCarrito = [];
+    guardarLocal();
+    renderLocal();
+  }
+});
+
 botonComprar?.addEventListener("click", async () => {
   const uid = await obtenerUsuarioId();
 
-  // Bloquear mientras procesa
   botonComprar.setAttribute("disabled", "true");
   botonComprar.textContent = "Redirigiendo…";
 
-  try {
-    const pasarelaUrl = new URL("./pasarelaPagos.html", window.location.href);
+  const pasarelaUrl = new URL("./pasarelaPagos.html", window.location.href);
 
+  try {
     if (uid) {
-      // Flujo con sesión: primero generamos el pedido en DB
-      const pedidoId = await checkoutRemoto(); // <-- tu RPC
-      // Pasamos el id a la pasarela
-      pasarelaUrl.searchParams.set("pedido", String(pedidoId));
-      window.location.assign(pasarelaUrl.toString());
-      return; // ¡importante! para no ejecutar más UI abajo
-    } else {
-      // Flujo sin sesión: llevamos a pasarela con el total local
-      if (!productosEnCarrito || productosEnCarrito.length === 0) {
+      // ---------- INTENTO REMOTO ----------
+      try {
+        const pedidoId = await checkoutRemoto();
+        const okId = typeof pedidoId === "string" && pedidoId.trim() !== "" &&
+                     !/^null|undefined$/i.test(pedidoId.trim());
+
+        if (okId) {
+          pasarelaUrl.searchParams.set("pedido", pedidoId);
+          sessionStorage.setItem("checkout_snapshot", JSON.stringify({
+            source: "remote",
+            pedidoId: String(pedidoId),
+            ts: Date.now()
+          }));
+          window.location.assign(pasarelaUrl.toString());
+          return;
+        } else {
+          console.warn("[checkout] pedidoId inválido, fallback a LOCAL:", pedidoId);
+          // ✅ Fallback usando items remotos si existen
+          if (ultimoRemoto && ultimoRemoto.length) {
+            irPasarelaConItems(pasarelaUrl, ultimoRemoto);
+            return;
+          }
+          // Si no hay remoto cargado, probamos local
+          if (productosEnCarrito && productosEnCarrito.length) {
+            irPasarelaConItems(pasarelaUrl, productosEnCarrito);
+            return;
+          }
+          alert("Tu carrito está vacío.");
+          return;
+        }
+      } catch (e) {
+        console.error("[checkout] checkoutRemoto falló; fallback a LOCAL:", e);
+        // ✅ Fallback usando items remotos si existen
+        if (ultimoRemoto && ultimoRemoto.length) {
+          irPasarelaConItems(pasarelaUrl, ultimoRemoto);
+          return;
+        }
+        if (productosEnCarrito && productosEnCarrito.length) {
+          irPasarelaConItems(pasarelaUrl, productosEnCarrito);
+          return;
+        }
         alert("Tu carrito está vacío.");
         return;
       }
-      pasarelaUrl.searchParams.set("monto", String(calcularTotalLocal()));
-      window.location.assign(pasarelaUrl.toString());
+    }
+
+    // ---------- INVITADO: LOCAL DIRECTO ----------
+    if (productosEnCarrito && productosEnCarrito.length) {
+      irPasarelaConItems(pasarelaUrl, productosEnCarrito);
       return;
     }
+    alert("Tu carrito está vacío.");
+    return;
+
   } catch (e) {
     console.error("[checkout] Error redirigiendo:", e);
     alert("No se pudo iniciar el pago. Intenta de nuevo.");
   } finally {
-    // Sólo rehabilitar si NO redirigimos (si llegaste aquí sin return)
     if (!document.hidden) {
       botonComprar.removeAttribute("disabled");
       botonComprar.textContent = "Comprar ahora";
@@ -310,8 +478,90 @@ botonComprar?.addEventListener("click", async () => {
   }
 });
 
+async function generateInvoicePDF(snapshot) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+  const pw = doc.internal.pageSize.getWidth();
 
-// ------ Carga inicial ------
+  const EMP = {
+    nombre: 'Paniquiños',
+    ruc: '80026041-4',
+    tel: '+595 971 000 000',
+    dir: 'Av. Sabor 123, Asunción',
+    timbrado: '15181564',
+    inicio: '01/01/2025'
+  };
+
+  const snap = snapshot || loadSnapshot() || {};
+  const metodo = snap.metodo || 'contado';
+  const extra = snap.extra || {};
+  const cliente = snap.cliente || collectClienteFromForm();
+
+  const data = getCheckoutData();
+  const items = (snap.items && snap.items.length ? snap.items : data.items) || [];
+  const totalUse = snap.total || data.total || 0;
+
+  const iva10 = Math.round(totalUse / 11);
+  const subBase = totalUse - iva10;
+  const fecha = snap.fechaISO ? new Date(snap.fechaISO) : new Date();
+  const nroFactura = `001-001-${String(Math.floor(Math.random() * 1000000)).padStart(6, '0')}`;
+
+  // --------- Encabezado Empresa ---------
+  doc.setFontSize(18);
+  doc.text(EMP.nombre, 40, 50);
+  doc.setFontSize(11);
+  doc.text(`RUC: ${EMP.ruc}`, 40, 70);
+  doc.text(`Tel: ${EMP.tel}`, 40, 85);
+  doc.text(`Dir: ${EMP.dir}`, 40, 100);
+  doc.text(`Timbrado: ${EMP.timbrado} (inicio ${EMP.inicio})`, 40, 115);
+
+  // --------- Datos Cliente ---------
+  doc.setFontSize(12);
+  doc.text("Factura Nº: " + nroFactura, pw - 250, 50);
+  doc.text("Fecha: " + fecha.toLocaleDateString(), pw - 250, 70);
+  doc.text("Método: " + metodo, pw - 250, 85);
+
+  doc.setFontSize(11);
+  doc.text("Cliente:", 40, 150);
+  doc.text(`${cliente.razon || ''}`, 100, 150);
+  doc.text("RUC: " + (cliente.ruc || ''), 40, 165);
+  doc.text("Tel: " + (cliente.tel || ''), 40, 180);
+
+  // --------- Tabla de Items ---------
+  const body = items.map(it => [
+    it.titulo,
+    it.cantidad,
+    new Intl.NumberFormat("es-PY").format(it.precio),
+    new Intl.NumberFormat("es-PY").format(it.precio * it.cantidad)
+  ]);
+
+  doc.autoTable({
+    head: [["Producto", "Cant.", "Precio", "Subtotal"]],
+    body,
+    startY: 210,
+    styles: { fontSize: 10 },
+    headStyles: { fillColor: [111, 92, 56] }
+  });
+
+  // --------- Totales ---------
+  let y = doc.lastAutoTable.finalY + 20;
+  doc.text("Sub-total: " + new Intl.NumberFormat("es-PY").format(subBase) + " Gs", pw - 200, y);
+  y += 15;
+  doc.text("IVA 10%: " + new Intl.NumberFormat("es-PY").format(iva10) + " Gs", pw - 200, y);
+  y += 15;
+  doc.setFontSize(13);
+  doc.text("TOTAL: " + new Intl.NumberFormat("es-PY").format(totalUse) + " Gs", pw - 200, y);
+
+  // --------- Guardar ---------
+  doc.save(`Factura_Paniquinos_${nroFactura}.pdf`);
+}
+
+
+
+
+/* =========================
+   Carga inicial
+========================= */
 async function cargarCarrito() {
   const uid = await obtenerUsuarioId();
   if (uid) {

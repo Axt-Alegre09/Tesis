@@ -9,19 +9,50 @@
   const efectivoMonto = document.getElementById('efectivo-monto');
   const efectivoTotalEl = document.getElementById('efectivo-total');
 
-  // ------- Utils -------
+  // ------- Constantes / Utils -------
   const fmtGs = (n) => new Intl.NumberFormat('es-PY').format(Number(n || 0)) + ' Gs';
-  const SNAP_KEY = 'pedido-simulado'; // snapshot del pedido confirmado
+  const QS = new URLSearchParams(location.search);
+  const SNAP_KEY = 'pedido-simulado';           // factura
+  const SNAP_CHECKOUT = 'checkout_snapshot';    // snapshot del carrito
+  const QR_URL = 'https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/QrGenerico.jpg';
 
-  function getCart() {
+  function hasValidPedido(qs = QS) {
+    const raw = qs.get('pedido');
+    if (raw == null) return false;
+    const v = String(raw).trim().toLowerCase();
+    return v !== '' && v !== 'null' && v !== 'undefined';
+  }
+  function readCheckoutSnapshot() {
+    try { return JSON.parse(sessionStorage.getItem(SNAP_CHECKOUT)); }
+    catch { return null; }
+  }
+  function getCartLocal() {
     try { return JSON.parse(localStorage.getItem('productos-en-carrito')) || []; }
     catch { return []; }
   }
-  function cartTotal(items = getCart()) {
-    return items.reduce((acc, p) => acc + Number(p.precio) * Number(p.cantidad || 1), 0);
+
+  // Items/total priorizando snapshot + URL; fallback a localStorage
+  function getCheckoutData() {
+    const snap = readCheckoutSnapshot();
+    const isLocalUrl  = QS.has('monto');
+    const isRemoteUrl = hasValidPedido(QS);
+
+    if (isLocalUrl && snap?.source === 'local') {
+      const items = Array.isArray(snap.items) ? snap.items : [];
+      const total = Number(snap.total || 0) || items.reduce((a,p)=>a + Number(p.precio) * Number(p.cantidad || 1), 0);
+      return { items, total, source: 'local' };
+    }
+
+    if (isRemoteUrl && snap?.source === 'remote' && snap?.pedidoId === QS.get('pedido')) {
+      return { items: [], total: NaN, source: 'remote', pedidoId: snap.pedidoId };
+    }
+
+    const items = getCartLocal();
+    const total = items.reduce((a,p)=>a + Number(p.precio) * Number(p.cantidad || 1), 0);
+    return { items, total, source: 'legacy' };
   }
 
-  // ------- Luhn + máscaras -------
+  // ------- Luhn/máscaras tarjeta -------
   function luhnCheck(numStr) {
     const digits = (numStr || '').replace(/\D/g, '');
     let sum = 0, dbl = false;
@@ -35,7 +66,7 @@
   const normalizeCard = (num) => (num || '').replace(/\D/g, '').slice(0, 19);
   const formatCardInput = (v) => normalizeCard(v).replace(/(\d{4})(?=\d)/g, '$1 ').trim();
 
-  // ------- Snapshot del pedido -------
+  // ------- Snapshot de factura -------
   function collectClienteFromForm() {
     return {
       ruc:      document.getElementById('ruc')?.value || '',
@@ -53,8 +84,7 @@
     };
   }
   function saveSnapshot(meta) {
-    const items = getCart();
-    const total = cartTotal(items);
+    const { items, total } = getCheckoutData();
     const data = {
       fechaISO: new Date().toISOString(),
       metodo: meta?.metodo || '',
@@ -71,45 +101,19 @@
     catch { return null; }
   }
 
-  // ------- Simulador de tarjeta (escenarios) -------
-  const CARD_TESTS = {
-    '4111111111111111': 'APPROVED',
-    '4999999999990000': 'NOT_FOUND',
-    '4999999999990001': 'NO_FUNDS',
-    '4999999999990002': 'BLOCKED'
-  };
-  function simulateCardCharge({ number, exp, cvv, amount }) {
-    const now = new Date();
-    const m = /^(\d{2})\/(\d{2})$/.exec(exp || '');
-    if (!m) return { ok: false, msg: 'Vencimiento inválido (usa MM/AA).' };
-    const mm = +m[1], yy = 2000 + +m[2];
-    if (mm < 1 || mm > 12) return { ok: false, msg: 'Mes inválido.' };
-    const endOfMonth = new Date(yy, mm, 0, 23, 59, 59, 999);
-    if (endOfMonth < now) return { ok: false, msg: 'La tarjeta está vencida.' };
-    if (!/^\d{3,4}$/.test(cvv || '')) return { ok: false, msg: 'CVV inválido.' };
-
-    const cleaned = normalizeCard(number);
-    if (!luhnCheck(cleaned)) return { ok: false, msg: 'Número de tarjeta inválido.' };
-
-    const scenario = CARD_TESTS[cleaned] || 'APPROVED';
-    if (scenario === 'NOT_FOUND') return { ok: false, msg: 'Tarjeta inexistente.' };
-    if (scenario === 'NO_FUNDS')  return { ok: false, msg: 'Saldo insuficiente.' };
-    if (scenario === 'BLOCKED')   return { ok: false, msg: 'Tarjeta bloqueada.' };
-
-    if (amount <= 0) return { ok: false, msg: 'El total es 0.' };
-    return { ok: true, msg: 'Pago aprobado.' };
-  }
-
-  // ------- UI: paneles por método -------
+  // ------- UI por método -------
   const radios = document.querySelectorAll('input[name="metodo"]');
   function showPanel(metodo) {
     panels.forEach(p => p.classList.toggle('disabled', p.dataset.metodo !== metodo));
-    if (metodo === 'efectivo' && efectivoTotalEl) efectivoTotalEl.value = fmtGs(cartTotal());
+    if (metodo === 'efectivo' && efectivoTotalEl) {
+      const { total, source } = getCheckoutData();
+      efectivoTotalEl.value = (source === 'remote' || !isFinite(total)) ? '—' : fmtGs(total);
+    }
   }
   radios.forEach(r => r.addEventListener('change', () => showPanel(r.value)));
   showPanel(document.querySelector('input[name="metodo"]:checked').value);
 
-  // Máscara del número de tarjeta
+  // Máscara tarjeta
   const cardNumEl = document.getElementById('card-number');
   if (cardNumEl) {
     cardNumEl.addEventListener('input', (e) => {
@@ -118,13 +122,17 @@
     });
   }
 
-  // ------- Submit: simular pago -------
+  // ------- SUBMIT -------
   form.addEventListener('submit', (e) => {
     e.preventDefault();
 
     const metodo = document.querySelector('input[name="metodo"]:checked')?.value;
-    const amount = cartTotal();
-    if (amount <= 0) { alert('Tu carrito está vacío.'); return; }
+    const { total, source } = getCheckoutData();
+
+    if (source !== 'remote' && (!isFinite(total) || total <= 0)) {
+      alert('Tu carrito está vacío. Volvé al carrito e iniciá el pago desde allí.');
+      return;
+    }
 
     if (metodo === 'transferencia') {
       if (!inputFile || !inputFile.files || inputFile.files.length === 0) {
@@ -146,8 +154,16 @@
       const cvv = document.getElementById('card-cvv')?.value?.trim();
       if (!name) { alert('Ingresá el nombre tal como figura en la tarjeta.'); return; }
 
-      const res = simulateCardCharge({ number, exp, cvv, amount });
-      if (!res.ok) { alert(`Pago rechazado: ${res.msg}`); return; }
+      const cleaned = normalizeCard(number);
+      if (!luhnCheck(cleaned)) { alert('Número de tarjeta inválido.'); return; }
+
+      const m = /^(\d{2})\/(\d{2})$/.exec(exp || '');
+      if (!m) { alert('Vencimiento inválido (usa MM/AA).'); return; }
+      const mm = +m[1], yy = 2000 + +m[2];
+      const endOfMonth = new Date(yy, mm, 0, 23, 59, 59, 999);
+      if (endOfMonth < new Date()) { alert('La tarjeta está vencida.'); return; }
+      if (!/^\d{3,4}$/.test(cvv || '')) { alert('CVV inválido.'); return; }
+      if (source !== 'remote' && (!isFinite(total) || total <= 0)) { alert('El total es 0.'); return; }
 
       alert('Pago aprobado. ¡Gracias por tu compra!');
       finalizeSuccess('tarjeta', { number });
@@ -155,12 +171,14 @@
     }
 
     if (metodo === 'efectivo') {
+      const { total, source } = getCheckoutData();
       const cash = Number(efectivoMonto?.value || 0);
       if (isNaN(cash) || cash <= 0) { alert('Ingresá el monto con el que vas a pagar.'); return; }
-      if (cash < amount) { alert(`El monto (${fmtGs(cash)}) no alcanza. Total: ${fmtGs(amount)}.`); return; }
-
-      const change = cash - amount;
-      alert(`Pedido confirmado. Vuelto: ${fmtGs(change)}. ¡Gracias!`);
+      if (source !== 'remote' && cash < total) {
+        alert(`El monto (${fmtGs(cash)}) no alcanza. Total: ${fmtGs(total)}.`); return;
+      }
+      const change = source !== 'remote' ? cash - total : 0;
+      alert(`Pedido confirmado. ${source !== 'remote' ? `Vuelto: ${fmtGs(change)}. ` : ''}¡Gracias!`);
       finalizeSuccess('efectivo', { cash, change });
       return;
     }
@@ -168,176 +186,226 @@
     alert('Seleccioná un método de pago.');
   });
 
+  // ------- Éxito + Factura -------
   function finalizeSuccess(metodo, extra = {}) {
-    // 1) Guardamos snapshot ANTES de vaciar el carrito
     const snap = saveSnapshot({ metodo, extra });
-
-    // 2) Limpiamos carrito
     try { localStorage.removeItem('productos-en-carrito'); } catch {}
 
-    // 3) UI de éxito
     form.classList.add('disabled');
     success.classList.remove('disabled');
     success.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-    // 4) Botón factura genera desde snapshot (aunque el carrito esté vacío)
-    if (btnFactura) {
-      btnFactura.onclick = () => generateInvoicePDF(snap || loadSnapshot());
-    }
+    if (btnFactura) btnFactura.onclick = () => generateInvoicePDF(snap || loadSnapshot());
   }
 
-  // ------- FACTURA PDF -------
-  async function generateInvoicePDF(snapshot) {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
-    const pw = doc.internal.pageSize.getWidth();
-
-    // Empresa (ficticia)
-    const EMP = {
-      nombre: 'Paniquiños',
-      ruc: '80026041-4',
-      tel: '+595 971 000 000',
-      dir: 'Av. Sabor 123, Asunción',
-      timbrado: '15181564',
-      inicio: '01/01/2025'
+  // ------- Helpers imágenes (logo / QR) -------
+async function toDataURL(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = img.naturalWidth; c.height = img.naturalHeight;
+      const ctx = c.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      resolve(c.toDataURL('image/png'));
     };
+    img.onerror = reject;
+    img.src = src;
+  });
+}
 
-    // Data desde snapshot (o fallback)
-    const snap = snapshot || loadSnapshot() || {};
-    const metodo = snap.metodo || 'contado';
-       const extra = snap.extra || {};
-    const cliente = snap.cliente || collectClienteFromForm();
-    const items = (snap.items && snap.items.length ? snap.items : getCart());
-    const totalUse = snap.total || cartTotal(items);
+  // ------- FACTURA PDF  -------
+// ------- FACTURA PDF (arreglo del ancho: adiós texto vertical) -------
+// ------- FACTURA PDF (encabezado estable, sin solaparse) -------
+async function generateInvoicePDF(snapshot) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
 
-    // IVA (precios IVA inc.): IVA10 = total/11
-    const iva10 = Math.round(totalUse / 11);
-    const subBase = totalUse - iva10;
+  const pw = doc.internal.pageSize.getWidth();
+  const ph = doc.internal.pageSize.getHeight();
 
-    const fecha = snap.fechaISO ? new Date(snap.fechaISO) : new Date();
-    const nroFactura = `001-001-${String(Math.floor(Math.random()*1000000)).padStart(6,'0')}`;
+  // Estilo / márgenes
+  const M = 54;
+  const C_BROWN = [111, 92, 56];
+  const C_GRAY  = [120, 120, 120];
+  const C_LINE  = [210, 210, 210];
 
-    // Logo (ojo con mayúsculas/minúsculas en ruta)
-    try {
-      const logoDataURL = await toDataURL('https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinos.png');
-      doc.addImage(logoDataURL, 'PNG', 32, 28, 90, 90);
-    } catch {}
+  // Empresa
+  const EMP = {
+    nombre: 'Paniquiños',
+    ruc: '80026041-4',
+    timbrado: '15181564',
+    inicio: '01/01/2025',
+    tel: '+595 971 000 000',
+    dir: 'Av. Sabor 123, Asunción',
+    logo: 'https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinos.png'
+  };
 
-    // Encabezado
-    doc.setFont('helvetica','bold').setFontSize(16);
-    doc.text('KuDE de FACTURA (Simulada)', 140, 46);
-    doc.setFont('helvetica','normal').setFontSize(11);
-    doc.text(`${EMP.nombre}`, 140, 66);
-    doc.text(`RUC: ${EMP.ruc}`, 140, 84);
-    doc.text(`Timbrado: ${EMP.timbrado}`, 140, 100);
-    doc.text(`Inicio de vigencia: ${EMP.inicio}`, 140, 116);
-    doc.text(`Tel: ${EMP.tel}`, 140, 132);
-    doc.text(`Dirección: ${EMP.dir}`, 140, 148);
+  // Datos
+  const snap = snapshot || loadSnapshot() || {};
+  const metodo  = snap.metodo || 'contado';
+  const cliente = snap.cliente || collectClienteFromForm();
+  const data    = getCheckoutData();
+  const items   = (snap.items && snap.items.length ? snap.items : data.items) || [];
+  const totalUse = Number(snap.total ?? data.total ?? 0);
 
-    doc.setFont('helvetica','bold');
-    doc.text(`FACTURA N° ${nroFactura}`, pw - 32, 46, { align: 'right' });
-    doc.setFont('helvetica','normal');
-    doc.text(
-      `Fecha: ${fecha.toLocaleDateString('es-PY')} ${fecha.toLocaleTimeString('es-PY',{hour:'2-digit',minute:'2-digit'})}`,
-      pw - 32, 66, { align: 'right' }
-    );
-    doc.text(`Condición de venta: ${metodo === 'tarjeta' ? 'Crédito' : 'Contado'}`, pw - 32, 84, { align: 'right' });
-    doc.text(`Moneda: Guaraní`, pw - 32, 100, { align: 'right' });
+  // Cálculos
+  const iva10   = Math.round(totalUse / 11);
+  const subBase = totalUse - iva10;
+  const fecha   = snap.fechaISO ? new Date(snap.fechaISO) : new Date();
+  const nroFactura = `001-001-${String(Math.floor(Math.random()*1_000_000)).padStart(6,'0')}`;
 
-    // Cliente
-    doc.setDrawColor(160).setLineWidth(1);
-    doc.roundedRect(28, 170, pw-56, 72, 6, 6);
-    doc.setFont('helvetica','bold'); doc.text('Cliente', 36, 188);
-    doc.setFont('helvetica','normal');
-    doc.text(`RUC/CI: ${cliente.ruc || '-'}`, 36, 208);
-    doc.text(`Razón Social: ${cliente.razon || '-'}`, 210, 208);
-    doc.text(`Tel: ${cliente.tel || '-'}  |  Mail: ${cliente.mail || '-'}`, 36, 228);
+  // ===== Encabezado =====
+  // Caja derecha
+  const boxW = 300, boxH = 100, boxX = pw - M - boxW, boxY = 40;
+  doc.setDrawColor(...C_LINE).setLineWidth(1);
+  doc.roundedRect(boxX, boxY, boxW, boxH, 10, 10);
+  doc.setFont('helvetica','bold').setFontSize(12).setTextColor(0,0,0);
+  doc.text(`FACTURA N° ${nroFactura}`, boxX + 16, boxY + 24);
+  doc.setFont('helvetica','normal').setFontSize(12).setTextColor(...C_GRAY);
+  doc.text(`Fecha: ${fecha.toLocaleDateString('es-PY')} ${fecha.toLocaleTimeString('es-PY',{hour:'2-digit',minute:'2-digit'})}`, boxX + 16, boxY + 44);
+  doc.text(`Condición de venta: ${metodo === 'tarjeta' ? 'Crédito' : 'Contado'}`, boxX + 16, boxY + 64);
+  doc.text('Moneda: Guaraní', boxX + 16, boxY + 84);
 
-    // Ítems (si no hay, línea genérica con total)
-    const body = (items && items.length ? items : [{ titulo: 'Pedido Paniquiños', cantidad: 1, precio: totalUse }])
-      .map(p => [
-        p.titulo || 'Producto',
-        String(p.cantidad || 1),
-        fmtGs(p.precio || 0),
-        fmtGs(Number(p.precio || 0) * Number(p.cantidad || 1))
-      ]);
+  // Logo
+  try {
+    const logoData = await toDataURL(EMP.logo);
+    doc.addImage(logoData, 'PNG', M, 44, 96, 96);
+  } catch {}
 
-    doc.autoTable({
-      startY: 260,
-      head: [['Descripción', 'Cant.', 'Precio', 'Subtotal']],
-      body,
-      styles: { fontSize: 10, cellPadding: 6 },
-      headStyles: { fillColor: [111,92,56], textColor: 255 },
-      theme: 'grid',
-      columnStyles: { 1: { halign:'center', cellWidth: 60 }, 2: { halign:'right', cellWidth: 90 }, 3: { halign:'right', cellWidth: 110 } }
-    });
+  // Columna izquierda (no invade la caja)
+  const leftX = M + 110;
+  const titleX = leftX, titleY = 62;
+  const titleMaxW = Math.max(120, boxX - titleX - 12); // ancho disponible hasta la caja
 
-    let y = doc.lastAutoTable.finalY + 14;
-
-    // Totales
-    doc.setFont('helvetica','bold');
-    doc.text(`SUBTOTAL (base)`, pw-240, y);
-    doc.text(`IVA 10%`, pw-240, y+18);
-    doc.text(`TOTAL`, pw-240, y+36);
-    doc.setFont('helvetica','normal');
-    doc.text(fmtGs(subBase), pw-32, y, { align:'right' });
-    doc.text(fmtGs(iva10), pw-32, y+18, { align:'right' });
-    doc.text(fmtGs(totalUse), pw-32, y+36, { align:'right' });
-
-    // Forma de pago
-    y += 60;
-    doc.setDrawColor(200); doc.line(28, y, pw-28, y);
-    y += 16;
-    doc.setFont('helvetica','bold'); doc.text('Forma de pago:', 28, y);
-    doc.setFont('helvetica','normal');
-    let nota = '';
-    if (metodo === 'transferencia') {
-      nota = 'Transferencia bancaria (comprobante recibido).';
-    } else if (metodo === 'tarjeta') {
-      const last4 = (extra.number || '').replace(/\D/g,'').slice(-4);
-      nota = `Tarjeta de crédito •••• ${last4} (aprobada - simulación).`;
-    } else {
-      nota = 'Efectivo contra entrega (simulación).';
-    }
-    doc.text(nota, 140, y);
-
-    // Pie + QR con imagen genérica
-    y += 40;
-    try {
-      const qrDataURL = await toDataURL('https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/QrGenerico.jpg'); // respeta mayúsculas/minúsculas
-      const qrSize = 120;
-      doc.addImage(qrDataURL, 'PNG', 28, y, qrSize, qrSize);
-    } catch {
-      doc.setDrawColor(120);
-      doc.roundedRect(28, y, 120, 120, 6, 6);
-      doc.setFontSize(9).text('QR (genérico no disponible)', 88, y + 62, { angle: -90, align: 'center' });
-    }
-
-    // Texto a la derecha del QR
-    doc.setFontSize(10);
-    doc.text('Este documento es una representación gráfica de una factura (simulada).', 160, y + 20);
-    doc.text('Uso demostrativo. No válida como comprobante fiscal.', 160, y + 36);
-    doc.text('Paniquiños ©', 160, y + 52);
-
-    // ¡Faltaba guardar!
-    doc.save(`Factura_Paniquinos_${nroFactura}.pdf`);
+  // Título: una línea si entra; si no, 2 líneas auto (no se superpone)
+  const title = 'KuDE de FACTURA (Simulada)';
+  doc.setFont('helvetica','bold').setTextColor(0,0,0);
+  let fs = 20;
+  while (fs >= 12) {
+    doc.setFontSize(fs);
+    if (doc.getTextWidth(title) <= titleMaxW) break;
+    fs -= 0.5;
+  }
+  let yLeft;
+  if (doc.getTextWidth(title) <= titleMaxW) {
+    doc.text(title, titleX, titleY);
+    yLeft = titleY + fs + 10;
+  } else {
+    // dividir en dos líneas dentro del ancho disponible
+    doc.setFontSize(16);
+    const lines = doc.splitTextToSize(title, titleMaxW).slice(0, 2);
+    doc.text(lines, titleX, titleY);
+    yLeft = titleY + lines.length * (16 * 1.25) + 6;
   }
 
-  // Cargar imagen como dataURL para jsPDF (debe estar FUERA de generateInvoicePDF)
-  function toDataURL(url) {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = function () {
-        const canvas = document.createElement('canvas');
-        canvas.width = this.naturalWidth;
-        canvas.height = this.naturalHeight;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(this, 0, 0);
-        resolve(canvas.toDataURL('image/png'));
-      };
-      img.onerror = reject;
-      img.src = url;
-    });
+  // Texto de empresa (envolver dentro del ancho disponible)
+  doc.setFont('helvetica','normal').setFontSize(12).setTextColor(...C_GRAY);
+  const lineH = 12 * 1.35;
+  function drawLine(txt) {
+    const lines = doc.splitTextToSize(txt, titleMaxW);
+    doc.text(lines, leftX, yLeft);
+    yLeft += lines.length * lineH;
   }
+  drawLine(EMP.nombre);
+  drawLine(`RUC: ${EMP.ruc}`);
+  drawLine(`Timbrado: ${EMP.timbrado}`);
+  drawLine(`Inicio de vigencia: ${EMP.inicio}`);
+  drawLine(`Tel: ${EMP.tel}`);
+  drawLine(`Dirección: ${EMP.dir}`);
+
+  // ===== Caja Cliente ===== (debajo de lo más bajo entre izquierda y caja)
+  const gapTop = 26;
+  const cliX = M;
+  const cliY = Math.max(boxY + boxH + gapTop, yLeft + 10);
+  const cliW = pw - M*2;
+  const cliH = 96;
+
+  doc.setDrawColor(...C_LINE);
+  doc.roundedRect(cliX, cliY, cliW, cliH, 10, 10);
+  doc.setFont('helvetica','bold').setFontSize(12).setTextColor(0,0,0);
+  doc.text('Cliente', cliX + 14, cliY + 24);
+
+  doc.setFont('helvetica','normal').setFontSize(12).setTextColor(...C_GRAY);
+  doc.text(`RUC/CI: ${cliente.ruc || '-'}`, cliX + 14, cliY + 46);
+  doc.text(`Razón Social: ${cliente.razon || '-'}`, cliX + cliW/2, cliY + 46);
+  doc.text(`Tel: ${cliente.tel || '-'}`, cliX + 14, cliY + 66);
+  doc.text(`Mail: ${cliente.mail || '-'}`, cliX + cliW/2, cliY + 66);
+
+  // ===== Tabla =====
+  const body = (items.length ? items : [{ titulo:'Pedido Paniquiños', cantidad:1, precio: totalUse }])
+    .map(it => [
+      it.titulo || 'Producto',
+      String(it.cantidad || 1),
+      new Intl.NumberFormat('es-PY').format(Number(it.precio || 0)) + ' Gs',
+      new Intl.NumberFormat('es-PY').format(Number(it.precio || 0) * Number(it.cantidad || 1)) + ' Gs'
+    ]);
+
+  doc.autoTable({
+    head: [['Descripción','Cant.','Precio','Subtotal']],
+    body,
+    startY: cliY + cliH + 18,
+    styles: { fontSize: 10, cellPadding: 6 },
+    headStyles: { fillColor: C_BROWN, textColor: 255 },
+    columnStyles: {
+      1: { halign:'center', cellWidth: 70 },
+      2: { halign:'right',  cellWidth: 90 },
+      3: { halign:'right',  cellWidth: 110 }
+    },
+    tableLineColor: C_LINE,
+    tableLineWidth: 0.5,
+    theme: 'grid'
+  });
+
+  // ===== Totales =====
+  let y = doc.lastAutoTable.finalY + 14;
+  const tx = pw - M - 226;
+  const vx = pw - M;
+
+  doc.setFont('helvetica','bold').setFontSize(11).setTextColor(0,0,0);
+  doc.text('SUBTOTAL (base)', tx, y);
+  doc.text('IVA 10%',         tx, y + 18);
+  doc.setFont('helvetica','bold').setFontSize(13);
+  doc.text('TOTAL',           tx, y + 36);
+
+  doc.setFont('helvetica','normal').setFontSize(11);
+  doc.text(new Intl.NumberFormat('es-PY').format(subBase) + ' Gs', vx, y,       { align:'right' });
+  doc.text(new Intl.NumberFormat('es-PY').format(iva10)   + ' Gs', vx, y + 18, { align:'right' });
+  doc.setFont('helvetica','bold').setFontSize(13);
+  doc.text(new Intl.NumberFormat('es-PY').format(totalUse)+ ' Gs', vx, y + 36, { align:'right' });
+
+  // ===== Forma de pago =====
+  y += 56;
+  doc.setDrawColor(...C_LINE); doc.line(M, y - 14, pw - M, y - 14);
+  doc.setFont('helvetica','bold').setFontSize(11).setTextColor(0,0,0);
+  doc.text('Forma de pago:', M, y);
+  doc.setFont('helvetica','normal').setTextColor(...C_GRAY);
+  const fp = (metodo === 'transferencia')
+      ? 'Transferencia bancaria (comprobante recibido).'
+      : (metodo === 'efectivo' ? 'Efectivo.' : 'Tarjeta.');
+  doc.text(fp, M + 110, y);
+
+  // ===== QR + nota =====
+  try {
+    const qrData = await toDataURL(QR_URL); // usa la constante global
+    const qrSize = 150;
+    const qrX = M, qrY = ph - qrSize - 140;
+    doc.addImage(qrData, 'PNG', qrX, qrY, qrSize, qrSize);
+    doc.setFillColor(64,120,215);
+    doc.rect(qrX + qrSize - 30, qrY + qrSize - 12, 30, 12, 'F');
+    doc.rect(qrX + qrSize - 12, qrY + qrSize - 30, 12, 30, 'F');
+
+    doc.setFont('helvetica','normal').setFontSize(10).setTextColor(...C_GRAY);
+    const noteX = qrX + qrSize + 22, noteY = qrY + 18;
+    doc.text('Este documento es una representación gráfica de una factura (simulada).', noteX, noteY);
+    doc.text('Uso demostrativo. No válida como comprobante fiscal.', noteX, noteY + 16);
+    doc.text('Paniquiños ©', noteX, noteY + 32);
+  } catch {}
+
+  // Guardar
+  doc.save(`Factura_Paniquinos_${nroFactura}.pdf`);
+}
+
+
 })();
