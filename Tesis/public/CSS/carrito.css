@@ -100,3 +100,105 @@
   .carrito-producto-subtotal{ grid-area: subtotal; }
   .carrito-producto-eliminar{ grid-area: borrar; justify-self: end; }
 }
+
+
+/* =========================
+   Responsive TABLET (≤1024px)
+   — Ajusta columnas, tipografías y paddings
+========================= */
+@media (max-width: 1024px){
+  /* Fila un poco más compacta */
+  .carrito-producto{
+    grid-template-columns: 72px 1fr 140px 120px 140px 44px;
+    gap: .8rem;
+    padding: .65rem .9rem;
+  }
+  .carrito-producto-imagen{ width: 72px; height: 72px; }
+
+  .carrito-producto h6{ font-size: .78rem; }
+  .carrito-producto-titulo h4{ font-size: 1rem; }
+  .carrito-producto-precio p,
+  .carrito-producto-subtotal p{ font-size: .95rem; }
+
+  /* Controles táctiles más cómodos */
+  .qty-ctrl{ padding: .28rem .6rem; }
+  .qty-btn{ width: 30px; height: 30px; font-size: 1.05rem; }
+  .qty{ min-width: 26px; }
+
+  /* Acciones de abajo: dejan respirar y no rompen */
+  .carrito-acciones{ gap: .75rem; }
+  .carrito-acciones-total{ padding: .8rem 1rem; }
+  .carrito-acciones-comprar{ padding: .85rem 1.1rem; }
+}
+
+/* =========================
+   Responsive MÓVIL (≤600px)
+   — Tarjeta apilada, CTA full width,
+     y estado vacío centrado
+========================= */
+@media (max-width: 600px){
+  /* Fila como tarjeta apilada */
+  .carrito-producto{
+    grid-template-columns: 64px 1fr;
+    grid-template-areas:
+      "img  titulo"
+      "img  cantidad"
+      "img  precio"
+      "img  subtotal"
+      "img  borrar";
+    align-items: flex-start;
+    gap: .75rem 1rem;
+    padding: .75rem;
+  }
+  .carrito-producto-imagen{ grid-area: img; width: 64px; height: 64px; }
+  .carrito-producto-titulo{ grid-area: titulo; }
+  .carrito-producto-cantidad{ grid-area: cantidad; }
+  .carrito-producto-precio{ grid-area: precio; }
+  .carrito-producto-subtotal{ grid-area: subtotal; }
+  .carrito-producto-eliminar{ grid-area: borrar; justify-self: end; }
+
+  .carrito-producto h6{ font-size: .76rem; }
+  .carrito-producto-titulo h4{ font-size: .98rem; }
+  .carrito-producto-precio p,
+  .carrito-producto-subtotal p{ font-size: .95rem; }
+
+  /* Controles de cantidad: touch-friendly */
+  .qty-ctrl{ padding: .35rem .7rem; border-radius: 999px; }
+  .qty-btn{ width: 34px; height: 34px; font-size: 1.1rem; }
+  .qty{ font-size: 1rem; min-width: 28px; }
+
+  /* Acciones: columna y botón grande */
+  .carrito-acciones{
+    flex-direction: column;
+    align-items: stretch;
+    gap: .6rem;
+  }
+  .carrito-acciones-derecha{
+    flex-direction: column;
+    align-items: stretch;
+    gap: .6rem;
+  }
+  .carrito-acciones-total{
+    justify-content: space-between;
+    padding: .9rem 1rem;
+  }
+  .carrito-acciones-comprar{
+    width: 100%;
+    padding: 1rem 1.1rem;
+    font-size: 1rem;
+  }
+
+  /* “Carrito vacío” centrado (sobrescribe tu layout de desktop) */
+  .carrito-vacio{
+    position: static;
+    margin: 0;
+    font-size: 1.2rem;
+    text-align: center;
+    justify-content: center;
+  }
+  .img-carrito-vacio{
+    width: 180px;
+    margin: 10px auto 0;
+    padding: 8px;
+  }
+}
