@@ -464,3 +464,80 @@ main{
   .contenedor-productos{ gap: .6rem; }
   .producto-detalles{ padding: .6rem .65rem; }
 }
+
+
+
+/* =========================
+   Index – móvil chico (≤ 480px) afinado visual
+========================= */
+@media (max-width: 480px){
+  /* Topbar súper compacto */
+  .topbar-inner{
+    padding: .4rem .55rem;
+    gap: .5rem;
+  }
+  .searchbar{ padding: .32rem .5rem; gap: .3rem; }
+  .searchbar input{ font-size: .95rem; }
+  .searchbar-btn{ display: none; }       /* solo ícono */
+
+  /* Oculta el email/label largo en móvil */
+  .user-chip .user-name{ display: none; }
+  .user-chip{ padding: .3rem .5rem; }
+
+  /* Main más al borde, sin tanto “aire” */
+  main{ margin: .5rem; padding: .6rem; }
+
+  /* Grid 2 columnas bien apretado */
+  .contenedor-productos{
+    grid-template-columns: repeat(2, minmax(0,1fr));
+    gap: .55rem;
+  }
+
+  /* Tarjeta compacta */
+  :root{ --card-img-h: 160px; }
+  .producto{
+    border-radius: .9rem;
+    box-shadow: 0 2px 7px rgba(0,0,0,.06);
+    overflow: hidden;
+    border: 1px solid rgba(0,0,0,.05);
+  }
+  .producto-imagen{
+    aspect-ratio: 1/1;    /* imagen cuadrada consistente */
+    height: auto;
+    object-fit: cover;
+  }
+  .producto-detalles{
+    padding: .55rem .6rem;
+    gap: .3rem;
+    border-radius: 0 0 .9rem .9rem;
+  }
+
+  /* Título en 2 líneas máximo (evita que “salte”) */
+  .producto-titulo{
+    font-size: .95rem; line-height: 1.15;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    min-height: 2.2em;   /* estabiliza altura */
+  }
+  .producto-precio{ font-size: .88rem; }
+
+  /* Botón más bajo y ancho completo */
+  .producto-agregar{
+    width: 100%;
+    padding: .42rem .6rem;
+    font-size: .82rem;
+    border-width: 1.5px;
+    border-radius: 1rem;
+  }
+
+  /* Aside off-canvas más angosto en pantallas chicas */
+  aside{ width: min(88vw, 300px); left: -100vw; }
+  .aside-open aside{ left: 0; }
+}
+
+/* Ultra-compacto (≤ 360px) */
+@media (max-width: 360px){
+  :root{ --card-img-h: 140px; }
+  .contenedor-productos{ gap: .5rem; }
+  .producto-titulo{ font-size: .9rem; }
+  .producto-agregar{ padding: .38rem .55rem; font-size: .78rem; }
+}
