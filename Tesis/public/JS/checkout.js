@@ -216,8 +216,8 @@ async function toDataURL(src) {
 }
 
   // ------- FACTURA PDF  -------
-// ------- FACTURA PDF (arreglo del ancho: adiós texto vertical) -------
-// ------- FACTURA PDF (encabezado estable, sin solaparse) -------
+
+// ===== FACTURA PDF (header en caja con 2 columnas, sin solapes) =====
 async function generateInvoicePDF(snapshot) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
@@ -225,24 +225,27 @@ async function generateInvoicePDF(snapshot) {
   const pw = doc.internal.pageSize.getWidth();
   const ph = doc.internal.pageSize.getHeight();
 
-  // Estilo / márgenes
+  // Paleta y márgenes
   const M = 54;
-  const C_BROWN = [111, 92, 56];
-  const C_GRAY  = [120, 120, 120];
-  const C_LINE  = [210, 210, 210];
+  const C_TXT  = [30, 30, 30];
+  const C_MUT  = [110, 110, 110];
+  const C_LINE = [170, 170, 170];
+  const C_HEAD = [111, 92, 56];
 
-  // Empresa
+  // Empresa (ajustá a tu marca)
   const EMP = {
     nombre: 'Paniquiños',
-    ruc: '80026041-4',
+    actividad: ' Panaderia ',
+    dir: 'Avda Sabor 1500',
+    tel: '+595 992544305',
+    ruc: '800260001-4',
     timbrado: '15181564',
-    inicio: '01/01/2025',
-    tel: '+595 971 000 000',
-    dir: 'Av. Sabor 123, Asunción',
+    inicio: '20/10/2021',
     logo: 'https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinos.png'
   };
+  const QR_URL  = 'https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/QrGenerico.jpg';
 
-  // Datos
+  // Snapshot / carrito
   const snap = snapshot || loadSnapshot() || {};
   const metodo  = snap.metodo || 'contado';
   const cliente = snap.cliente || collectClienteFromForm();
@@ -256,87 +259,94 @@ async function generateInvoicePDF(snapshot) {
   const fecha   = snap.fechaISO ? new Date(snap.fechaISO) : new Date();
   const nroFactura = `001-001-${String(Math.floor(Math.random()*1_000_000)).padStart(6,'0')}`;
 
-  // ===== Encabezado =====
-  // Caja derecha
-  const boxW = 300, boxH = 100, boxX = pw - M - boxW, boxY = 40;
-  doc.setDrawColor(...C_LINE).setLineWidth(1);
-  doc.roundedRect(boxX, boxY, boxW, boxH, 10, 10);
-  doc.setFont('helvetica','bold').setFontSize(12).setTextColor(0,0,0);
-  doc.text(`FACTURA N° ${nroFactura}`, boxX + 16, boxY + 24);
-  doc.setFont('helvetica','normal').setFontSize(12).setTextColor(...C_GRAY);
-  doc.text(`Fecha: ${fecha.toLocaleDateString('es-PY')} ${fecha.toLocaleTimeString('es-PY',{hour:'2-digit',minute:'2-digit'})}`, boxX + 16, boxY + 44);
-  doc.text(`Condición de venta: ${metodo === 'tarjeta' ? 'Crédito' : 'Contado'}`, boxX + 16, boxY + 64);
-  doc.text('Moneda: Guaraní', boxX + 16, boxY + 84);
+  // ===== Caja grande del encabezado =====
+  const hbX = 28, hbY = 28, hbW = pw - 56, hbH = 150;
+  const pad = 16;
+  doc.setDrawColor(...C_LINE).setLineWidth(2);
+  doc.roundedRect(hbX, hbY, hbW, hbH, 10, 10);
+
+  // Layout interno (logo + columna izquierda + columna derecha)
+  const gap = 16;
+  const logoW = 100, logoH = 100;
+  const rightW = 270;                          // ancho fijo de la columna derecha
+  const rightX = hbX + hbW - pad - rightW;     // empieza a la derecha
+  const leftX  = hbX + pad + logoW + gap;      // izquierda, después del logo
+  const leftW  = rightX - gap - leftX;         // TODO el espacio restante hasta la derecha
 
   // Logo
   try {
     const logoData = await toDataURL(EMP.logo);
-    doc.addImage(logoData, 'PNG', M, 44, 96, 96);
+    doc.addImage(logoData, 'PNG', hbX + pad, hbY + pad, logoW, logoH);
   } catch {}
 
-  // Columna izquierda (no invade la caja)
-  const leftX = M + 110;
-  const titleX = leftX, titleY = 62;
-  const titleMaxW = Math.max(120, boxX - titleX - 12); // ancho disponible hasta la caja
+  // Tipografías unificadas
+  const FS_TITLE = 16;
+  const FS_LABEL = 11;
+  const FS_TEXT  = 11;
+  const LH       = 14;
 
-  // Título: una línea si entra; si no, 2 líneas auto (no se superpone)
-  const title = 'KuDE de FACTURA (Simulada)';
-  doc.setFont('helvetica','bold').setTextColor(0,0,0);
-  let fs = 20;
-  while (fs >= 12) {
-    doc.setFontSize(fs);
-    if (doc.getTextWidth(title) <= titleMaxW) break;
-    fs -= 0.5;
+  // ---- Columna izquierda (título + datos empresa) ----
+  let yL = hbY + pad + 6;
+
+  doc.setFont('helvetica','bold').setFontSize(FS_TITLE).setTextColor(...C_TXT);
+  const titleLines = doc.splitTextToSize('KuDE de FACTURA ELECTRÓNICA', leftW);
+  doc.text(titleLines, leftX, yL);
+  yL += titleLines.length * (FS_TITLE * 1.1) + 4;
+
+  doc.setFont('helvetica','normal').setFontSize(FS_TEXT).setTextColor(...C_MUT);
+  const leftBlocks = [
+    EMP.nombre,
+    EMP.actividad,
+    EMP.dir,
+    `Tel: ${EMP.tel}`
+  ];
+  for (const t of leftBlocks) {
+    const lines = doc.splitTextToSize(t, leftW);
+    doc.text(lines, leftX, yL);
+    yL += lines.length * LH;
   }
-  let yLeft;
-  if (doc.getTextWidth(title) <= titleMaxW) {
-    doc.text(title, titleX, titleY);
-    yLeft = titleY + fs + 10;
-  } else {
-    // dividir en dos líneas dentro del ancho disponible
-    doc.setFontSize(16);
-    const lines = doc.splitTextToSize(title, titleMaxW).slice(0, 2);
-    doc.text(lines, titleX, titleY);
-    yLeft = titleY + lines.length * (16 * 1.25) + 6;
-  }
 
-  // Texto de empresa (envolver dentro del ancho disponible)
-  doc.setFont('helvetica','normal').setFontSize(12).setTextColor(...C_GRAY);
-  const lineH = 12 * 1.35;
-  function drawLine(txt) {
-    const lines = doc.splitTextToSize(txt, titleMaxW);
-    doc.text(lines, leftX, yLeft);
-    yLeft += lines.length * lineH;
-  }
-  drawLine(EMP.nombre);
-  drawLine(`RUC: ${EMP.ruc}`);
-  drawLine(`Timbrado: ${EMP.timbrado}`);
-  drawLine(`Inicio de vigencia: ${EMP.inicio}`);
-  drawLine(`Tel: ${EMP.tel}`);
-  drawLine(`Dirección: ${EMP.dir}`);
+  // ---- Columna derecha (RUC / Timbrado / Inicio / Factura) ----
+  let yR = hbY + pad + 6;
+  doc.setFont('helvetica','bold').setFontSize(FS_LABEL).setTextColor(...C_TXT);
+  doc.text(`RUC : ${EMP.ruc}`, rightX, yR);
 
-  // ===== Caja Cliente ===== (debajo de lo más bajo entre izquierda y caja)
-  const gapTop = 26;
-  const cliX = M;
-  const cliY = Math.max(boxY + boxH + gapTop, yLeft + 10);
-  const cliW = pw - M*2;
-  const cliH = 96;
+  yR += 20;
+  doc.text('Timbrado', rightX, yR);
+  doc.setFont('helvetica','normal').setFontSize(FS_TEXT).setTextColor(...C_TXT);
+  doc.text(EMP.timbrado, rightX + 90, yR);
 
-  doc.setDrawColor(...C_LINE);
+  yR += 18;
+  doc.setFont('helvetica','bold').setFontSize(FS_LABEL).setTextColor(...C_TXT);
+  doc.text('Inicio de', rightX, yR);
+  doc.setFont('helvetica','normal').setFontSize(FS_TEXT).setTextColor(...C_TXT);
+  doc.text(EMP.inicio, rightX + 90, yR);
+
+  yR += 26;
+  doc.setFont('helvetica','bold').setFontSize(FS_LABEL + 1).setTextColor(...C_TXT);
+  doc.text('FACTURA ELECTRÓNICA', rightX, yR);
+  yR += 18;
+  doc.setFont('helvetica','normal').setFontSize(FS_TEXT).setTextColor(...C_TXT);
+  doc.text(nroFactura.replace(/-/g, ' - '), rightX, yR);
+
+  // ===== Caja Cliente =====
+  const cliX = M, cliY = hbY + hbH + 28, cliW = pw - 2*M, cliH = 96;
+  doc.setDrawColor(210).setLineWidth(1);
   doc.roundedRect(cliX, cliY, cliW, cliH, 10, 10);
-  doc.setFont('helvetica','bold').setFontSize(12).setTextColor(0,0,0);
+
+  doc.setFont('helvetica','bold').setFontSize(FS_LABEL).setTextColor(...C_TXT);
   doc.text('Cliente', cliX + 14, cliY + 24);
 
-  doc.setFont('helvetica','normal').setFontSize(12).setTextColor(...C_GRAY);
-  doc.text(`RUC/CI: ${cliente.ruc || '-'}`, cliX + 14, cliY + 46);
-  doc.text(`Razón Social: ${cliente.razon || '-'}`, cliX + cliW/2, cliY + 46);
-  doc.text(`Tel: ${cliente.tel || '-'}`, cliX + 14, cliY + 66);
-  doc.text(`Mail: ${cliente.mail || '-'}`, cliX + cliW/2, cliY + 66);
+  doc.setFont('helvetica','normal').setFontSize(FS_TEXT).setTextColor(...C_MUT);
+  doc.text(`RUC/CI: ${cliente.ruc || '-'}`,        cliX + 14,     cliY + 46);
+  doc.text(`Razón Social: ${cliente.razon || '-'}`,cliX + cliW/2, cliY + 46);
+  doc.text(`Tel: ${cliente.tel || '-'}`,           cliX + 14,     cliY + 66);
+  doc.text(`Mail: ${cliente.mail || '-'}`,         cliX + cliW/2, cliY + 66);
 
   // ===== Tabla =====
-  const body = (items.length ? items : [{ titulo:'Pedido Paniquiños', cantidad:1, precio: totalUse }])
+  const body = (items.length ? items : [{ titulo:'Servicio/Producto', cantidad:1, precio: totalUse }])
     .map(it => [
-      it.titulo || 'Producto',
+      it.titulo || 'Item',
       String(it.cantidad || 1),
       new Intl.NumberFormat('es-PY').format(Number(it.precio || 0)) + ' Gs',
       new Intl.NumberFormat('es-PY').format(Number(it.precio || 0) * Number(it.cantidad || 1)) + ' Gs'
@@ -346,49 +356,43 @@ async function generateInvoicePDF(snapshot) {
     head: [['Descripción','Cant.','Precio','Subtotal']],
     body,
     startY: cliY + cliH + 18,
-    styles: { fontSize: 10, cellPadding: 6 },
-    headStyles: { fillColor: C_BROWN, textColor: 255 },
-    columnStyles: {
-      1: { halign:'center', cellWidth: 70 },
-      2: { halign:'right',  cellWidth: 90 },
-      3: { halign:'right',  cellWidth: 110 }
-    },
-    tableLineColor: C_LINE,
+    styles: { fontSize: 10, cellPadding: 6, textColor: C_TXT },
+    headStyles: { fillColor: C_HEAD, textColor: 255 },
+    columnStyles: { 1: { halign:'center', cellWidth: 70 }, 2: { halign:'right', cellWidth: 90 }, 3: { halign:'right', cellWidth: 110 } },
+    tableLineColor: [210,210,210],
     tableLineWidth: 0.5,
     theme: 'grid'
   });
 
   // ===== Totales =====
-  let y = doc.lastAutoTable.finalY + 14;
-  const tx = pw - M - 226;
-  const vx = pw - M;
+  let yTot = doc.lastAutoTable.finalY + 14;
+  const tx = pw - M - 226, vx = pw - M;
 
-  doc.setFont('helvetica','bold').setFontSize(11).setTextColor(0,0,0);
-  doc.text('SUBTOTAL (base)', tx, y);
-  doc.text('IVA 10%',         tx, y + 18);
+  doc.setFont('helvetica','bold').setFontSize(11).setTextColor(...C_TXT);
+  doc.text('SUBTOTAL (base)', tx, yTot);
+  doc.text('IVA 10%',         tx, yTot + 18);
   doc.setFont('helvetica','bold').setFontSize(13);
-  doc.text('TOTAL',           tx, y + 36);
+  doc.text('TOTAL',           tx, yTot + 36);
 
-  doc.setFont('helvetica','normal').setFontSize(11);
-  doc.text(new Intl.NumberFormat('es-PY').format(subBase) + ' Gs', vx, y,       { align:'right' });
-  doc.text(new Intl.NumberFormat('es-PY').format(iva10)   + ' Gs', vx, y + 18, { align:'right' });
+  doc.setFont('helvetica','normal').setFontSize(11).setTextColor(...C_TXT);
+  doc.text(new Intl.NumberFormat('es-PY').format(subBase) + ' Gs', vx, yTot,       { align:'right' });
+  doc.text(new Intl.NumberFormat('es-PY').format(iva10)   + ' Gs', vx, yTot + 18, { align:'right' });
   doc.setFont('helvetica','bold').setFontSize(13);
-  doc.text(new Intl.NumberFormat('es-PY').format(totalUse)+ ' Gs', vx, y + 36, { align:'right' });
+  doc.text(new Intl.NumberFormat('es-PY').format(totalUse)+ ' Gs', vx, yTot + 36, { align:'right' });
 
   // ===== Forma de pago =====
-  y += 56;
-  doc.setDrawColor(...C_LINE); doc.line(M, y - 14, pw - M, y - 14);
-  doc.setFont('helvetica','bold').setFontSize(11).setTextColor(0,0,0);
-  doc.text('Forma de pago:', M, y);
-  doc.setFont('helvetica','normal').setTextColor(...C_GRAY);
-  const fp = (metodo === 'transferencia')
-      ? 'Transferencia bancaria (comprobante recibido).'
-      : (metodo === 'efectivo' ? 'Efectivo.' : 'Tarjeta.');
-  doc.text(fp, M + 110, y);
+  yTot += 56;
+  doc.setDrawColor(210); doc.line(M, yTot - 14, pw - M, yTot - 14);
+  doc.setFont('helvetica','bold').setFontSize(11).setTextColor(...C_TXT);
+  doc.text('Forma de pago:', M, yTot);
+  doc.setFont('helvetica','normal').setFontSize(11).setTextColor(...C_MUT);
+  const fp = (metodo === 'transferencia') ? 'Transferencia bancaria (comprobante recibido).' :
+            (metodo === 'efectivo') ? 'Efectivo.' : 'Tarjeta.';
+  doc.text(fp, M + 110, yTot);
 
   // ===== QR + nota =====
   try {
-    const qrData = await toDataURL(QR_URL); // usa la constante global
+    const qrData = await toDataURL(QR_URL);
     const qrSize = 150;
     const qrX = M, qrY = ph - qrSize - 140;
     doc.addImage(qrData, 'PNG', qrX, qrY, qrSize, qrSize);
@@ -396,14 +400,13 @@ async function generateInvoicePDF(snapshot) {
     doc.rect(qrX + qrSize - 30, qrY + qrSize - 12, 30, 12, 'F');
     doc.rect(qrX + qrSize - 12, qrY + qrSize - 30, 12, 30, 'F');
 
-    doc.setFont('helvetica','normal').setFontSize(10).setTextColor(...C_GRAY);
+    doc.setFont('helvetica','normal').setFontSize(10).setTextColor(...C_MUT);
     const noteX = qrX + qrSize + 22, noteY = qrY + 18;
     doc.text('Este documento es una representación gráfica de una factura (simulada).', noteX, noteY);
     doc.text('Uso demostrativo. No válida como comprobante fiscal.', noteX, noteY + 16);
     doc.text('Paniquiños ©', noteX, noteY + 32);
   } catch {}
 
-  // Guardar
   doc.save(`Factura_Paniquinos_${nroFactura}.pdf`);
 }
 
