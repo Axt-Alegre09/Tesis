@@ -3,15 +3,15 @@ import { supabase } from "./ScriptLogin.js";
 
 const contenedorProductos = document.querySelector("#contenedor-productos");
 const botonesCategorias = document.querySelectorAll(".boton-categoria");
-const tituloPrincipal = document.querySelector("#titulo-principal");
-const numerito = document.querySelector("#numerito");
+const tituloPrincipal   = document.querySelector("#titulo-principal");
+const numerito          = document.querySelector("#numerito");
 
 let CATALOGO = [];
 let productosEnCarrito = []; // fallback local
 
 // -------- Utils --------
 function formatearGs(n) {
-  return new Intl.NumberFormat("es-PY").format(Number(n)) + " Gs";
+  return new Intl.NumberFormat("es-PY").format(Number(n || 0)) + " Gs";
 }
 function slugFix(s) {
   return String(s || "")
@@ -40,7 +40,7 @@ async function obtenerUsuarioId() {
 async function agregarAlCarritoRemoto(productoId, delta = 1) {
   const { error } = await supabase.rpc("carrito_agregar_item", {
     p_producto_id: productoId,
-    p_delta: delta
+    p_delta: delta,
   });
   if (error) {
     console.error("carrito_agregar_item error:", error);
@@ -72,13 +72,13 @@ async function fetchProductos() {
     return [];
   }
 
-  return (data || []).map(p => ({
+  return (data || []).map((p) => ({
     id: p.id,
     sku: p.sku ?? null,
     titulo: p.nombre,
     imagen: toPublicImageUrl(p.imagen),
     precio: p.precio,
-    categoria: { id: p.categoria_slug, nombre: p.categoria_nombre }
+    categoria: { id: p.categoria_slug, nombre: p.categoria_nombre },
   }));
 }
 
@@ -100,13 +100,13 @@ async function buscarProductos(q) {
     return;
   }
 
-  const resultados = (data || []).map(p => ({
+  const resultados = (data || []).map((p) => ({
     id: p.id,
     sku: p.sku ?? null,
     titulo: p.nombre,
     imagen: toPublicImageUrl(p.imagen),
     precio: p.precio,
-    categoria: { id: p.categoria_slug, nombre: p.categoria_nombre }
+    categoria: { id: p.categoria_slug, nombre: p.categoria_nombre },
   }));
 
   tituloPrincipal.textContent = `Resultados para "${q}" (${resultados.length})`;
@@ -122,7 +122,7 @@ function cargarProductos(productosElegidos) {
     return;
   }
 
-  productosElegidos.forEach(producto => {
+  productosElegidos.forEach((producto) => {
     const imgSrc = producto.imagen || IMG_FALLBACK;
 
     const div = document.createElement("div");
@@ -137,7 +137,9 @@ function cargarProductos(productosElegidos) {
     `;
 
     const img = div.querySelector(".producto-imagen");
-    img.addEventListener("error", () => { img.src = IMG_FALLBACK; });
+    img.addEventListener("error", () => {
+      img.src = IMG_FALLBACK;
+    });
 
     contenedorProductos.append(div);
   });
@@ -152,16 +154,16 @@ function renderTodos() {
 
 // -------- Filtros por categoría --------
 function activarBotonesCategorias() {
-  botonesCategorias.forEach(boton => {
+  botonesCategorias.forEach((boton) => {
     boton.addEventListener("click", (e) => {
-      botonesCategorias.forEach(b => b.classList.remove("active"));
+      botonesCategorias.forEach((b) => b.classList.remove("active"));
       e.currentTarget.classList.add("active");
 
       const filtro = slugFix(e.currentTarget.id);
       if (filtro && filtro !== "todos") {
-        const productoCategoria = CATALOGO.find(p => p.categoria.id === filtro);
+        const productoCategoria = CATALOGO.find((p) => p.categoria.id === filtro);
         tituloPrincipal.textContent = productoCategoria?.categoria?.nombre || "Productos";
-        const productosBoton = CATALOGO.filter(p => p.categoria.id === filtro);
+        const productosBoton = CATALOGO.filter((p) => p.categoria.id === filtro);
         cargarProductos(productosBoton);
       } else {
         renderTodos();
@@ -173,7 +175,7 @@ function activarBotonesCategorias() {
 // -------- Carrito (agregar) --------
 function actualizarBotonesAgregar() {
   const botonesAgregar = document.querySelectorAll(".producto-agregar");
-  botonesAgregar.forEach(boton => {
+  botonesAgregar.forEach((boton) => {
     boton.addEventListener("click", agregarAlCarrito);
   });
 }
@@ -185,7 +187,7 @@ function cargarCarritoLS() {
 
 async function agregarAlCarrito(e) {
   const id = e.currentTarget.dataset.id;
-  const prod = CATALOGO.find(p => p.id === id);
+  const prod = CATALOGO.find((p) => p.id === id);
   if (!prod) return;
 
   const uid = await obtenerUsuarioId();
@@ -194,7 +196,7 @@ async function agregarAlCarrito(e) {
     if (!ok) return;
   } else {
     // fallback local
-    const ya = productosEnCarrito.find(p => p.id === id);
+    const ya = productosEnCarrito.find((p) => p.id === id);
     if (ya) ya.cantidad += 1;
     else productosEnCarrito.push({ ...prod, cantidad: 1 });
     localStorage.setItem("productos-en-carrito", JSON.stringify(productosEnCarrito));
@@ -216,12 +218,22 @@ async function actualizarNumerito() {
 // -------- Inicio --------
 async function iniciarCatalogo() {
   cargarCarritoLS();
+
+  // 1) Traer catálogo
   CATALOGO = await fetchProductos();
+
+  // 2) Exponerlo global para el chatbot (por si aún no cargó el script)
+  window.__PRODUCTS__ = CATALOGO;
+
+  // 3) Si el “cerebro” ya está cargado, construye su índice
+  window.ChatBrain?.buildIndex?.(CATALOGO);
+
+  // 4) Render + UI
   renderTodos();
   activarBotonesCategorias();
   await actualizarNumerito();
 
-  // Búsqueda
+  // 5) Búsqueda
   const inputBusqueda = document.getElementById("searchInput");
   const formBusqueda = document.getElementById("searchForm");
 
@@ -232,16 +244,8 @@ async function iniciarCatalogo() {
 
   inputBusqueda?.addEventListener("keyup", (e) => {
     if (e.key === "Enter") buscarProductos(inputBusqueda.value);
-    if (inputBusqueda.value === "") renderTodos(); 
+    if (inputBusqueda.value === "") renderTodos();
   });
 }
-
-async function cargarCatalogo() {
-  const productos = await obtenerProductosDesdeSupabase(); 
-  renderProductos(productos);                               
-
-  window.ChatBrain?.buildIndex(productos);
-}
-cargarCatalogo();
 
 iniciarCatalogo();
