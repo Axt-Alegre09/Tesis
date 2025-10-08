@@ -93,8 +93,6 @@
     document.getElementById('searchForm')?.addEventListener('submit', (e) => e.preventDefault());
   </script>
 
-  <script type="module" src="JS/cart-api.js"></script>
-  <script src="JS/chatbot.brain.js"></script>
 
   <!-- Catálogo -->
   <script type="module" src="JS/main.js"></script>
@@ -183,8 +181,8 @@
       <i class="bi bi-send-fill" id="sendChatBtn" role="button" aria-label="Enviar"></i>
     </div>
   </div>
-
-  <!-- Control del chat (usa ChatBrain ya cargado) -->
-  <script src="JS/script-chatbot.js" defer></script>
+         <script type="module" src="JS/cart-api.js"></script>
+         <script src="JS/chatbot.brain.js"></script>
+         <script src="JS/script-chatbot.js" defer></script>
 </body>
 </html>

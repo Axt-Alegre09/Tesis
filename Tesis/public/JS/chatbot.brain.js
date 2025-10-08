@@ -23,10 +23,10 @@ const SYN = {
   empanada: ["empanada","empanadas","empi","empas"],
   alfajor:  ["alfajor","alfajores"],
   bocadito: ["bocadito","bocaditos","combo","combos"],
-  pan:      ["pan","panificados","baguette","gallego","campo","chip"],
-  milanesa: ["milanesa","milanesas","sandwich milanesa","sándwich milanesa"],
-  sandwich: ["sandwich","sandwiches","sándwich","sándwiches"]
+  pan:      ["pan","panificados"],
+  milanesa: ["milanesa","milanesas","sandwich milanesa","sándwich milanesa"]
 };
+
 
 
   // sabores (con multi-palabra)
@@ -228,54 +228,74 @@ const SYN = {
 
   // Extrae “2 empanadas de carne”, “… 2 sandwiches”
   function extractItems(msg){
-    const items = [];
-    const segs = splitSegments(msg);
-    let lastProd = null;
+  const items = [];
+  let lastProd = null;
 
-    const r = /(\d+|uno|una|un|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*)?(?:\s+de\s+([a-záéíóúñ]+(?:\s+y\s+[a-záéíóúñ]+)?(?:\s+de\s+[a-záéíóúñ]+)?))?/i;
+  // patrón: "2 empanadas de carne", "1 alfajor", ...
+  const r1 = /(\d+|uno|una|un|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*)?(?:\s+de\s+([a-záéíóúñ]+(?:\s+y\s+[a-záéíóúñ]+)?(?:\s+de\s+[a-záéíóúñ]+)?))?/gi;
+  let m;
+  while ((m = r1.exec(msg)) !== null) {
+    const qty = toNumber(m[1]);
+    let prodTxt = m[2] ? normalize(m[2]) : null;
+    const flavor = m[3] ? normalize(m[3]) : extractFlavor(msg);
 
-    for (const seg of segs) {
-      const m = seg.match(r);
-      if (!m) continue;
-      const qty = toNumber(m[1]);
-     const prodTxt =
-            (m[2] && normalize(m[2])) ||
-            // si no hay sustantivo explícito y hay “carrito” o un sabor, asumimos empanadas
-            ((/carrito/.test(msg) || FLAVORS.some(f => seg.includes(f))) ? "empanadas" : null) ||
-            lastProd || guessProductText(msg) || "empanadas";
-      const flavor = m[3] ? normalize(m[3]) : extractFlavor(seg);
-      lastProd = prodTxt;
-      if (qty) items.push({ cantidad: qty, prodTxt, flavor });
-    }
+    // si no hay producto claro, usar guess (que ya asume empanadas por sabor)
+    if (!prodTxt) prodTxt = guessProductText(msg) || lastProd || "empanada";
 
-    // fallback: “... y 1 de jamon”
-    if (!items.length) {
-      const r2 = /(?:y|,|mas|con)\s+(\d+|uno|una|un|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\s+de\s+([a-záéíóúñ]+(?:\s+y\s+[a-záéíóúñ]+)?)/gi;
-      let m2;
-      while ((m2 = r2.exec(msg)) !== null) {
-        const qty = toNumber(m2[1]);
-        const flavor = normalize(m2[2]);
-        const prodTxt = lastProd ||
-            ((/carrito/.test(msg) || FLAVORS.some(f => msg.includes(f))) ? "empanadas" : guessProductText(msg)) ||
-            "empanadas";
-        items.push({ cantidad: qty || 1, prodTxt, flavor });
-      }
-    }
+    // evitar que “carrito” entre como producto
+    if (/\bcarrito(s)?\b/.test(prodTxt)) prodTxt = "empanada";
 
-    return items;
+    lastProd = prodTxt;
+    items.push({ cantidad: qty || 1, prodTxt, flavor });
   }
 
-  function guessProductText(msg){
-    const n = normalize(msg);
-    for (const [alias] of ALIAS.entries()) if (n.includes(alias)) return alias;
-    const tokens = n.split(" ");
-    for (const [canon, arr] of Object.entries(SYN)) if (arr.some(a => tokens.includes(a))) return canon;
-    const idx = getProductIndex();
-    for (const t of tokens) if (idx.byToken?.has(t)) return t;
-    const kb = kbLookup(n); if (kb) return kb.key;
-    return null;
+  // “y 1 de jamon y queso”
+  const r2 = /(?:y|,|mas)\s+(\d+|uno|una|un|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\s+de\s+([a-záéíóúñ]+(?:\s+y\s+[a-záéíóúñ]+)?)/gi;
+  while ((m = r2.exec(msg)) !== null) {
+    const qty = toNumber(m[1]);
+    const flavor = normalize(m[2]);
+    let prodTxt = lastProd || guessProductText(msg) || "empanada";
+    if (/\bcarrito(s)?\b/.test(prodTxt)) prodTxt = "empanada";
+    items.push({ cantidad: qty || 1, prodTxt, flavor });
   }
+  return items;
+}
 
+
+        function guessProductText(msg){
+        // 1) alias/KB primero (combos, etc.)
+        for (const [alias] of ALIAS.entries()) if (msg.includes(alias)) return alias;
+
+        // 2) si menciona milanesa → milanesa
+        if (/\bmilanesa(s)?\b/.test(msg)) return "milanesa";
+
+        // 3) si menciona “empanad” → empanada
+        if (/\bempanad(a|as)\b/.test(msg)) return "empanada";
+
+        // 4) si hay un sabor conocido pero no hay producto → empanadas
+        const hasFlavor = FLAVORS.some(f => msg.includes(normalize(f)));
+        if (hasFlavor) return "empanada";
+
+        // 5) tokens del catálogo
+        const idx = getProductIndex();
+        for (const t of msg.split(" ")) if (idx.byToken?.has(t)) return t;
+
+        // 6) por KB substring
+        const kb = kbLookup(msg);
+        if (kb) return kb.key;
+
+        return null;
+        }
+
+
+  function preclean(s=""){
+  return s
+    .replace(/\b(al|a|en)\s+mi?\s+carrito\b/g, "")   // “al/a mi carrito”
+    .replace(/\bcarrito(s)?\b/g, "")                // por si quedó suelto
+    .replace(/\bpor favor\b/g,"")
+    .replace(/\bgracias\b/g,"")
+    .trim();
+    }
   // ===== Intents =====
   function parseMessage(msgRaw=""){
     const msg = normalize(msgRaw);
