@@ -93,8 +93,7 @@
     document.getElementById('searchForm')?.addEventListener('submit', (e) => e.preventDefault());
   </script>
 
-  <!-- Chatbot + carrito (deben ir ANTES que main.js para que buildIndex funcione) -->
-  <script src="JS/cart-api.js"></script>
+  <script type="module" src="JS/cart-api.js"></script>
   <script src="JS/chatbot.brain.js"></script>
 
   <!-- Catálogo -->
