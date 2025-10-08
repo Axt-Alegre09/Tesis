@@ -236,4 +236,12 @@ async function iniciarCatalogo() {
   });
 }
 
+async function cargarCatalogo() {
+  const productos = await obtenerProductosDesdeSupabase(); 
+  renderProductos(productos);                               
+
+  window.ChatBrain?.buildIndex(productos);
+}
+cargarCatalogo();
+
 iniciarCatalogo();
