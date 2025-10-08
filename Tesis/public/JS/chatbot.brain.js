@@ -1,63 +1,146 @@
 /* JS/chatbot.brain.js
-   “Cerebro” del Paniquiños Bot para entender acciones del catálogo y carrito.
-   No llama a OpenAI: es NLU liviano en el frontend.
+   “Cerebro” del Paniquiños Bot para entender catálogo y carrito (NLU liviano).
+   Cobertura: Bocaditos (combos), Confitería, Panificados, Rotisería/Empanadas.
 */
 (() => {
-  // ---------- Utiles de lenguaje ----------
-  const NUM_PAL = {
-    uno:1, una:1, un:1, dos:2, tres:3, cuatro:4, cinco:5, seis:6, siete:7,
-    ocho:8, nueve:9, diez:10, once:11, doce:12
-  };
+  // ================ Utiles de lenguaje ================
+  const NUM_PAL = { uno:1, una:1, un:1, dos:2, tres:3, cuatro:4, cinco:5, seis:6, siete:7,
+    ocho:8, nueve:9, diez:10, once:11, doce:12, quince:15, veinte:20 };
   const normalize = (s="") =>
     s.toLowerCase()
-     .normalize("NFD").replace(/\p{Diacritic}/gu, "")
-     .replace(/[.,;:!¡¿?()"]/g, " ")
-     .replace(/\s+/g, " ")
+     .normalize("NFD").replace(/\p{Diacritic}/gu,"")
+     .replace(/[.,;:!¡¿?()"]/g," ")
+     .replace(/\s+/g," ")
      .trim();
+  const toNumber = (w) => (/^\d+$/.test(w) ? parseInt(w,10) : (NUM_PAL[w] ?? NaN));
 
-  const toNumber = (w) => {
-    if (!w) return NaN;
-    if (/^\d+$/.test(w)) return parseInt(w,10);
-    return NUM_PAL[w] ?? NaN;
-  };
-
-  // ---------- Conocimiento de dominio ----------
-  // Sinónimos de categorías / productos
+  // ================ Conocimiento de dominio ================
+  // Sinónimos de “tipos”/palabras clave de productos
   const SYN = {
-    empanada: ["empanada","empanadas","empi","empas"],
+    empanada: ["empanada","empanadas","empi","empas","saltena","salteña"],
     alfajor:  ["alfajor","alfajores"],
-    bocadito: ["bocadito","bocaditos"],
-    pan:      ["pan","panificados"],
+    bocadito: ["bocadito","bocaditos","combo","combos","aperitivo","aperitivos"],
+    sandwich: ["sandwich","sándwich","sandwiches","sánguches","sandwichito","sandwichitos"],
+    pan:      ["pan","panes","panificados","baguette","baguete","buguete","gallego","campo","casero","chip","chipa"],
+    postre:   ["postre","postres","confiteria","confitería","dulces","reposteria","repostería","torta","tortas","tarteletas","pai","pay","flan","flanes","croissant","croisants","medialuna","medialunas","pastaflora","pasta flora","pasta floras"],
+    bebida:   ["coca","coca cola","gaseosa","bebida"],
+    sopa:     ["sopa","sopas"],
+    mbeju:    ["mbeyu","mbeju","mbejú"],
+    milanesa: ["milanesa","milanesas"],
+    pajagua:  ["pajagua","pajaguas"],
+    chipaguazu: ["chipa guazu","chipaguazu","chipa guazú"]
   };
-  // Sabores/variantes comunes (se usan como “tags” para match)
-  const FLAVORS = ["carne","pollo","jamon","jamón","queso","dulce","chocolate","personal","pareja","combo"];
 
-  // Arma/obtiene índice de productos
+  // Sabores/variantes (tags)
+  const FLAVORS_GENERAL = [
+    "carne","pollo","jamon","jamon y queso","queso","dulce","chocolate","personal","pareja","combo"
+  ];
+  const FLAVORS_EMPANADA = [
+    "carne","pollo","jamon","jamon y queso","queso","huevo","mandioca","saltena","salteña"
+  ];
+  const FLAVORS_DESSERT = [
+    "dulce de leche","chocolate","maicena","maizena","frutilla","fruta","membrillo",
+    "vainilla","coco","nuez","manjar","glaseado","manzana"
+  ];
+  const FLAVORS_BREAD = [
+    "baguette","buguete","gallego","campo","casero","chip","del campo"
+  ];
+
+  // Sinónimos por categoría (para “¿qué tienen en …?” y “sabores de …”)
+  const CAT_SYNONYMS = {
+    empanadas: SYN.empanada,
+    bocaditos: SYN.bocadito,
+    confiteria: ["confiteria","confitería","postres","dulces","reposteria","repostería","alfajores","tortas","flanes","pai","pastaflora","pasta flora"],
+    panificados: ["pan","panes","panificados","baguette","gallego","campo","casero","chip"],
+    rosticeria: ["rosticeria","rotiseria","rostiseria","sandwich","sándwich","milanesa","combo"]
+  };
+
+  // ====== Productos “extra” (por si aún no están en window.__PRODUCTS__) ======
+  // Sirven para que el bot igual pueda reconocer y agregar (modo invitado/local).
+  // Si ya los tienes en el catálogo real, el índice los fusiona y no duplica.
+  const EXTRA_PRODUCTS = [
+    // -------- BOCADITOS / COMBOS --------
+    { nombre: "Bocaditos Combo 1", precio: 55000 },
+    { nombre: "Bocaditos Combo 2", precio: 50000 },
+    { nombre: "Bocaditos Combo 3", precio: 150000 },
+    { nombre: "Bocaditos Combo 4", precio: 75000 },
+    { nombre: "Bocadito Personal", precio: 35000 },
+    { nombre: "Bocadito en Pareja", precio: 65000 },
+
+    // -------- CONFITERÍA --------
+    { nombre: "Alfajores de maicena y chocolate", precio: 25000 },
+    { nombre: "Croissants", precio: 30000 },
+    { nombre: "Caja de 20 Dulces", precio: 25000 },
+    { nombre: "Flanes (2 unidades)", precio: 20000 },
+    { nombre: "Pasta Floras (kilo)", precio: 20000 },
+    { nombre: "Torta pequeña de dulce de leche (congelada)", precio: 45000 },
+    { nombre: "Pai de manzana", precio: 35000 },
+
+    // -------- PANIFICADOS --------
+    { nombre: "Pan Baguette (1 u.)", precio: 15000 },
+    { nombre: "Pan Casero de la casa (1 u.)", precio: 20000 },
+    { nombre: "Pan Chip (pack x10)", precio: 15000 },
+    { nombre: "Pan del Campo (1 u.)", precio: 22000 },
+    { nombre: "Pan del Campo (kilo)", precio: 22000 },
+    { nombre: "Pan Gallego (kilo)", precio: 19000 },
+
+    // -------- ROSTISERÍA / EMPANADAS & COMBOS --------
+    { nombre: "Empanada de carne", precio: 19000 },
+    { nombre: "Empanada de huevo", precio: 17000 },
+    { nombre: "Empanada de mandioca", precio: 10000 },
+    { nombre: "Empanada de jamón y queso", precio: 17000 },
+
+    { nombre: "Combo Empanada + Coca 250 ml", precio: 24000 },
+    { nombre: "Combo Empanada Salteña + salsa", precio: 26000 },
+    { nombre: "Combo Sándwich de milanesa + papas + Coca 350 ml", precio: 25000 },
+
+    { nombre: "Mbeju (1 u.)", precio: 14000 }
+  ];
+
+  // ================ Índice de productos (usa tu catálogo + extra) ================
   function getProductIndex() {
-    // Preferí el índice creado por tu catálogo si existe
     if (window.__PRODUCT_INDEX__?.byToken) return window.__PRODUCT_INDEX__;
 
-    const productos = window.__PRODUCTS__ || [];
-    const byToken = new Map();
-    const all = productos.map(p => ({
+    const base = (window.__PRODUCTS__ || []).map(p => ({
       id: String(p.id ?? p.productoId ?? p.uuid ?? p.ID ?? p.Id ?? p.slug ?? p.nombre),
       nombre: String(p.nombre ?? p.titulo ?? p.title ?? "").trim(),
       precio: Number(p.precio || 0),
-      imagen: p.imagen || p.image || null,
+      imagen: p.imagen || p.image || null
     }));
 
+    // Merge con EXTRA (evita duplicados por nombre normalizado)
+    const seen = new Set(base.map(p => normalize(p.nombre)));
+    for (const ex of EXTRA_PRODUCTS) {
+      const key = normalize(ex.nombre);
+      if (!seen.has(key)) base.push({
+        id: ex.id ? String(ex.id) : ex.nombre, // id “amigable” si no hay UUID
+        nombre: ex.nombre,
+        precio: Number(ex.precio || 0),
+        imagen: ex.imagen || null
+      });
+      seen.add(key);
+    }
+
+    const byToken = new Map();
+    const all = base;
+
     for (const p of all) {
-      const base = normalize(p.nombre);
-      const tokens = new Set(base.split(" ").filter(Boolean));
-      // agrega sinónimos básicos por tipo
+      const baseName = normalize(p.nombre);
+      const tokens = new Set(baseName.split(" ").filter(Boolean));
+
+      // sinónimos por “tipo”
       for (const [canon, arr] of Object.entries(SYN)) {
-        if (base.includes(canon) || arr.some(a => base.includes(a))) {
-          arr.forEach(a => tokens.add(a));
-          tokens.add(canon);
+        if (baseName.includes(canon) || arr.some(a => baseName.includes(a))) {
+          tokens.add(canon); arr.forEach(a => tokens.add(a));
         }
       }
-      // agrega sabores que aparezcan en el nombre
-      FLAVORS.forEach(f => { if (base.includes(f)) tokens.add(f); });
+      // sabores
+      [...FLAVORS_GENERAL, ...FLAVORS_EMPANADA, ...FLAVORS_DESSERT, ...FLAVORS_BREAD]
+        .forEach(f => { if (baseName.includes(normalize(f))) tokens.add(normalize(f)); });
+
+      // multi-palabra -> generar también token junto
+      const multipal = ["dulce de leche","jamon y queso","pan del campo"];
+      multipal.forEach(mp => { if (baseName.includes(normalize(mp))) tokens.add(normalize(mp)); });
 
       for (const t of tokens) {
         if (!byToken.has(t)) byToken.set(t, []);
@@ -67,151 +150,190 @@
     return (window.__PRODUCT_INDEX__ = { all, byToken });
   }
 
-  function candidatesFor(token) {
-    const idx = getProductIndex();
-    return idx.byToken.get(token) || [];
-  }
+  const candidatesFor = (token) => getProductIndex().byToken.get(token) || [];
 
-  // Match por texto + sabor (si hay)
+  // ================ Búsqueda de producto por texto + (opcional) sabor ================
   function findProduct(text, flavor) {
     const t = normalize(text);
     const fav = flavor ? normalize(flavor) : null;
 
-    // 1) Si el texto es muy claro, trae por token directo
     let cands = candidatesFor(t);
-    // 2) Si no, probar por sinónimos
     if (!cands.length) {
       for (const [canon, arr] of Object.entries(SYN)) {
-        if (arr.includes(t) || t.includes(canon)) { cands = candidatesFor(canon); break; }
+        if (t.includes(canon) || arr.includes(t)) { cands = candidatesFor(canon); break; }
       }
     }
-    // 3) Si aún nada, búsqueda floja en nombres
     if (!cands.length) {
       const all = getProductIndex().all;
       cands = all.filter(p => normalize(p.nombre).includes(t));
     }
-
     if (!cands.length) return null;
     if (!fav) return cands[0];
 
-    // Si hay sabor, prioriza coincidencias que contengan el sabor
+    // prioriza coincidencias por sabor/variante
     const favMatch = cands.find(p => normalize(p.nombre).includes(fav));
     return favMatch || cands[0];
   }
 
-  // ---------- Parser de intención ----------
-  // Devuelve: { intent, items:[{cantidad,prodTxt,flavor,product}], qty, ... }
+  // ================ Detección de categorías + resumen dinámico ================
+  function detectCategory(msgNorm) {
+    for (const [cat, syns] of Object.entries(CAT_SYNONYMS)) {
+      if (syns.some(s => msgNorm.includes(normalize(s)))) return cat;
+    }
+    return null;
+  }
+
+  function getCategorySummary(cat) {
+    const idx = getProductIndex();
+    const inCat = idx.all.filter(p => {
+      const n = normalize(p.nombre);
+      if (cat === "empanadas")   return SYN.empanada.some(s => n.includes(s));
+      if (cat === "bocaditos")   return n.includes("combo") || SYN.bocadito.some(s => n.includes(s));
+      if (cat === "confiteria")  return CAT_SYNONYMS.confiteria.some(s => n.includes(normalize(s))) || SYN.alfajor.some(s => n.includes(s));
+      if (cat === "panificados") return CAT_SYNONYMS.panificados.some(s => n.includes(normalize(s)));
+      if (cat === "rosticeria")  return ["empanada","sandwich","milanesa","combo","mbeju","sopa"].some(k => n.includes(k));
+      return false;
+    });
+
+    const names = inCat.map(p => p.nombre);
+    const flavors = new Set();
+    const scan = (arr, src) => arr.forEach(f => { if (normalize(src).includes(normalize(f))) flavors.add(f); });
+
+    for (const n of names) {
+      scan(FLAVORS_GENERAL, n);
+      scan(FLAVORS_EMPANADA, n);
+      scan(FLAVORS_DESSERT, n);
+      scan(FLAVORS_BREAD, n);
+    }
+
+    return {
+      count: inCat.length,
+      names: names.slice(0, 10),
+      flavors: Array.from(flavors)
+    };
+  }
+
+  // ================ Parser de intención ================
   function parseMessage(msgRaw="") {
     const msg = normalize(msgRaw);
 
-    // Intenciones rápidas
-    if (/vaciar (el )?carrito|limpiar carrito|vaciar todo/.test(msg)) {
-      return { intent: "empty_cart" };
-    }
-    if (/ver (mi )?carrito|mostrar carrito|que (hay|tengo) en el carrito/.test(msg)) {
-      return { intent: "show_cart" };
-    }
-    if (/total|cuanto (es|sale|debo)/.test(msg)) {
-      return { intent: "show_total" };
-    }
-    if (/ayuda|que puedes hacer|como funciona/.test(msg)) {
-      return { intent: "help" };
-    }
+    // rápidas
+    if (/vaciar (el )?carrito|limpiar carrito|vaciar todo/.test(msg)) return { intent:"empty_cart" };
+    if (/ver (mi )?carrito|mostrar carrito|que (hay|tengo) en el carrito/.test(msg)) return { intent:"show_cart" };
+    if (/total|cuanto (es|sale|debo)/.test(msg)) return { intent:"show_total" };
+    if (/ayuda|que puedes hacer|como funciona/.test(msg)) return { intent:"help" };
 
-    // ¿Setear cantidad de algo existente? “poné 5 empanadas”
+    // setear cantidad (p. ej. “poné 5 empanadas”)
     if (/(pone|pon|coloca|ajusta|setea|deja)\s+(\d+|uno|una|un|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\s+/.test(msg)) {
       const m = msg.match(/(pone|pon|coloca|ajusta|setea|deja)\s+(\d+|uno|una|un|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\s+(.*)/);
       if (m) {
         const qty = toNumber(m[2]);
         const rest = (m[3]||"").trim();
-        const flavor = FLAVORS.find(f => rest.includes(f)) || null;
+        const flavor =
+          [...FLAVORS_EMPANADA, ...FLAVORS_DESSERT, ...FLAVORS_BREAD, ...FLAVORS_GENERAL]
+            .find(f => rest.includes(normalize(f))) || null;
         return { intent:"set_qty", qty, prodTxt: rest, flavor };
       }
     }
 
-    // Quitar…
-    if (/quita|saca|elimina|borra/.test(msg)) {
-      const items = extractItems(msg);
-      if (items.length) return { intent: "remove", items };
-      // Si no hay cantidades, al menos identificar el producto
-      const prodTxt = guessProductText(msg);
-      if (prodTxt) return { intent: "remove", items: [{ cantidad:1, prodTxt }] };
+    // preguntas por categoría
+    const cat = detectCategory(msg);
+    if (cat) {
+      if (/sabor|sabores|variedad|gusto|gustos/.test(msg)) {
+        return { intent:"category_info", cat, topic:"sabores" };
+      }
+      if (/que tienen|que hay|lista|catalogo|catálogo|mostrar|ofrecen/.test(msg)) {
+        return { intent:"category_info", cat, topic:"lista" };
+      }
     }
 
-    // Agregar…
-    if (/agrega|agrega?me|sum(a|ar)|pone|pon|quiero|dame|agregame|añade|anadi/.test(msg)) {
+    // quitar
+    if (/quita|saca|elimina|borra|remueve/.test(msg)) {
       const items = extractItems(msg);
-      if (items.length) return { intent: "add", items };
+      if (items.length) return { intent:"remove", items };
       const prodTxt = guessProductText(msg);
-      if (prodTxt) return { intent: "add", items: [{ cantidad:1, prodTxt }] };
+      if (prodTxt) return { intent:"remove", items:[{ cantidad:1, prodTxt }] };
     }
 
-    // Si nada calzó, no hay intención
-    return { intent: "none" };
+    // agregar
+    if (/agrega|agregame|agrega?me|sum(a|ar)|pone|pon|quiero|dame|añade|anadi|anadir/.test(msg)) {
+      const items = extractItems(msg);
+      if (items.length) return { intent:"add", items };
+      const prodTxt = guessProductText(msg);
+      if (prodTxt) return { intent:"add", items:[{ cantidad:1, prodTxt }] };
+    }
+
+    return { intent:"none" };
   }
 
-  // Extrae pares cantidad + producto [+ sabor] del texto
+  // extrae cantidad + producto + (opcional) sabor
   function extractItems(msg) {
     const items = [];
-    // Patrones tipo: "2 empanadas de carne", "1 alfajor", "... y 3 de jamon"
-    // 1) bloques con cantidad y sustantivo
-    const r1 = /(\d+|uno|una|un|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\s+([a-záéíóúñ]+[a-záéíóúñ]*)?(?:\s+de\s+([a-záéíóúñ]+))?/g;
+    // “2 empanadas de carne”, “1 alfajor”, “3 pan baguette”, “… y 2 de jamon y queso”
+    const r1 = /(\d+|uno|una|un|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*)?(?:\s+de\s+([a-záéíóúñ\s]+))?/g;
     let m;
     while ((m = r1.exec(msg)) !== null) {
       const qty = toNumber(m[1]);
-      // si no hay sustantivo, mirar antes/después el token producto más cercano
-      let prodTxt = m[2] || guessProductText(msg);
+      let prodTxt = (m[2]||"").trim() || guessProductText(msg);
       if (!prodTxt) continue;
-      const flavor = m[3] || FLAVORS.find(f => msg.includes(f)) || null;
+      const flavorRaw = (m[3]||"").trim();
+      const flavor = flavorRaw || null;
       items.push({ cantidad: qty || 1, prodTxt, flavor });
     }
 
-    // 2) fragmento “… y 1 de jamon” (sin sustantivo explícito)
+    // “… y 1 de jamon y queso”
     if (!items.length) {
-      const r2 = /(?:y|mas)\s+(\d+|uno|una|un|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\s+de\s+([a-záéíóúñ]+)/g;
+      const r2 = /(?:y|mas)\s+(\d+|uno|una|un|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\s+de\s+([a-záéíóúñ\s]+)/g;
       while ((m = r2.exec(msg)) !== null) {
         const qty = toNumber(m[1]);
-        const flavor = m[2];
+        const flavor = m[2].trim();
         const prodTxt = guessProductText(msg) || "empanadas";
         items.push({ cantidad: qty || 1, prodTxt, flavor });
       }
     }
-
     return items;
   }
 
-  // Intenta deducir el sustantivo “producto” dominante del mensaje
   function guessProductText(msg) {
     const tokens = msg.split(" ");
-    // Busca en orden por sinónimos/categorías
     for (const [canon, arr] of Object.entries(SYN)) {
       if (arr.some(a => tokens.includes(a))) return canon;
     }
-    // Si no, alguna palabra que exista como token de producto
     const idx = getProductIndex();
-    for (const t of tokens) {
-      if (idx.byToken?.has(t)) return t;
-    }
+    for (const t of tokens) if (idx.byToken?.has(t)) return t;
     return null;
   }
 
-  // ---------- Ejecutores de intent ----------
-  async function actAdd(items) {
-    const done = [];
-    const missing = [];
+  // ================ Acciones de categoría ================
+  async function actCategoryInfo({ cat, topic }) {
+    const sum = getCategorySummary(cat);
+    if (sum.count === 0) return { text: "Aún no tengo productos en esa categoría." };
 
+    if (topic === "sabores") {
+      const has = sum.flavors.length > 0;
+      const label = (cat === "confiteria") ? "postres/confitería" : cat;
+      return { text: has
+        ? `En ${label} tenemos sabores/variantes como: ${sum.flavors.join(", ")}.`
+        : `Tenemos varias opciones en ${label}. ¿Querés que te muestre algunos?`
+      };
+    }
+    const listado = sum.names.map(n => `• ${n}`).join("\n");
+    const extra = sum.count > sum.names.length ? `\n…y ${sum.count - sum.names.length} más.` : "";
+    const label = (cat === "confiteria") ? "postres/confitería" : cat;
+    return { text: `En ${label} tenemos:\n${listado}${extra}` };
+  }
+
+  // ================ Ejecutores de intents ================
+  async function actAdd(items) {
+    const done = [], missing = [];
     for (const it of items) {
       const prod = findProduct(it.prodTxt, it.flavor);
       if (!prod) { missing.push(it); continue; }
-
       try {
-        // Si el ID parece UUID, usamos addById (remoto si hay sesión)
         if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(prod.id)) {
           await window.CartAPI.addById(prod.id, it.cantidad);
         } else {
-          await window.CartAPI.addProduct({
-            id: prod.id, titulo: prod.nombre, precio: prod.precio, imagen: prod.imagen
-          }, it.cantidad);
+          await window.CartAPI.addProduct({ id: prod.id, titulo: prod.nombre, precio: prod.precio, imagen: prod.imagen }, it.cantidad);
         }
         done.push({ ...it, producto: prod.nombre });
       } catch (e) {
@@ -219,11 +341,7 @@
         missing.push(it);
       }
     }
-
-    // Respuesta
-    const parts = done.map(d =>
-      `${d.cantidad} ${pluralize(d.producto || d.prodTxt)}${d.flavor ? " de " + d.flavor : ""}`
-    );
+    const parts = done.map(d => `${d.cantidad} ${pluralize(d.producto || d.prodTxt)}${d.flavor ? " de " + d.flavor : ""}`);
     let text = "";
     if (parts.length) {
       const snap = window.CartAPI.getSnapshot?.();
@@ -239,9 +357,6 @@
   }
 
   async function actRemove(items) {
-    // Si dieron producto, intentamos disminuir 1 (o la cantidad indicada) en local;
-    // en remoto requeriríamos el itemId de carrito_items, así que damos soporte básico:
-    // estrategia: si es local → bajar; si es remoto → avisar que por nombre no puedo borrar exacto.
     const snap = window.CartAPI.getSnapshot?.();
     const isRemote = snap?.mode === "remote";
     if (!snap?.items?.length) return { text: "Tu carrito está vacío." };
@@ -251,20 +366,15 @@
       const prod = findProduct(it.prodTxt, it.flavor);
       if (!prod) continue;
 
-      // Busca una fila equivalente
       const row = snap.items.find(r => normalize(r.titulo).includes(normalize(prod.nombre)));
       if (!row) continue;
 
       if (isRemote) {
-        // En remoto necesitas itemId; informamos cómo proceder
-        return { text: "En este momento puedo quitar por item en el carrito (remoto). Abrí el carrito y tocá el icono de papelera del producto a eliminar. 😉" };
+        return { text: "Para quitar ítems del carrito remoto usá el icono de papelera del producto. 😉" };
       } else {
         const newQty = Math.max(0, Number(row.cantidad || 1) - (it.cantidad || 1));
-        if (newQty === 0) {
-          await window.CartAPI.remove({ id: row.id });
-        } else {
-          await window.CartAPI.setQty({ id: row.id }, newQty);
-        }
+        if (newQty === 0) await window.CartAPI.remove({ id: row.id });
+        else await window.CartAPI.setQty({ id: row.id }, newQty);
         removed.push(`${it.cantidad} ${pluralize(prod.nombre)}`);
       }
     }
@@ -279,14 +389,11 @@
     const prod = findProduct(prodTxt, flavor);
     if (!prod) return { text: "No identifiqué el producto. Decímelo como en el catálogo." };
 
-    // Busca fila equivalente
     const row = snap.items.find(r => normalize(r.titulo).includes(normalize(prod.nombre)));
     if (!row) return { text: "Ese producto no está en tu carrito." };
 
     if (snap.mode === "remote") {
-      // Necesita itemId (remoto). Si tu render guardó _itemId en snapshot, úsalo aquí.
-      // En nuestra snapshot remota no guardamos _itemId, así que damos feedback amigable:
-      return { text: "Por ahora solo puedo cambiar cantidades desde la vista del carrito (remoto). Abrí el carrito y usá los botones +/− del producto 😊" };
+      return { text: "Por ahora solo puedo cambiar cantidades desde la vista del carrito (remoto). Usá los botones +/− 😊" };
     } else {
       await window.CartAPI.setQty({ id: row.id }, qty);
       const after = window.CartAPI.getSnapshot?.();
@@ -307,62 +414,53 @@
     return { text: `En tu carrito:\n${lines.join("\n")}${extra}\nTotal: ${fmtGs(snap.total)}.` };
   }
   async function actEmpty() {
-    // Mejor pedir confirmación textual, pero lo dejamos directo por simplicidad:
     const snap = window.CartAPI.getSnapshot?.();
     if (!snap?.items?.length) return { text: "Tu carrito ya está vacío." };
-    if (snap.mode === "remote") {
-      // Necesitamos la acción remota -> botón "Vaciar" ya la hace; aquí orientamos.
-      return { text: "Para vaciar el carrito remoto, usá el botón “Vaciar carrito” en la página del carrito. 😉" };
-    } else {
-      for (const it of (snap.items || [])) await window.CartAPI.remove({ id: it.id });
-      return { text: "Listo, vacié tu carrito." };
-    }
+    if (snap.mode === "remote") return { text: "Para vaciar el carrito remoto, usá el botón “Vaciar carrito”. 😉" };
+    for (const it of (snap.items || [])) await window.CartAPI.remove({ id: it.id });
+    return { text: "Listo, vacié tu carrito." };
   }
 
   function actHelp() {
-    return {
-      text:
+    return { text:
 `Puedo ayudarte con el carrito:
 • “agregá 2 empanadas de carne y 1 de jamón”
 • “quitá 1 alfajor”
 • “poné 5 empanadas”
 • “ver carrito”, “total”, “vaciar carrito”
 
-También respondo dudas simples de los productos.`
-    };
+También respondo:
+• “qué sabores de empanadas/postres tienen”
+• “qué hay en bocaditos / panificados / rotisería”` };
   }
 
-  // ---------- Helpers UI ----------
+  // ================ Helpers UI ================
   const fmtGs = n => new Intl.NumberFormat("es-PY").format(Math.max(0, Number(n)||0)) + " Gs";
   const pluralize = (s, n=2) => {
-    const base = String(s || "");
+    const base = String(s||"");
     if (n === 1) return base;
-    if (base.endsWith("a")) return base + "s";         // empanada → empanadas
-    if (base.endsWith("or")) return base + "es";       // alfajor → alfajores
+    if (base.endsWith("a")) return base + "s";      // empanada → empanadas
+    if (base.endsWith("or")) return base + "es";    // alfajor → alfajores
     return base + "s";
   };
   const list = (arr=[]) => arr.length<=1 ? (arr[0]||"") :
     arr.slice(0,-1).join(", ") + " y " + arr.slice(-1);
 
-  // ---------- API pública para script-chatbot.js ----------
+  // ================ API pública ================
   window.ChatBrain = {
-    /**
-     * Maneja un mensaje y devuelve { text } si resuelve localmente.
-     * Si no reconoce intención, retorna null para que el frontend
-     * envíe el mensaje al backend (reservas).
-     */
     async handleMessage(userText) {
       try {
         const parsed = parseMessage(userText || "");
         switch (parsed.intent) {
-          case "add":        return await actAdd(parsed.items);
-          case "remove":     return await actRemove(parsed.items);
-          case "set_qty":    return await actSetQty(parsed);
-          case "show_total": return await actShowTotal();
-          case "show_cart":  return await actShowCart();
-          case "empty_cart": return await actEmpty();
-          case "help":       return actHelp();
-          default:           return null; // que siga el backend (reservas)
+          case "add":           return await actAdd(parsed.items);
+          case "remove":        return await actRemove(parsed.items);
+          case "set_qty":       return await actSetQty(parsed);
+          case "show_total":    return await actShowTotal();
+          case "show_cart":     return await actShowCart();
+          case "empty_cart":    return await actEmpty();
+          case "help":          return actHelp();
+          case "category_info": return await actCategoryInfo(parsed);
+          default:              return null; // que siga el backend (reservas)
         }
       } catch (e) {
         console.error("[ChatBrain] handleMessage error:", e);
@@ -371,4 +469,3 @@ También respondo dudas simples de los productos.`
     }
   };
 })();
-
