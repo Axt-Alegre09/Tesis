@@ -63,35 +63,44 @@
   }
 
   // Maneja el envío del mensaje del usuario
-  function handleChat() {
-    if (!chatInput) return;
-    userMessage = (chatInput.value || "").trim();
-    if (!userMessage) return;
+function handleChat() {
+  if (!chatInput) return;
+  userMessage = (chatInput.value || "").trim();
+  if (!userMessage) return;
 
-    // Limpia y reajusta textarea
-    chatInput.value = "";
-    if (inputIniHeight) chatInput.style.height = `${inputIniHeight}px`;
+  // Limpia textarea
+  chatInput.value = "";
+  if (inputIniHeight) chatInput.style.height = `${inputIniHeight}px`;
 
-    // Muestra el mensaje del usuario
-    chatbox?.append(createChatLi(userMessage, "outgoing"));
-    chatbox.scrollTop = chatbox.scrollHeight;
+  // Muestra el mensaje del usuario
+  chatbox?.append(createChatLi(userMessage, "outgoing"));
+  chatbox.scrollTop = chatbox.scrollHeight;
 
-    // Guarda en historial (limitamos a últimas 20 entradas por prolijidad)
+  // 1) Intento local (agregar/quitar/faq)
+  (async () => {
+    const local = await window.ChatBrain?.handleMessage(userMessage);
+    if (local && local.text) {
+      chatbox?.append(createChatLi(local.text, "incoming"));
+      chatbox.scrollTop = chatbox.scrollHeight;
+      return; // listo, sin ir al backend
+    }
+
+    // 2) Si no hubo match local, va al backend (reservas)
     MESSAGES.push({ role: "user", content: userMessage });
     if (MESSAGES.length > 20) MESSAGES.splice(0, MESSAGES.length - 20);
 
-    // Deshabilita el botón mientras carga para evitar spam
-    sendChatBtn?.setAttribute("aria-disabled", "true");
+    sendChatBtn?.setAttribute("aria-disabled","true");
     sendChatBtn?.classList.add("disabled");
 
-    // Muestra “Cargando…” y llama al backend
     setTimeout(() => {
       const incomingLi = createChatLi("Cargando...", "incoming");
       chatbox?.appendChild(incomingLi);
       chatbox.scrollTop = chatbox.scrollHeight;
       generateResponse(incomingLi);
     }, 200);
-  }
+  })();
+}
+
 
   // Auto-resize del textarea
   chatInput?.addEventListener("input", () => {

@@ -577,4 +577,143 @@ async function cargarCarrito() {
   }
 }
 
+
+/* =========================
+   API para el Chatbot
+   (disponible en window.CartAPI)
+========================= */
+
+// --- remoto
+async function addItemRemoto(productoId, qty = 1) {
+  qty = Math.max(1, Number(qty));
+  const { data: carritoId, error: e1 } = await supabase.rpc("asegurar_carrito");
+  if (e1) throw e1;
+
+  // ¿existe ya?
+  const { data: item, error: e2 } = await supabase
+    .from("carrito_items")
+    .select("id, cantidad")
+    .eq("carrito_id", carritoId)
+    .eq("producto_id", productoId)
+    .maybeSingle();
+  if (e2) throw e2;
+
+  if (item) {
+    const nueva = Number(item.cantidad || 1) + qty;
+    const { error: e3 } = await supabase
+      .from("carrito_items")
+      .update({ cantidad: nueva })
+      .eq("id", item.id);
+    if (e3) throw e3;
+  } else {
+    const { error: e4 } = await supabase
+      .from("carrito_items")
+      .insert({ carrito_id: carritoId, producto_id: productoId, cantidad: qty });
+    if (e4) throw e4;
+  }
+
+  await cargarCarrito();
+  return true;
+}
+
+// --- local
+function addItemLocal(prod, qty = 1) {
+  qty = Math.max(1, Number(qty));
+  const id = String(prod.id);
+  const i = (productosEnCarrito || []).findIndex(p => String(p.id) === id);
+  if (i >= 0) {
+    productosEnCarrito[i].cantidad = Number(productosEnCarrito[i].cantidad || 1) + qty;
+  } else {
+    productosEnCarrito.push({
+      id,
+      titulo: prod.titulo,
+      precio: Number(prod.precio || 0),
+      cantidad: qty,
+      imagen: prod.imagen || null
+    });
+  }
+  guardarLocal();
+  renderLocal();
+  return true;
+}
+
+// helpers comunes
+async function removeRemotoByItemId(itemId) {
+  const ok = await eliminarItemRemoto(itemId);
+  if (ok) await cargarCarrito();
+  return ok;
+}
+function removeLocalById(id) {
+  eliminarDelCarritoLocal(id);
+  return true;
+}
+async function setQtyRemotoByItemId(itemId, qty) {
+  await setCantidadRemoto(itemId, qty);
+  return true;
+}
+function setQtyLocalById(id, qty) {
+  setCantidadLocal(id, qty);
+  return true;
+}
+
+// snapshot para el bot (por si quiere leer)
+function getSnapshot() {
+  if (modoActual === "remote") {
+    return {
+      mode: "remote",
+      items: (ultimoRemoto || []).map(p => ({
+        id: String(p.id),
+        titulo: p.titulo,
+        precio: Number(p.precio),
+        cantidad: Number(p.cantidad || 1),
+        imagen: p.imagen
+      })),
+      total: (ultimoRemoto || []).reduce((a,p)=>a+Number(p.precio)*Number(p.cantidad||1),0)
+    };
+  }
+  return {
+    mode: "local",
+    items: (productosEnCarrito || []).map(p => ({
+      id: String(p.id),
+      titulo: p.titulo,
+      precio: Number(p.precio),
+      cantidad: Number(p.cantidad || 1),
+      imagen: p.imagen || null
+    })),
+    total: calcularTotalLocal()
+  };
+}
+
+// API pública para el chatbot
+window.CartAPI = {
+  // Si el usuario está logueado, usar addById (tiene el UUID). Para invitado, usar addProduct.
+  addById: async (productoId, qty=1) => {
+    const uid = await obtenerUsuarioId();
+    if (uid) return addItemRemoto(productoId, qty);
+    throw new Error("addById requiere sesión (remoto). Para invitados usar addProduct(producto, qty).");
+  },
+  addProduct: async (productoObj, qty=1) => {
+    const uid = await obtenerUsuarioId();
+    if (uid && productoObj?.id && /^[0-9a-f-]{36}$/i.test(String(productoObj.id))) {
+      return addItemRemoto(String(productoObj.id), qty);
+    }
+    return addItemLocal(productoObj, qty);
+  },
+  remove: async ({ itemId, id }) => {
+    // remoto: pasar itemId (id de carrito_items). local: pasar id (id del producto en el storage)
+    if (itemId) return removeRemotoByItemId(itemId);
+    if (id)     return removeLocalById(id);
+    return false;
+  },
+  setQty: async ({ itemId, id }, qty) => {
+    qty = Math.max(1, Number(qty || 1));
+    if (itemId) return setQtyRemotoByItemId(itemId, qty);
+    if (id)     return setQtyLocalById(id, qty);
+    return false;
+  },
+  getSnapshot,
+  refresh: cargarCarrito
+};
+
+
 cargarCarrito();
