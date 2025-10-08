@@ -2,25 +2,21 @@
 import { supabase } from "./ScriptLogin.js";
 
 const contenedorProductos = document.querySelector("#contenedor-productos");
-const botonesCategorias = document.querySelectorAll(".boton-categoria");
-const tituloPrincipal = document.querySelector("#titulo-principal");
-const numerito = document.querySelector("#numerito");
+const botonesCategorias   = document.querySelectorAll(".boton-categoria");
+const tituloPrincipal     = document.querySelector("#titulo-principal");
+const numerito            = document.querySelector("#numerito");
 
 let CATALOGO = [];
-let productosEnCarrito = []; // fallback local
+let productosEnCarrito = []; // localStorage
 
 // -------- Utils --------
-function formatearGs(n) {
-  return new Intl.NumberFormat("es-PY").format(Number(n || 0)) + " Gs";
-}
-function slugFix(s) {
-  return String(s || "")
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase().replace(/\s+/g, "-");
-}
-
 const IMG_FALLBACK = "https://placehold.co/512x512?text=Imagen";
 const STORAGE_BASE = "https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/";
+
+const formatearGs = (n) => new Intl.NumberFormat("es-PY").format(Number(n || 0)) + " Gs";
+const slugFix = (s) => String(s || "")
+  .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+  .toLowerCase().replace(/\s+/g, "-");
 
 function toPublicImageUrl(value) {
   if (!value) return IMG_FALLBACK;
@@ -28,35 +24,6 @@ function toPublicImageUrl(value) {
   if (/^https?:\/\//i.test(v)) return v;
   if (v.toLowerCase().startsWith("productos/")) v = v.slice("productos/".length);
   return STORAGE_BASE + encodeURIComponent(v);
-}
-
-// -------- Auth helpers --------
-async function obtenerUsuarioId() {
-  const { data } = await supabase.auth.getUser();
-  return data?.user?.id || null;
-}
-
-// -------- RPC carrito (remoto) --------
-async function agregarAlCarritoRemoto(productoId, delta = 1) {
-  const { error } = await supabase.rpc("carrito_agregar_item", {
-    p_producto_id: productoId,
-    p_delta: delta
-  });
-  if (error) {
-    console.error("carrito_agregar_item error:", error);
-    return false;
-  }
-  return true;
-}
-async function contarCarritoRemoto() {
-  const uid = await obtenerUsuarioId();
-  if (!uid) return null; // sin sesión → usar local
-  const { data, error } = await supabase.rpc("carrito_contar");
-  if (error) {
-    console.error("carrito_contar error:", error);
-    return 0;
-  }
-  return data ?? 0;
 }
 
 // -------- Fetch catálogo desde BD --------
@@ -76,40 +43,9 @@ async function fetchProductos() {
     sku: p.sku ?? null,
     titulo: p.nombre,
     imagen: toPublicImageUrl(p.imagen),
-    precio: p.precio,
+    precio: Number(p.precio || 0),
     categoria: { id: p.categoria_slug, nombre: p.categoria_nombre }
   }));
-}
-
-// -------- Buscar en BD --------
-async function buscarProductos(q) {
-  if (!q || q.trim() === "") {
-    renderTodos();
-    return;
-  }
-
-  const { data, error } = await supabase
-    .from("v_productos_publicos")
-    .select("*")
-    .or(`nombre.ilike.%${q}%, descripcion.ilike.%${q}%, categoria_nombre.ilike.%${q}%`)
-    .order("nombre");
-
-  if (error) {
-    console.error("❌ Error en búsqueda:", error.message);
-    return;
-  }
-
-  const resultados = (data || []).map(p => ({
-    id: p.id,
-    sku: p.sku ?? null,
-    titulo: p.nombre,
-    imagen: toPublicImageUrl(p.imagen),
-    precio: p.precio,
-    categoria: { id: p.categoria_slug, nombre: p.categoria_nombre }
-  }));
-
-  tituloPrincipal.textContent = `Resultados para "${q}" (${resultados.length})`;
-  cargarProductos(resultados);
 }
 
 // -------- Render catálogo --------
@@ -141,7 +77,7 @@ function cargarProductos(productosElegidos) {
     contenedorProductos.append(div);
   });
 
-  actualizarBotonesAgregar();
+  activarBotonesAgregar();
 }
 
 function renderTodos() {
@@ -169,47 +105,71 @@ function activarBotonesCategorias() {
   });
 }
 
-// -------- Carrito (agregar) --------
-function actualizarBotonesAgregar() {
+// -------- Carrito (localStorage) --------
+function cargarCarritoLS() {
+  try {
+    const ls = localStorage.getItem("productos-en-carrito");
+    productosEnCarrito = ls ? JSON.parse(ls) : [];
+  } catch {
+    productosEnCarrito = [];
+  }
+}
+
+function guardarCarritoLS() {
+  localStorage.setItem("productos-en-carrito", JSON.stringify(productosEnCarrito));
+}
+
+function actualizarNumerito() {
+  const totalLocal = productosEnCarrito.reduce((a, p) => a + (p.cantidad || 0), 0);
+  numerito.textContent = String(totalLocal);
+}
+
+function activarBotonesAgregar() {
   const botonesAgregar = document.querySelectorAll(".producto-agregar");
   botonesAgregar.forEach(boton => {
-    boton.addEventListener("click", agregarAlCarrito);
+    boton.addEventListener("click", (e) => agregarAlCarrito(e.currentTarget.dataset.id, 1));
   });
 }
 
-function cargarCarritoLS() {
-  const ls = localStorage.getItem("productos-en-carrito");
-  productosEnCarrito = ls ? JSON.parse(ls) : [];
-}
-
-async function agregarAlCarrito(e) {
-  const id = e.currentTarget.dataset.id;
-  const prod = CATALOGO.find(p => p.id === id);
+function agregarAlCarrito(id, cant = 1) {
+  const prod = CATALOGO.find(p => String(p.id) === String(id));
   if (!prod) return;
 
-  const uid = await obtenerUsuarioId();
-  if (uid) {
-    const ok = await agregarAlCarritoRemoto(id, 1);
-    if (!ok) return;
-  } else {
-    // fallback local
-    const ya = productosEnCarrito.find(p => p.id === id);
-    if (ya) ya.cantidad += 1;
-    else productosEnCarrito.push({ ...prod, cantidad: 1 });
-    localStorage.setItem("productos-en-carrito", JSON.stringify(productosEnCarrito));
-  }
+  const ya = productosEnCarrito.find(p => String(p.id) === String(id));
+  if (ya) ya.cantidad += Number(cant || 1);
+  else productosEnCarrito.push({ id: String(prod.id), titulo: prod.titulo, precio: prod.precio, imagen: prod.imagen, cantidad: Number(cant || 1) });
 
-  await actualizarNumerito();
+  guardarCarritoLS();
+  actualizarNumerito();
 }
 
-async function actualizarNumerito() {
-  const remoto = await contarCarritoRemoto();
-  if (remoto !== null) {
-    numerito.textContent = String(remoto);
-  } else {
-    const totalLocal = productosEnCarrito.reduce((a, p) => a + (p.cantidad || 0), 0);
-    numerito.textContent = String(totalLocal);
+// -------- Búsqueda --------
+async function buscarProductos(q) {
+  const query = (q || "").trim();
+  if (!query) { renderTodos(); return; }
+
+  const { data, error } = await supabase
+    .from("v_productos_publicos")
+    .select("*")
+    .or(`nombre.ilike.%${query}%, descripcion.ilike.%${query}%, categoria_nombre.ilike.%${query}%`)
+    .order("nombre");
+
+  if (error) {
+    console.error("❌ Error en búsqueda:", error.message);
+    return;
   }
+
+  const resultados = (data || []).map(p => ({
+    id: p.id,
+    sku: p.sku ?? null,
+    titulo: p.nombre,
+    imagen: toPublicImageUrl(p.imagen),
+    precio: Number(p.precio || 0),
+    categoria: { id: p.categoria_slug, nombre: p.categoria_nombre }
+  }));
+
+  tituloPrincipal.textContent = `Resultados para "${query}" (${resultados.length})`;
+  cargarProductos(resultados);
 }
 
 // -------- Inicio --------
@@ -218,9 +178,10 @@ async function iniciarCatalogo() {
   CATALOGO = await fetchProductos();
   renderTodos();
   activarBotonesCategorias();
-  await actualizarNumerito();
+  actualizarNumerito();
 
-  // ChatBrain necesita el catálogo para entender nombres → indexar aquí
+  // deja el catálogo para el bot y construye índice
+  window.__PRODUCTS__ = CATALOGO;
   window.ChatBrain?.buildIndex?.(CATALOGO);
 
   // Búsqueda
@@ -239,3 +200,6 @@ async function iniciarCatalogo() {
 }
 
 iniciarCatalogo();
+
+// Exponer una mínima API para el bot (por si la necesitás)
+window.__ADD_TO_CART__ = (id, qty=1) => agregarAlCarrito(id, qty);
