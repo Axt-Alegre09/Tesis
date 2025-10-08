@@ -19,14 +19,15 @@
   const list = (arr=[]) => arr.length<=1 ? (arr[0]||"") : arr.slice(0,-1).join(", ") + " y " + arr.slice(-1);
 
   // ===== Dominio: sinónimos + sabores/categorías =====
-  const SYN = {
-    empanada: ["empanada","empanadas","empi","empas"],
-    alfajor:  ["alfajor","alfajores"],
-    bocadito: ["bocadito","bocaditos","combo","combos"],
-    pan:      ["pan","panificados","baguette","gallego","campo","chip"],
-    milanesa: ["milanesa","milanesas","sandwich milanesa","sándwich milanesa","sandwiches","sándwiches","sanguche","sanguches"],
-    sandwich: ["sandwich","sandwiches","sándwich","sándwiches"]
-  };
+const SYN = {
+  empanada: ["empanada","empanadas","empi","empas"],
+  alfajor:  ["alfajor","alfajores"],
+  bocadito: ["bocadito","bocaditos","combo","combos"],
+  pan:      ["pan","panificados","baguette","gallego","campo","chip"],
+  milanesa: ["milanesa","milanesas","sandwich milanesa","sándwich milanesa"],
+  sandwich: ["sandwich","sandwiches","sándwich","sándwiches"]
+};
+
 
   // sabores (con multi-palabra)
   const FLAVORS = [
@@ -219,10 +220,11 @@
   }
 
   // Divide por conectores: "y", "e", ",", "con"
-  function splitSegments(msg) {
+    function splitSegments(msg) {
     const parts = normalize(msg).split(/\s+(?:y|e|,|con)\s+/g);
     return parts.filter(Boolean);
-  }
+    }
+
 
   // Extrae “2 empanadas de carne”, “… 2 sandwiches”
   function extractItems(msg){
@@ -236,7 +238,11 @@
       const m = seg.match(r);
       if (!m) continue;
       const qty = toNumber(m[1]);
-      const prodTxt = (m[2] && normalize(m[2])) || lastProd || guessProductText(msg) || "empanadas";
+     const prodTxt =
+            (m[2] && normalize(m[2])) ||
+            // si no hay sustantivo explícito y hay “carrito” o un sabor, asumimos empanadas
+            ((/carrito/.test(msg) || FLAVORS.some(f => seg.includes(f))) ? "empanadas" : null) ||
+            lastProd || guessProductText(msg) || "empanadas";
       const flavor = m[3] ? normalize(m[3]) : extractFlavor(seg);
       lastProd = prodTxt;
       if (qty) items.push({ cantidad: qty, prodTxt, flavor });
@@ -249,7 +255,9 @@
       while ((m2 = r2.exec(msg)) !== null) {
         const qty = toNumber(m2[1]);
         const flavor = normalize(m2[2]);
-        const prodTxt = lastProd || guessProductText(msg) || "empanadas";
+        const prodTxt = lastProd ||
+            ((/carrito/.test(msg) || FLAVORS.some(f => msg.includes(f))) ? "empanadas" : guessProductText(msg)) ||
+            "empanadas";
         items.push({ cantidad: qty || 1, prodTxt, flavor });
       }
     }
@@ -340,11 +348,11 @@
     }
 
     // Agregar (incluye compuestos con “con”)
-    if (/(agrega(me)?|sum(a|ar)|pone|pon|quiero|dame|añade|anadi)\b/.test(msg)) {
-      const items = extractItems(msg);
-      if (items.length) return { intent:"add", items };
-      const prodTxt = guessProductText(msg);
-      if (prodTxt) return { intent:"add", items:[{ cantidad:1, prodTxt }] };
+    if (/(?:me\s+)?(?:puedes|podes|podrias|podrías)?\s*(agrega(r)?(me)?|sum(a|ar)|pone(r)?|pon|quiero|dame|añade(r)?|anadi(ar)?)(\s|$)/.test(msg)) {
+    const items = extractItems(msg);
+    if (items.length) return { intent:"add", items };
+    const prodTxt = guessProductText(msg);
+    if (prodTxt) return { intent:"add", items:[{ cantidad:1, prodTxt }] };
     }
 
     return { intent:"none" };

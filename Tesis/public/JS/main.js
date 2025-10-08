@@ -222,6 +222,8 @@ async function iniciarCatalogo() {
   // 1) Traer catálogo
   CATALOGO = await fetchProductos();
 
+  window.ChatBrain?.buildIndex(CATALOGO);
+
   // 2) Exponerlo global para el chatbot (por si aún no cargó el script)
   window.__PRODUCTS__ = CATALOGO;
 
