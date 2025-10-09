@@ -66,8 +66,6 @@ async function init() {
     // y mostrarlo, por ejemplo:
     // const total = await fetchTotalDePedido(pedidoId);
     // putMessage(`Pedido #${pedidoId} listo para pagar. Total: ${fmtGs(total)}.`, "ok");
-
-    putMessage(`Pedido #${pedidoId} listo para pagar.`, "ok");
     return;
   }
 
