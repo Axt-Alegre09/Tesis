@@ -54,136 +54,144 @@
       <p id="carrito-comprado" class="carrito-comprado disabled">¡Muchas gracias por tu compra! <i class="bi bi-emoji-laughing"></i></p>
     </main>
   </div>
-      <!-- ...resto del HTML igual... -->
-<script type="module">
-  import { supabase } from "./JS/ScriptLogin.js";
-  import "./JS/cart-api.js";
 
-  const contVacio   = document.getElementById("carrito-vacio");
-  const contProds   = document.getElementById("carrito-productos");
-  const contAcc     = document.getElementById("carrito-acciones");
-  const totalEl     = document.getElementById("total");
-  const btnVaciar   = document.getElementById("btn-vaciar");
-  const btnComprar  = document.getElementById("btn-comprar");
+  <!-- Script de la API del carrito (efecto lateral) -->
+  <script type="module">
+    import "./JS/cart-api.js";
 
-  const IMG_FALLBACK = "https://placehold.co/256x256?text=Imagen";
-  const fmtGs = (n) => new Intl.NumberFormat("es-PY").format(Number(n||0)) + " Gs";
+    const contVacio   = document.getElementById("carrito-vacio");
+    const contProds   = document.getElementById("carrito-productos");
+    const contAcc     = document.getElementById("carrito-acciones");
+    const totalEl     = document.getElementById("total");
+    const btnVaciar   = document.getElementById("btn-vaciar");
+    const btnComprar  = document.getElementById("btn-comprar");
 
-  function setEstado(vacio){
-    if (vacio) {
-      contVacio.classList.remove("disabled");
-      contProds.classList.add("disabled");
-      contAcc.classList.add("disabled");
-    } else {
-      contVacio.classList.add("disabled");
-      contProds.classList.remove("disabled");
-      contAcc.classList.remove("disabled");
+    const IMG_FALLBACK = "https://placehold.co/256x256?text=Imagen";
+    const fmtGs = (n) => new Intl.NumberFormat("es-PY").format(Number(n||0)) + " Gs";
+
+    function setEstado(vacio){
+      if (vacio) {
+        contVacio.classList.remove("disabled");
+        contProds.classList.add("disabled");
+        contAcc.classList.add("disabled");
+      } else {
+        contVacio.classList.add("disabled");
+        contProds.classList.remove("disabled");
+        contAcc.classList.remove("disabled");
+      }
     }
-  }
 
-  async function render() {
-    const snap = await window.CartAPI.getSnapshot();
-    const items = snap.items || [];
-    totalEl.textContent = fmtGs(snap.total || 0);
+    async function render() {
+      const snap = await window.CartAPI.getSnapshot();
+      const items = snap.items || [];
+      totalEl.textContent = fmtGs(snap.total || 0);
 
-    if (!items.length) {
+      if (!items.length) {
+        contProds.innerHTML = "";
+        setEstado(true);
+        return;
+      }
+
+      setEstado(false);
       contProds.innerHTML = "";
-      setEstado(true);
-      return;
-    }
 
-    setEstado(false);
-    contProds.innerHTML = "";
+      for (const it of items) {
+        const row = document.createElement("div");
+        row.className = "carrito-producto";
 
-    for (const it of items) {
-      const row = document.createElement("div");
-      row.className = "carrito-producto";
-      const idAttrKey = snap.mode === "remote" ? "data-itemid" : "data-id";
-      const idAttrVal = snap.mode === "remote" ? String(it._itemId) : String(it.id);
+        // Remoto usa itemId (id de carrito_items). Hacemos fallback por si vino _itemId o id.
+        const idAttrKey = snap.mode === "remote" ? "data-itemid" : "data-id";
+        const resolvedId = snap.mode === "remote"
+          ? (it.itemId ?? it._itemId ?? it.id)
+          : it.id;
+        const idAttrVal = String(resolvedId);
 
-      row.innerHTML = `
-        <img class="carrito-producto-imagen" src="${it.imagen || IMG_FALLBACK}" alt="${it.titulo}">
-        <div class="carrito-producto-titulo"><h6>Título</h6><h4>${it.titulo}</h4></div>
-        <div class="carrito-producto-cantidad">
-          <h6>Cantidad</h6>
-          <div class="qty-ctrl">
-            <button class="qty-btn" data-action="dec" ${idAttrKey}="${idAttrVal}" aria-label="Disminuir">−</button>
-            <span class="qty" data-qty>${Number(it.cantidad||1)}</span>
-            <button class="qty-btn" data-action="inc" ${idAttrKey}="${idAttrVal}" aria-label="Aumentar">+</button>
+        row.innerHTML = `
+          <img class="carrito-producto-imagen" src="${it.imagen || IMG_FALLBACK}" alt="${it.titulo}">
+          <div class="carrito-producto-titulo"><h6>Título</h6><h4>${it.titulo}</h4></div>
+          <div class="carrito-producto-cantidad">
+            <h6>Cantidad</h6>
+            <div class="qty-ctrl">
+              <button class="qty-btn" data-action="dec" ${idAttrKey}="${idAttrVal}" aria-label="Disminuir">−</button>
+              <span class="qty" data-qty>${Number(it.cantidad||1)}</span>
+              <button class="qty-btn" data-action="inc" ${idAttrKey}="${idAttrVal}" aria-label="Aumentar">+</button>
+            </div>
           </div>
-        </div>
-        <div class="carrito-producto-precio"><h6>Precio</h6><p>${fmtGs(it.precio)}</p></div>
-        <div class="carrito-producto-subtotal"><h6>Subtotal</h6><p>${fmtGs(it.precio * (it.cantidad||1))}</p></div>
-        <button class="carrito-producto-eliminar" title="Eliminar" ${idAttrKey}="${idAttrVal}">
-          <i class="bi bi-trash"></i>
-        </button>
-      `;
-      row.querySelector(".carrito-producto-imagen")?.addEventListener("error", (e)=> e.currentTarget.src = IMG_FALLBACK);
-      contProds.appendChild(row);
+          <div class="carrito-producto-precio"><h6>Precio</h6><p>${fmtGs(it.precio)}</p></div>
+          <div class="carrito-producto-subtotal"><h6>Subtotal</h6><p>${fmtGs(it.precio * (it.cantidad||1))}</p></div>
+          <button class="carrito-producto-eliminar" title="Eliminar" ${idAttrKey}="${idAttrVal}">
+            <i class="bi bi-trash"></i>
+          </button>
+        `;
+        row.querySelector(".carrito-producto-imagen")?.addEventListener("error", (e)=> e.currentTarget.src = IMG_FALLBACK);
+        contProds.appendChild(row);
+      }
     }
-  }
 
-  contProds.addEventListener("click", async (e) => {
-    const btn = e.target.closest(".qty-btn, .carrito-producto-eliminar");
-    if (!btn) return;
+    // Delegación de eventos (+/− y eliminar)
+    contProds.addEventListener("click", async (e) => {
+      const btn = e.target.closest(".qty-btn, .carrito-producto-eliminar");
+      if (!btn) return;
 
-    const isRemote = btn.hasAttribute("data-itemid");
-    const idKey = isRemote ? "data-itemid" : "data-id";
-    const idVal = btn.getAttribute(idKey);
+      const isRemote = btn.hasAttribute("data-itemid");
+      const idKey = isRemote ? "data-itemid" : "data-id";
+      const idVal = btn.getAttribute(idKey);
 
-    if (btn.classList.contains("carrito-producto-eliminar")) {
-      await window.CartAPI.remove({ [isRemote?"itemId":"id"]: idVal });
+      if (btn.classList.contains("carrito-producto-eliminar")) {
+        await window.CartAPI.remove({ [isRemote ? "itemId" : "id"]: idVal });
+        await render();
+        await window.CartAPI.refreshBadge?.();
+        return;
+      }
+
+      if (btn.classList.contains("qty-btn")) {
+        const action = btn.getAttribute("data-action"); // inc/dec
+        const row = btn.closest(".carrito-producto");
+        const qEl = row?.querySelector("[data-qty]");
+        const qty = Number(qEl?.textContent || "1");
+        const nueva = Math.max(1, qty + (action === "inc" ? 1 : -1));
+        await window.CartAPI.setQty({ [isRemote ? "itemId" : "id"]: idVal }, nueva);
+        await render();
+        await window.CartAPI.refreshBadge?.();
+      }
+    });
+
+    // Vaciar carrito
+    btnVaciar.addEventListener("click", async () => {
+      await window.CartAPI.empty?.();   // si tu CartAPI tiene empty(); si no, se ignora
       await render();
       await window.CartAPI.refreshBadge?.();
-      return;
-    }
+    });
 
-    if (btn.classList.contains("qty-btn")) {
-      const action = btn.getAttribute("data-action"); // inc/dec
-      const row = btn.closest(".carrito-producto");
-      const qEl = row?.querySelector("[data-qty]");
-      const qty = Number(qEl?.textContent || "1");
-      const nueva = Math.max(1, qty + (action === "inc" ? 1 : -1));
-      await window.CartAPI.setQty({ [isRemote?"itemId":"id"]: idVal }, nueva);
-      await render();
-      await window.CartAPI.refreshBadge?.();
-    }
-  });
+    // Comprar ahora: guarda SNAPSHOT y navega con ?monto=<total> (flujo local)
+    btnComprar.addEventListener("click", async () => {
+      const snap = await window.CartAPI.getSnapshot();
+      const items = snap.items || [];
+      if (!items.length) { alert("Tu carrito está vacío."); return; }
 
-  btnVaciar.addEventListener("click", async () => {
-    await window.CartAPI.empty?.();   // si tu CartAPI tiene empty(); si no, deja como está
+      const payload = {
+        // para ?monto= usamos "local" (invitado o fallback)
+        source: "local",
+        items: items.map(it => ({
+          id: it.id,
+          titulo: it.titulo,
+          precio: Number(it.precio || 0),
+          cantidad: Number(it.cantidad || 1)
+        })),
+        total: Number(snap.total || 0),
+        ts: Date.now()
+      };
+
+      sessionStorage.setItem("checkout_snapshot", JSON.stringify(payload));
+      sessionStorage.setItem("checkout", JSON.stringify(payload)); // compatibilidad legacy
+
+      const url = new URL("./pasarelaPagos.html", window.location.href);
+      url.searchParams.set("monto", String(payload.total));
+      window.location.assign(url.toString());
+    });
+
     await render();
-    await window.CartAPI.refreshBadge?.();
-  });
-
-  // Comprar ahora: guarda SNAPSHOT y navega con ?monto=<total>
-      btnComprar.addEventListener("click", async () => {
-        const snap = await window.CartAPI.getSnapshot();
-        const items = snap.items || [];
-        if (!items.length) { alert("Tu carrito está vacío."); return; }
-
-        const payload = {
-          source: snap.mode,                      // "local" o "remote"
-          items: items.map(it => ({
-            id: it.id, titulo: it.titulo, precio: it.precio, cantidad: it.cantidad
-          })),
-          total: Number(snap.total || 0),
-          ts: Date.now()
-        };
-
-        // Guardamos con clave nueva y legacy (por compatibilidad)
-        sessionStorage.setItem("checkout_snapshot", JSON.stringify(payload));
-        sessionStorage.setItem("checkout", JSON.stringify(payload));
-
-        // IMPORTANTE: pasar el total por la URL para que la pasarela valide
-        const url = new URL("./pasarelaPagos.html", window.location.href);
-        url.searchParams.set("monto", String(payload.total));
-        window.location.assign(url.toString());
-      });
-
-
-  await render();
-</script>
+  </script>
 
 </body>
 </html>
