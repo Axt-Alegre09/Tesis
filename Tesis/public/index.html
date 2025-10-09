@@ -94,9 +94,6 @@
   </script>
 
 
-  <!-- Catálogo -->
-  <script type="module" src="JS/main.js"></script>
-
   <!-- Dropdown usuario -->
   <script>
     (() => {
@@ -181,8 +178,29 @@
       <i class="bi bi-send-fill" id="sendChatBtn" role="button" aria-label="Enviar"></i>
     </div>
   </div>
-         <script type="module" src="JS/cart-api.js"></script>
-         <script src="JS/chatbot.brain.js"></script>
-         <script src="JS/script-chatbot.js" defer></script>
+
+
+<!-- Auth (igual que antes) -->
+<script type="module">
+  import { logout, autoWireAuthMenu, requireAuth } from "./JS/ScriptLogin.js";
+  requireAuth();
+  autoWireAuthMenu();
+  document.getElementById("logoutBtn")?.addEventListener("click", logout);
+  document.getElementById('searchForm')?.addEventListener('submit', (e) => e.preventDefault());
+</script>
+
+<!-- 1) API del carrito (NO module) -->
+<script src="JS/cart-api.js"></script>
+
+<!-- 2) Catálogo -->
+<script type="module" src="JS/main.js"></script>
+
+<!-- 3) Chat -->
+<script src="JS/chatbot.brain.js"></script>
+<script src="JS/script-chatbot.js" defer></script>
+
+
+
+
 </body>
 </html>

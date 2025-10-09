@@ -57,8 +57,18 @@ function render(productos) {
   document.querySelectorAll(".producto-agregar").forEach(btn => {
     btn.addEventListener("click", async (e) => {
       const id = e.currentTarget.dataset.id;
-      try { await window.CartAPI.addById(id, 1); }
-      catch (err) { console.error("addById:", err); }
+      try {
+        // Preferimos addById si __PRODUCTS__ está cargado
+        await window.CartAPI.addById(id, 1);
+      } catch {
+        // Fallback seguro para invitados
+        const prod = CATALOGO.find(p => String(p.id) === String(id));
+        if (prod) {
+          await window.CartAPI.addProduct({
+            id: prod.id, titulo: prod.titulo, precio: prod.precio, imagen: prod.imagen
+          }, 1);
+        }
+      }
     });
   });
 }
@@ -83,13 +93,17 @@ function wireCategorias() {
 
 async function init() {
   CATALOGO = await fetchProductos();
+
+  // Catálogo accesible para el Chat y CartAPI.addById
   window.__PRODUCTS__ = CATALOGO.map(p => ({
     id: p.id, nombre: p.nombre, titulo: p.titulo, precio: p.precio, imagen: p.imagen
   }));
+
   render(CATALOGO);
   wireCategorias();
   window.CartAPI.refreshBadge();
 
+  // Búsqueda
   const form = document.getElementById("searchForm");
   const input = document.getElementById("searchInput");
   form?.addEventListener("submit", (e)=>{ e.preventDefault(); doSearch(input.value); });

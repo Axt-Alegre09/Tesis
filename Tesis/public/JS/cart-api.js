@@ -26,7 +26,6 @@
       cantidad: Number(qty||1),
     });
     write(cart);
-    window.dispatchEvent(new StorageEvent("storage", { key: LS_KEY }));
     return cart;
   }
   function removeLocal(id, qty=1) {
@@ -36,7 +35,6 @@
       cart[i].cantidad = Math.max(0, Number(cart[i].cantidad||0) - Number(qty||1));
       if (cart[i].cantidad === 0) cart.splice(i,1);
       write(cart);
-      window.dispatchEvent(new StorageEvent("storage", { key: LS_KEY }));
     }
     return cart;
   }
@@ -46,7 +44,6 @@
     if (i >= 0) {
       cart[i].cantidad = Math.max(1, Number(qty||1));
       write(cart);
-      window.dispatchEvent(new StorageEvent("storage", { key: LS_KEY }));
     }
     return cart;
   }
@@ -61,6 +58,7 @@
   }
 
   window.CartAPI = {
+    // Para el Home/Chat: si existe __PRODUCTS__, agrega por id. Si no, usa addProduct.
     async addById(productoId, qty=1) {
       const all = window.__PRODUCTS__ || [];
       const prod = all.find(p => String(p.id) === String(productoId));
