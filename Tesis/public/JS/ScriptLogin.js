@@ -244,22 +244,23 @@ async function wireLoginPage() {
   });
 
   // --- Recuperación de contraseña ---
+  // --- Recuperación de contraseña ---
   forgot?.addEventListener("click", async (e) => {
     e.preventDefault();
     const email = prompt("Ingresa tu correo para recuperar la contraseña:");
     if (!email) return;
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin + "/" + LOGIN_URL, // página que abrirá el enlace para setear nueva contraseña
+      redirectTo: "https://tesis-ochre-iota.vercel.app/misdatos.html",
     });
 
     if (error) {
-      const msg = translateAuthError("reset", error);
-      showMsg(`❌ ${msg}`, "danger");
+      showMsg("❌ No se pudo enviar el correo de recuperación.", "danger");
       return;
     }
     showMsg("📧 Te enviamos un correo con el enlace para cambiar la contraseña.", "info");
   });
+
 }
 
 /* ========= Auto-init ========= */
