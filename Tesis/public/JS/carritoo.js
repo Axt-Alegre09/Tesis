@@ -13,8 +13,8 @@ const contenedorCarritoProductos = document.querySelector("#carrito-productos");
 const contenedorCarritoAcciones  = document.querySelector("#carrito-acciones");
 const contenedorCarritoComprado  = document.querySelector("#carrito-comprado");
 
-const botonVaciar  = document.querySelector("#carrito-acciones-vaciar");
-const botonComprar = document.querySelector("#carrito-acciones-comprar");
+const botonVaciar  = document.querySelector("#carrito-acciones-vaciar") || document.querySelector("#btn-vaciar");
+const botonComprar = document.querySelector("#carrito-acciones-comprar") || document.querySelector("#btn-comprar");
 const totalEl      = document.querySelector("#total");
 
 /* =========================
@@ -26,6 +26,13 @@ const STORAGE_BASE = "https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object
 /* =========================
    Helpers
 ========================= */
+function setCheckoutSnapshot(obj) {
+  const json = JSON.stringify(obj || {});
+  // clave nueva
+  sessionStorage.setItem("checkout_snapshot", json);
+  // clave legacy (por compatibilidad con la pasarela)
+  sessionStorage.setItem("checkout", json);
+}
 
 function calcularTotal(items) {
   return (items || []).reduce((acc, p) => acc + Number(p.precio) * Number(p.cantidad || 1), 0);
@@ -50,7 +57,7 @@ function buildSnapshotFromItems(items) {
 function irPasarelaConItems(pasarelaUrl, items) {
   const snap = buildSnapshotFromItems(items);
   pasarelaUrl.searchParams.set("monto", String(snap.total));
-  sessionStorage.setItem("checkout_snapshot", JSON.stringify(snap));
+  setCheckoutSnapshot(snap);
   window.location.assign(pasarelaUrl.toString());
 }
 
@@ -73,7 +80,7 @@ function buildSnapshotLocal(){
 function irPasarelaLocal(pasarelaUrl){
   const total = calcularTotalLocal();
   pasarelaUrl.searchParams.set("monto", String(total));
-  sessionStorage.setItem("checkout_snapshot", JSON.stringify(buildSnapshotLocal()));
+  setCheckoutSnapshot(buildSnapshotLocal());
   window.location.assign(pasarelaUrl.toString());
 }
 
@@ -346,17 +353,15 @@ function actualizarTotalRemoto(items) {
 }
 
 /* =========================
-   Delegación de eventos (1 sola vez)
+   Delegación de eventos
 ========================= */
-contenedorCarritoProductos.addEventListener("click", async (e) => {
+contenedorCarritoProductos?.addEventListener("click", async (e) => {
   const btn = e.target.closest(".qty-btn, .carrito-producto-eliminar");
   if (!btn) return;
 
-  // Local vs remoto por el atributo presente
   const isLocal = btn.hasAttribute("data-id");
   const isRemoto = btn.hasAttribute("data-itemid");
 
-  // Papelera
   if (btn.classList.contains("carrito-producto-eliminar")) {
     if (isLocal) {
       const id = btn.getAttribute("data-id");
@@ -369,9 +374,8 @@ contenedorCarritoProductos.addEventListener("click", async (e) => {
     return;
   }
 
-  // Botones +/−
   if (btn.classList.contains("qty-btn")) {
-    const action = btn.getAttribute("data-action"); // "inc" | "dec"
+    const action = btn.getAttribute("data-action");
     const delta = action === "inc" ? +1 : -1;
 
     if (isLocal) {
@@ -379,7 +383,6 @@ contenedorCarritoProductos.addEventListener("click", async (e) => {
       deltaCantidadLocal(id, delta);
     } else if (isRemoto) {
       const itemId = btn.getAttribute("data-itemid");
-      // Leer cantidad visible y enviar setCantidadRemoto con la nueva
       const row = btn.closest(".carrito-producto");
       const qEl = row?.querySelector("[data-qty]");
       const qty = Number(qEl?.textContent || "1");
@@ -421,41 +424,24 @@ botonComprar?.addEventListener("click", async () => {
 
         if (okId) {
           pasarelaUrl.searchParams.set("pedido", pedidoId);
-          sessionStorage.setItem("checkout_snapshot", JSON.stringify({
+          setCheckoutSnapshot({
             source: "remote",
             pedidoId: String(pedidoId),
             ts: Date.now()
-          }));
+          });
           window.location.assign(pasarelaUrl.toString());
           return;
         } else {
           console.warn("[checkout] pedidoId inválido, fallback a LOCAL:", pedidoId);
-          // ✅ Fallback usando items remotos si existen
-          if (ultimoRemoto && ultimoRemoto.length) {
-            irPasarelaConItems(pasarelaUrl, ultimoRemoto);
-            return;
-          }
-          // Si no hay remoto cargado, probamos local
-          if (productosEnCarrito && productosEnCarrito.length) {
-            irPasarelaConItems(pasarelaUrl, productosEnCarrito);
-            return;
-          }
-          alert("Tu carrito está vacío.");
-          return;
+          if (ultimoRemoto && ultimoRemoto.length) { irPasarelaConItems(pasarelaUrl, ultimoRemoto); return; }
+          if (productosEnCarrito && productosEnCarrito.length) { irPasarelaConItems(pasarelaUrl, productosEnCarrito); return; }
+          alert("Tu carrito está vacío."); return;
         }
       } catch (e) {
         console.error("[checkout] checkoutRemoto falló; fallback a LOCAL:", e);
-        // ✅ Fallback usando items remotos si existen
-        if (ultimoRemoto && ultimoRemoto.length) {
-          irPasarelaConItems(pasarelaUrl, ultimoRemoto);
-          return;
-        }
-        if (productosEnCarrito && productosEnCarrito.length) {
-          irPasarelaConItems(pasarelaUrl, productosEnCarrito);
-          return;
-        }
-        alert("Tu carrito está vacío.");
-        return;
+        if (ultimoRemoto && ultimoRemoto.length) { irPasarelaConItems(pasarelaUrl, ultimoRemoto); return; }
+        if (productosEnCarrito && productosEnCarrito.length) { irPasarelaConItems(pasarelaUrl, productosEnCarrito); return; }
+        alert("Tu carrito está vacío."); return;
       }
     }
 
@@ -478,87 +464,6 @@ botonComprar?.addEventListener("click", async () => {
   }
 });
 
-async function generateInvoicePDF(snapshot) {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
-  const pw = doc.internal.pageSize.getWidth();
-
-  const EMP = {
-    nombre: 'Paniquiños',
-    ruc: '80026041-4',
-    tel: '+595 971 000 000',
-    dir: 'Av. Sabor 123, Asunción',
-    timbrado: '15181564',
-    inicio: '01/01/2025'
-  };
-
-  const snap = snapshot || loadSnapshot() || {};
-  const metodo = snap.metodo || 'contado';
-  const extra = snap.extra || {};
-  const cliente = snap.cliente || collectClienteFromForm();
-
-  const data = getCheckoutData();
-  const items = (snap.items && snap.items.length ? snap.items : data.items) || [];
-  const totalUse = snap.total || data.total || 0;
-
-  const iva10 = Math.round(totalUse / 11);
-  const subBase = totalUse - iva10;
-  const fecha = snap.fechaISO ? new Date(snap.fechaISO) : new Date();
-  const nroFactura = `001-001-${String(Math.floor(Math.random() * 1000000)).padStart(6, '0')}`;
-
-  // --------- Encabezado Empresa ---------
-  doc.setFontSize(18);
-  doc.text(EMP.nombre, 40, 50);
-  doc.setFontSize(11);
-  doc.text(`RUC: ${EMP.ruc}`, 40, 70);
-  doc.text(`Tel: ${EMP.tel}`, 40, 85);
-  doc.text(`Dir: ${EMP.dir}`, 40, 100);
-  doc.text(`Timbrado: ${EMP.timbrado} (inicio ${EMP.inicio})`, 40, 115);
-
-  // --------- Datos Cliente ---------
-  doc.setFontSize(12);
-  doc.text("Factura Nº: " + nroFactura, pw - 250, 50);
-  doc.text("Fecha: " + fecha.toLocaleDateString(), pw - 250, 70);
-  doc.text("Método: " + metodo, pw - 250, 85);
-
-  doc.setFontSize(11);
-  doc.text("Cliente:", 40, 150);
-  doc.text(`${cliente.razon || ''}`, 100, 150);
-  doc.text("RUC: " + (cliente.ruc || ''), 40, 165);
-  doc.text("Tel: " + (cliente.tel || ''), 40, 180);
-
-  // --------- Tabla de Items ---------
-  const body = items.map(it => [
-    it.titulo,
-    it.cantidad,
-    new Intl.NumberFormat("es-PY").format(it.precio),
-    new Intl.NumberFormat("es-PY").format(it.precio * it.cantidad)
-  ]);
-
-  doc.autoTable({
-    head: [["Producto", "Cant.", "Precio", "Subtotal"]],
-    body,
-    startY: 210,
-    styles: { fontSize: 10 },
-    headStyles: { fillColor: [111, 92, 56] }
-  });
-
-  // --------- Totales ---------
-  let y = doc.lastAutoTable.finalY + 20;
-  doc.text("Sub-total: " + new Intl.NumberFormat("es-PY").format(subBase) + " Gs", pw - 200, y);
-  y += 15;
-  doc.text("IVA 10%: " + new Intl.NumberFormat("es-PY").format(iva10) + " Gs", pw - 200, y);
-  y += 15;
-  doc.setFontSize(13);
-  doc.text("TOTAL: " + new Intl.NumberFormat("es-PY").format(totalUse) + " Gs", pw - 200, y);
-
-  // --------- Guardar ---------
-  doc.save(`Factura_Paniquinos_${nroFactura}.pdf`);
-}
-
-
-
-
 /* =========================
    Carga inicial
 ========================= */
@@ -577,10 +482,8 @@ async function cargarCarrito() {
   }
 }
 
-
 /* =========================
    API para el Chatbot
-   (disponible en window.CartAPI)
 ========================= */
 
 // --- remoto
@@ -686,7 +589,6 @@ function getSnapshot() {
 
 // API pública para el chatbot
 window.CartAPI = {
-  // Si el usuario está logueado, usar addById (tiene el UUID). Para invitado, usar addProduct.
   addById: async (productoId, qty=1) => {
     const uid = await obtenerUsuarioId();
     if (uid) return addItemRemoto(productoId, qty);
@@ -700,7 +602,6 @@ window.CartAPI = {
     return addItemLocal(productoObj, qty);
   },
   remove: async ({ itemId, id }) => {
-    // remoto: pasar itemId (id de carrito_items). local: pasar id (id del producto en el storage)
     if (itemId) return removeRemotoByItemId(itemId);
     if (id)     return removeLocalById(id);
     return false;
@@ -714,6 +615,5 @@ window.CartAPI = {
   getSnapshot,
   refresh: cargarCarrito
 };
-
 
 cargarCarrito();
