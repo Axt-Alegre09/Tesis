@@ -104,3 +104,8 @@ async function init() {
 }
 
 init();
+
+
+// Eliminar mensajes de debug del checkout
+document.querySelectorAll("[data-checkout-msg]").forEach(el => el.remove());
+
