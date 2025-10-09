@@ -194,5 +194,44 @@
   <script src="JS/checkout.js"></script>
   <script type="module" src="JS/pasarelaPagos.js"></script>
 
+
+  <!--Para autocompletar desde mis datos en la pasarela de pago-->
+
+  <script type="module">
+  import { supabase } from "./JS/ScriptLogin.js";
+
+  const $ = (id) => document.getElementById(id);
+  const FIELD_IDS = ["ruc","razon","tel","mail","contacto","ciudad","barrio","depto","postal","calle1","calle2","nro"];
+
+  function isEmpty(v){ return v == null || String(v).trim() === ""; }
+
+  async function preloadProfileIntoForm() {
+    // si no hay sesión, no hacemos nada (flujo invitado)
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    // leer perfil
+    const { data, error } = await supabase
+      .from("clientes_perfil")
+      .select("*")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (error || !data) return;
+
+    // completar solo inputs vacíos
+    FIELD_IDS.forEach(id => {
+      const el = $(id);
+      if (el && isEmpty(el.value) && typeof data[id] !== "undefined" && data[id] !== null) {
+        el.value = String(data[id]);
+      }
+    });
+  }
+
+  preloadProfileIntoForm();
+</script>
+
+
+
+
 </body>
 </html>
