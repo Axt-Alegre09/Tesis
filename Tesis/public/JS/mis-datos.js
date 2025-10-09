@@ -1,7 +1,4 @@
 // JS/mis-datos.js
-// Requiere ScriptLogin.js que exporta `supabase`, y asume que el HTML
-// tiene los mismos IDs de inputs que pasarelaPagos (ruc, razon, tel, mail, etc.)
-
 import { supabase, requireAuth } from "./ScriptLogin.js";
 
 // ---------- util dom ----------
@@ -15,8 +12,8 @@ const FIELD_IDS = [
 ];
 
 // Campos de “usuario” (auth)
-const userField  = $("usuario");      // opcional (sólo visual)
-const passField  = $("contrasenia");  // opcional: si lo llenan, actualiza clave
+const userField  = $("usuario");      // opcional (solo display)
+const passField  = $("contrasenia");  // si lo llenan, se actualiza clave
 const btnGuardar = document.querySelector('[data-accion="actualizar"]') || document.querySelector("button[type=submit]");
 
 // ---------- helpers ----------
@@ -40,14 +37,34 @@ function setLoading(on) {
   btnGuardar.textContent = on ? "Guardando…" : "Actualizar";
 }
 
-function toast(msg, type="ok") {
-  // muy simple
-  alert(msg);
+function toast(msg) { alert(msg); }
+
+// Asegura sesión de recuperación si viniste desde el mail (hash con tokens)
+async function ensureRecoverySession() {
+  // Si ya hay sesión, nada que hacer
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.user) return session;
+
+  // Forzar sesión de recovery desde la URL
+  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  const access_token  = hash.get("access_token");
+  const refresh_token = hash.get("refresh_token");
+
+  if (access_token && refresh_token) {
+    const { data, error } = await supabase.auth.setSession({ access_token, refresh_token });
+    if (error) throw error;
+
+    // Limpia el hash visualmente
+    history.replaceState({}, document.title, window.location.pathname + window.location.search);
+    return data.session;
+  }
+  return null; // no hay sesión ni tokens
 }
 
 // ---------- flujo principal ----------
 async function getUserOrRedirect() {
-  await requireAuth(); // si no hay sesión, redirige
+  // Si no hay sesión, redirige a login
+  await requireAuth();
   const { data: { user } } = await supabase.auth.getUser();
   return user;
 }
@@ -58,7 +75,6 @@ async function loadProfile(uid) {
     .select("*")
     .eq("user_id", uid)
     .maybeSingle();
-
   if (error) throw error;
   return data || null;
 }
@@ -71,23 +87,42 @@ async function upsertProfile(uid, values) {
   if (error) throw error;
 }
 
+// Actualiza email de Auth si cambió
 async function updateAuthEmailIfNeeded(currentEmail, newEmail) {
-  // si cambiaron el mail y es distinto del actual de auth, intenta actualizarlo
-  if (newEmail && newEmail !== currentEmail) {
-    const { error } = await supabase.auth.updateUser({ email: newEmail });
-    if (error) throw error;
-  }
+  if (!newEmail || newEmail === currentEmail) return;
+
+  const { data, error } = await supabase.auth.updateUser({ email: newEmail });
+  if (error) throw error;
+
+  // Si tu proyecto requiere confirmación de email, Supabase enviará correo.
+  // Podés avisar:
+  toast("Email actualizado. Si tu proyecto lo requiere, revisá tu correo para confirmarlo.");
 }
 
+// Actualiza contraseña (requiere sesión válida o sesión de recuperación)
 async function updateAuthPasswordIfProvided(pwd) {
-  if (pwd && pwd.length >= 6) {
-    const { error } = await supabase.auth.updateUser({ password: pwd });
-    if (error) throw error;
+  if (!pwd) return;
+  if (pwd.length < 8) throw new Error("La contraseña debe tener al menos 8 caracteres.");
+
+  // Garantizar que hay sesión (normal o de recovery)
+  const session = await ensureRecoverySession();
+  if (!session) {
+    throw new Error("No se encontró una sesión válida para cambiar la contraseña. Volvé a abrir el enlace 'Olvidé mi contraseña' desde tu correo.");
   }
+
+  const { error } = await supabase.auth.updateUser({ password: pwd });
+  if (error) throw error;
+
+  toast("Contraseña actualizada. Por seguridad, iniciá sesión nuevamente.");
+  await supabase.auth.signOut();
+  window.location.href = "login.html";
 }
 
 async function init() {
   try {
+    // (por si viniste desde el mail, activamos sesión de recovery antes de leer user)
+    await ensureRecoverySession();
+
     const user = await getUserOrRedirect();
 
     // mostrar email actual en el campo “usuario” si existe
@@ -97,28 +132,28 @@ async function init() {
     const perfil = await loadProfile(user.id);
     if (perfil) fillForm(perfil);
 
-    // 2) wire botón guardar
+    // 2) Guardar
     btnGuardar?.addEventListener("click", async (e) => {
       e.preventDefault();
       setLoading(true);
       try {
         const values = readFormValues();
-        // validaciones mínimas
-        if (!values.mail) throw new Error("Ingresá un mail.");
+        if (!values.mail)  throw new Error("Ingresá un mail.");
         if (!values.razon) throw new Error("Ingresá la razón social / nombre.");
 
-        // upsert perfil
         await upsertProfile(user.id, values);
-
-        // auth: email y/o password (opcionales)
         await updateAuthEmailIfNeeded(user.email, values.mail);
+
         const newPwd = passField?.value?.trim() ?? "";
-        if (newPwd) await updateAuthPasswordIfProvided(newPwd);
+        if (newPwd) {
+          await updateAuthPasswordIfProvided(newPwd);
+          return; // updateAuthPasswordIfProvided ya redirige al login
+        }
 
         toast("Datos actualizados correctamente ✔️");
       } catch (err) {
         console.error(err);
-        toast("No se pudieron guardar los datos. " + (err?.message ?? ""), "error");
+        toast("No se pudieron guardar los datos. " + (err?.message ?? ""));
       } finally {
         setLoading(false);
       }
@@ -126,7 +161,7 @@ async function init() {
 
   } catch (err) {
     console.error("init mis-datos:", err);
-    toast("Necesitás estar logueado para ver tus datos.", "error");
+    toast("Necesitás estar logueado para ver tus datos.");
   }
 }
 

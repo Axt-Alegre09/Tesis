@@ -173,38 +173,22 @@ async function wireLoginPage() {
   const { data } = await supabase.auth.getSession();
   if (data.session) return go(DASHBOARD_URL);
 
-  // --- Login ---
-  loginForm?.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    showMsg("Procesando...", "secondary");
-
-    const email = (document.getElementById("loginEmail")?.value || "").trim();
-    const password = (document.getElementById("loginPassword")?.value || "").trim();
-
-    if (!email || !password) {
-      showMsg("Completa correo y contraseña.", "warning");
-      return;
-    }
-
-    // Intento de login
-    const { data: loginData, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      // Si falla, intentamos distinguir (si existe el RPC)
-      const exists = await emailExists(email); // true | false | null
-      const msg = translateAuthError("login", error, { exists });
-      showMsg(`❌ ${msg}`, "danger");
-      return;
-    }
-
-    // Si tu proyecto exige confirmación, loginData.session podría ser null hasta confirmar
-    if (!loginData?.session) {
-      showMsg("Favor confirmar correo desde el email", "warning");
-      return;
-    }
-
-    showMsg("✅ Bienvenido. Redirigiendo…", "success");
-    go(DASHBOARD_URL);
+  // --- Login ---asda
+ forgot?.addEventListener("click", async (e) => {
+  e.preventDefault();
+  const email = prompt("Ingresa tu correo para recuperar la contraseña:");
+  if (!email) return;
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: "https://tesis-ochre-iota.vercel.app/misdatos.html",
   });
+  if (error) {
+    console.error(error);
+    showMsg("❌ No se pudo enviar el correo de recuperación.", "danger");
+    return;
+  }
+  showMsg("📧 Te enviamos un correo con las instrucciones.", "info");
+});
+
 
   // --- Registro ---
   registerForm?.addEventListener("submit", async (e) => {
@@ -241,6 +225,11 @@ async function wireLoginPage() {
     // Si tienes verificación por email activada en Supabase:
     showMsg("✅ Cuenta creada. Revisa tu correo para confirmar la cuenta.", "success");
     wrapper?.classList.remove("active"); // volver al login
+  });
+
+
+  await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: "https://tesis-ochre-iota.vercel.app/misdatos.html",
   });
 
   // --- Recuperación de contraseña ---
