@@ -1,28 +1,24 @@
 // JS/mis-datos.js
 import { supabase, requireAuth } from "./ScriptLogin.js";
 
-// ---------- util dom ----------
+// ---- util ----
 const $ = (id) => document.getElementById(id);
 
-// Campos de perfil (deben existir en el HTML)
 const FIELD_IDS = [
   "ruc","razon","tel","mail","contacto",
   "ciudad","barrio","depto","postal",
   "calle1","calle2","nro"
 ];
 
-// Campos de “usuario” (auth)
-const userField  = $("usuario");      // opcional (solo display)
-const passField  = $("contrasenia");  // si lo llenan, se actualiza clave
+const userField  = $("usuario");      // solo visual
+const passField  = $("contrasenia");  // para cambiar clave si lo completan
 const btnGuardar = document.querySelector('[data-accion="actualizar"]') || document.querySelector("button[type=submit]");
 
-// ---------- helpers ----------
 function readFormValues() {
   const v = {};
   FIELD_IDS.forEach(k => v[k] = $(k)?.value?.trim() ?? "");
   return v;
 }
-
 function fillForm(data = {}) {
   FIELD_IDS.forEach(k => {
     if ($(k) && typeof data[k] !== "undefined" && data[k] !== null) {
@@ -30,45 +26,14 @@ function fillForm(data = {}) {
     }
   });
 }
-
 function setLoading(on) {
   if (!btnGuardar) return;
   btnGuardar.disabled = !!on;
   btnGuardar.textContent = on ? "Guardando…" : "Actualizar";
 }
-
 function toast(msg) { alert(msg); }
 
-// Asegura sesión de recuperación si viniste desde el mail (hash con tokens)
-async function ensureRecoverySession() {
-  // Si ya hay sesión, nada que hacer
-  const { data: { session } } = await supabase.auth.getSession();
-  if (session?.user) return session;
-
-  // Forzar sesión de recovery desde la URL
-  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-  const access_token  = hash.get("access_token");
-  const refresh_token = hash.get("refresh_token");
-
-  if (access_token && refresh_token) {
-    const { data, error } = await supabase.auth.setSession({ access_token, refresh_token });
-    if (error) throw error;
-
-    // Limpia el hash visualmente
-    history.replaceState({}, document.title, window.location.pathname + window.location.search);
-    return data.session;
-  }
-  return null; // no hay sesión ni tokens
-}
-
-// ---------- flujo principal ----------
-async function getUserOrRedirect() {
-  // Si no hay sesión, redirige a login
-  await requireAuth();
-  const { data: { user } } = await supabase.auth.getUser();
-  return user;
-}
-
+// ----- BD perfil -----
 async function loadProfile(uid) {
   const { data, error } = await supabase
     .from("clientes_perfil")
@@ -78,7 +43,6 @@ async function loadProfile(uid) {
   if (error) throw error;
   return data || null;
 }
-
 async function upsertProfile(uid, values) {
   const payload = { user_id: uid, ...values };
   const { error } = await supabase
@@ -87,70 +51,77 @@ async function upsertProfile(uid, values) {
   if (error) throw error;
 }
 
-// Actualiza email de Auth si cambió
+// ----- Auth updates -----
 async function updateAuthEmailIfNeeded(currentEmail, newEmail) {
-  if (!newEmail || newEmail === currentEmail) return;
-
-  const { data, error } = await supabase.auth.updateUser({ email: newEmail });
+  if (!newEmail || newEmail === currentEmail) return { changed: false };
+  const { error } = await supabase.auth.updateUser({ email: newEmail });
   if (error) throw error;
-
-  // Si tu proyecto requiere confirmación de email, Supabase enviará correo.
-  // Podés avisar:
-  toast("Email actualizado. Si tu proyecto lo requiere, revisá tu correo para confirmarlo.");
+  return { changed: true };
 }
-
-// Actualiza contraseña (requiere sesión válida o sesión de recuperación)
 async function updateAuthPasswordIfProvided(pwd) {
-  if (!pwd) return;
+  if (!pwd) return false;
   if (pwd.length < 8) throw new Error("La contraseña debe tener al menos 8 caracteres.");
-
-  // Garantizar que hay sesión (normal o de recovery)
-  const session = await ensureRecoverySession();
-  if (!session) {
-    throw new Error("No se encontró una sesión válida para cambiar la contraseña. Volvé a abrir el enlace 'Olvidé mi contraseña' desde tu correo.");
-  }
-
   const { error } = await supabase.auth.updateUser({ password: pwd });
   if (error) throw error;
-
-  toast("Contraseña actualizada. Por seguridad, iniciá sesión nuevamente.");
-  await supabase.auth.signOut();
-  window.location.href = "login.html";
+  return true;
 }
 
+// ----- Flujo de RECOVERY desde email -----
+async function handleRecoveryIfNeeded() {
+  const hash = new URLSearchParams(window.location.hash.slice(1));
+  if (hash.get("type") !== "recovery") return;
+
+  // A esta altura Supabase ya tomó el access_token del hash y creó la sesión
+  const newPwd = prompt("Ingresá tu nueva contraseña (mínimo 8 caracteres):");
+  if (!newPwd) return;
+
+  try {
+    await updateAuthPasswordIfProvided(newPwd);
+    alert("✅ Contraseña actualizada. Usala a partir de ahora.");
+  } catch (e) {
+    alert("No se pudo actualizar la contraseña: " + (e?.message || ""));
+  } finally {
+    // limpiamos el hash para que no quede feo
+    history.replaceState({}, document.title, window.location.pathname);
+  }
+}
+
+// ----- init -----
 async function init() {
   try {
-    // (por si viniste desde el mail, activamos sesión de recovery antes de leer user)
-    await ensureRecoverySession();
+    await requireAuth();
+    await handleRecoveryIfNeeded();
 
-    const user = await getUserOrRedirect();
-
-    // mostrar email actual en el campo “usuario” si existe
+    const { data: { user } } = await supabase.auth.getUser();
     if (userField) userField.value = user.email ?? "";
 
-    // 1) cargar perfil de la BD y completar formulario
     const perfil = await loadProfile(user.id);
     if (perfil) fillForm(perfil);
 
-    // 2) Guardar
     btnGuardar?.addEventListener("click", async (e) => {
       e.preventDefault();
       setLoading(true);
       try {
         const values = readFormValues();
-        if (!values.mail)  throw new Error("Ingresá un mail.");
+        if (!values.mail) throw new Error("Ingresá un mail.");
         if (!values.razon) throw new Error("Ingresá la razón social / nombre.");
 
+        // 1) Guardar/actualizar perfil
         await upsertProfile(user.id, values);
-        await updateAuthEmailIfNeeded(user.email, values.mail);
 
+        // 2) Auth: email y/o password
+        const emailChanged = await updateAuthEmailIfNeeded(user.email, values.mail);
         const newPwd = passField?.value?.trim() ?? "";
-        if (newPwd) {
-          await updateAuthPasswordIfProvided(newPwd);
-          return; // updateAuthPasswordIfProvided ya redirige al login
-        }
+        const passChanged = newPwd ? await updateAuthPasswordIfProvided(newPwd) : false;
 
+        // limpiar campo de contraseña si se usó
+        if (passField) passField.value = "";
+
+        if (emailChanged.changed) {
+          alert("Email actualizado. Si tu proyecto lo requiere, revisá tu correo para confirmarlo.");
+        }
         toast("Datos actualizados correctamente ✔️");
+
       } catch (err) {
         console.error(err);
         toast("No se pudieron guardar los datos. " + (err?.message ?? ""));
