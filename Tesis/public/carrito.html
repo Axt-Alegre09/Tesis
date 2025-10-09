@@ -156,24 +156,31 @@
     await window.CartAPI.refreshBadge?.();
   });
 
-  // Comprar ahora: guarda SNAPSHOT con dos claves y navega
-  btnComprar.addEventListener("click", async () => {
-    const snap = await window.CartAPI.getSnapshot();
-    const items = snap.items || [];
-    if (!items.length) { alert("Tu carrito está vacío."); return; }
+  // Comprar ahora: guarda SNAPSHOT y navega con ?monto=<total>
+      btnComprar.addEventListener("click", async () => {
+        const snap = await window.CartAPI.getSnapshot();
+        const items = snap.items || [];
+        if (!items.length) { alert("Tu carrito está vacío."); return; }
 
-    const payload = {
-      source: snap.mode,
-      items: items.map(it => ({
-        id: it.id, titulo: it.titulo, precio: it.precio, cantidad: it.cantidad
-      })),
-      total: snap.total,
-      ts: Date.now()
-    };
-    sessionStorage.setItem("checkout_snapshot", JSON.stringify(payload)); // clave nueva
-    sessionStorage.setItem("checkout", JSON.stringify(payload));          // clave legacy
-    window.location.assign(new URL("./pasarelaPagos.html", window.location.href).toString());
-  });
+        const payload = {
+          source: snap.mode,                      // "local" o "remote"
+          items: items.map(it => ({
+            id: it.id, titulo: it.titulo, precio: it.precio, cantidad: it.cantidad
+          })),
+          total: Number(snap.total || 0),
+          ts: Date.now()
+        };
+
+        // Guardamos con clave nueva y legacy (por compatibilidad)
+        sessionStorage.setItem("checkout_snapshot", JSON.stringify(payload));
+        sessionStorage.setItem("checkout", JSON.stringify(payload));
+
+        // IMPORTANTE: pasar el total por la URL para que la pasarela valide
+        const url = new URL("./pasarelaPagos.html", window.location.href);
+        url.searchParams.set("monto", String(payload.total));
+        window.location.assign(url.toString());
+      });
+
 
   await render();
 </script>
