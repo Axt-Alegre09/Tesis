@@ -1,77 +1,79 @@
 // JS/cart-api.js
-// Implementación de carrito 100% localStorage, en la misma clave que usa tu carrito.html
-
 (function () {
-  const KEY = "productos-en-carrito";
+  const LS_KEY = "productos-en-carrito";
 
-  function _read() {
-    try { return JSON.parse(localStorage.getItem(KEY)) || []; }
+  const read = () => {
+    try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; }
     catch { return []; }
-  }
-  function _write(cart) {
-    localStorage.setItem(KEY, JSON.stringify(cart || []));
-    try {
-      const totalQty = (cart || []).reduce((a,p)=>a + Number(p.cantidad||0), 0);
-      document.getElementById('numerito')?.replaceChildren(document.createTextNode(totalQty));
-    } catch {}
-  }
-  function _total(cart) {
-    return (cart || []).reduce((a,p)=> a + Number(p.precio||0) * Number(p.cantidad||1), 0);
-  }
+  };
+  const write = (cart) => {
+    localStorage.setItem(LS_KEY, JSON.stringify(cart || []));
+    refreshBadge();
+  };
+  const total = (cart) =>
+    (cart || []).reduce((a,p)=> a + Number(p.precio||0) * Number(p.cantidad||1), 0);
 
-  // Métodos base
-  function add(item, qty=1) {
-    const cart = _read();
+  function addLocal(item, qty=1) {
+    const cart = read();
     const id = String(item.id);
     const i = cart.findIndex(p => String(p.id) === id);
     if (i >= 0) cart[i].cantidad = Number(cart[i].cantidad||1) + Number(qty||1);
     else cart.push({
       id,
       titulo: item.titulo || item.nombre || "",
-      precio: Number(item.precio || 0),
+      precio: Number(item.precio||0),
       imagen: item.imagen || null,
-      cantidad: Number(qty || 1)
+      cantidad: Number(qty||1),
     });
-    _write(cart);
+    write(cart);
+    window.dispatchEvent(new StorageEvent("storage", { key: LS_KEY }));
     return cart;
   }
-  function removeById(id, qty=1) {
-    const cart = _read();
+  function removeLocal(id, qty=1) {
+    const cart = read();
     const i = cart.findIndex(p => String(p.id) === String(id));
     if (i >= 0) {
       cart[i].cantidad = Math.max(0, Number(cart[i].cantidad||0) - Number(qty||1));
       if (cart[i].cantidad === 0) cart.splice(i,1);
-      _write(cart);
+      write(cart);
+      window.dispatchEvent(new StorageEvent("storage", { key: LS_KEY }));
     }
     return cart;
   }
-  function setQtyById(id, qty) {
-    const cart = _read();
+  function setQtyLocal(id, qty) {
+    const cart = read();
     const i = cart.findIndex(p => String(p.id) === String(id));
     if (i >= 0) {
       cart[i].cantidad = Math.max(1, Number(qty||1));
-      _write(cart);
+      write(cart);
+      window.dispatchEvent(new StorageEvent("storage", { key: LS_KEY }));
     }
     return cart;
   }
 
-  // API que usa ChatBrain
+  function refreshBadge() {
+    try {
+      const cart = read();
+      const totalQty = cart.reduce((a,p)=> a + Number(p.cantidad||0), 0);
+      const el = document.getElementById("numerito");
+      if (el) el.textContent = String(totalQty);
+    } catch {}
+  }
+
   window.CartAPI = {
     async addById(productoId, qty=1) {
       const all = window.__PRODUCTS__ || [];
       const prod = all.find(p => String(p.id) === String(productoId));
       if (!prod) throw new Error("Producto no encontrado en __PRODUCTS__");
-      add({ id: prod.id, titulo: prod.titulo || prod.nombre, precio: prod.precio, imagen: prod.imagen }, qty);
+      addLocal({ id: prod.id, titulo: prod.nombre||prod.titulo, precio: prod.precio, imagen: prod.imagen }, qty);
       return true;
     },
-    async addProduct(productObj, qty=1) {
-      add(productObj, qty);
-      return true;
-    },
-    async remove({ id }) { removeById(id, 999999); return true; },
-    async setQty({ id }, qty) { setQtyById(id, qty); return true; },
+    async addProduct(productObj, qty=1) { addLocal(productObj, qty); return true; },
+    async remove({ id }) { removeLocal(id, 999999); return true; },
+    async setQty({ id }, qty) { setQtyLocal(id, qty); return true; },
+
     getSnapshot() {
-      const cart = _read();
+      const cart = read();
       return {
         mode: "local",
         items: cart.map(p => ({
@@ -79,23 +81,18 @@
           titulo: p.titulo,
           precio: Number(p.precio||0),
           cantidad: Number(p.cantidad||1),
-          imagen: p.imagen || null
+          imagen: p.imagen || null,
         })),
-        total: _total(cart)
+        total: total(cart),
       };
     },
-    refresh() {},
-
-    // Utilidades por si otros scripts las usan
-    add, removeById,
-    list() { return _read(); }
+    refreshBadge,
+    list() { return read(); },
+    clear() { write([]); }
   };
 
-  // helper para el bot: permite cargar catálogo e invalidar índice
-  window.ChatBrain = window.ChatBrain || {};
-  window.ChatBrain.buildIndex = function (productos) {
-    window.__PRODUCTS__ = Array.isArray(productos) ? productos : [];
-    window.__PRODUCT_INDEX__ = null;
-    return true;
-  };
+  window.addEventListener("storage", (e) => {
+    if (!e || e.key === null || e.key === LS_KEY) window.CartAPI.refreshBadge();
+  });
+  document.addEventListener("DOMContentLoaded", () => window.CartAPI.refreshBadge());
 })();
