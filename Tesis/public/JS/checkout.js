@@ -205,17 +205,29 @@
 
   // --------- Éxito + Factura ---------
   function finalizeSuccess(metodo, extra = {}) {
-    const snap = saveFacturaSnapshot({ metodo, extra });
+      const snap = saveFacturaSnapshot({ metodo, extra });
 
-    // limpiar carrito local
-    try { localStorage.removeItem('productos-en-carrito'); } catch {}
+      // 1) Intentar vaciar carrito (remoto/local) vía CartAPI si está disponible
+      Promise.resolve()
+        .then(() => window.CartAPI?.empty?.())
+        .catch(() => {})  // si no existe empty() o falla, seguimos
+        .finally(() => {
+          // 2) Asegurar limpieza local por las dudas
+          try { localStorage.removeItem('productos-en-carrito'); } catch {}
 
-    form.classList.add('disabled');
-    success.classList.remove('disabled');
-    success.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          // 3) Mostrar pantalla de éxito
+          form.classList.add('disabled');
+          success.classList.remove('disabled');
+          success.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-    if (btnFactura) btnFactura.onclick = () => generateInvoicePDF(snap || loadFacturaSnapshot());
-  }
+          // 4) Botón de factura
+          if (btnFactura) btnFactura.onclick = () => generateInvoicePDF(snap || loadFacturaSnapshot());
+          
+          // 5) Opcional: refrescar badge si tu CartAPI lo expone
+          try { window.CartAPI?.refreshBadge?.(); } catch {}
+        });
+    }
+
 
   // --------- Helpers imagen a dataURL (logo/QR) ---------
   async function toDataURL(src) {
