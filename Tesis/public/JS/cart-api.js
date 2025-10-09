@@ -1,96 +1,230 @@
 // JS/cart-api.js
-(function () {
-  const LS_KEY = "productos-en-carrito";
+// CartAPI único: sincroniza localStorage o BD según si hay usuario logueado (Supabase).
+import { supabase } from "./ScriptLogin.js";
 
-  const read = () => {
-    try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; }
-    catch { return []; }
-  };
-  const write = (cart) => {
-    localStorage.setItem(LS_KEY, JSON.stringify(cart || []));
-    refreshBadge();
-  };
-  const total = (cart) =>
-    (cart || []).reduce((a,p)=> a + Number(p.precio||0) * Number(p.cantidad||1), 0);
+// ---------- Utils ----------
+const IMG_FALLBACK = "https://placehold.co/512x512?text=Imagen";
+const STORAGE_BASE = "https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/";
+const fmtGs = (n) => new Intl.NumberFormat("es-PY").format(Number(n||0)) + " Gs";
 
-  function addLocal(item, qty=1) {
-    const cart = read();
-    const id = String(item.id);
-    const i = cart.findIndex(p => String(p.id) === id);
-    if (i >= 0) cart[i].cantidad = Number(cart[i].cantidad||1) + Number(qty||1);
-    else cart.push({
-      id,
-      titulo: item.titulo || item.nombre || "",
-      precio: Number(item.precio||0),
-      imagen: item.imagen || null,
-      cantidad: Number(qty||1),
-    });
-    write(cart);
-    return cart;
-  }
-  function removeLocal(id, qty=1) {
-    const cart = read();
-    const i = cart.findIndex(p => String(p.id) === String(id));
-    if (i >= 0) {
-      cart[i].cantidad = Math.max(0, Number(cart[i].cantidad||0) - Number(qty||1));
-      if (cart[i].cantidad === 0) cart.splice(i,1);
-      write(cart);
-    }
-    return cart;
-  }
-  function setQtyLocal(id, qty) {
-    const cart = read();
-    const i = cart.findIndex(p => String(p.id) === String(id));
-    if (i >= 0) {
-      cart[i].cantidad = Math.max(1, Number(qty||1));
-      write(cart);
-    }
-    return cart;
-  }
+const toImg = (v) => {
+  if (!v) return IMG_FALLBACK;
+  let s = String(v).trim();
+  if (/^https?:\/\//i.test(s)) return s;
+  if (s.toLowerCase().startsWith("productos/")) s = s.slice("productos/".length);
+  return STORAGE_BASE + encodeURIComponent(s);
+};
 
-  function refreshBadge() {
-    try {
-      const cart = read();
-      const totalQty = cart.reduce((a,p)=> a + Number(p.cantidad||0), 0);
-      const el = document.getElementById("numerito");
-      if (el) el.textContent = String(totalQty);
-    } catch {}
-  }
+async function getUserId() {
+  const { data } = await supabase.auth.getUser();
+  return data?.user?.id || null;
+}
 
-  window.CartAPI = {
-    // Para el Home/Chat: si existe __PRODUCTS__, agrega por id. Si no, usa addProduct.
-    async addById(productoId, qty=1) {
-      const all = window.__PRODUCTS__ || [];
-      const prod = all.find(p => String(p.id) === String(productoId));
-      if (!prod) throw new Error("Producto no encontrado en __PRODUCTS__");
-      addLocal({ id: prod.id, titulo: prod.nombre||prod.titulo, precio: prod.precio, imagen: prod.imagen }, qty);
-      return true;
-    },
-    async addProduct(productObj, qty=1) { addLocal(productObj, qty); return true; },
-    async remove({ id }) { removeLocal(id, 999999); return true; },
-    async setQty({ id }, qty) { setQtyLocal(id, qty); return true; },
-
-    getSnapshot() {
-      const cart = read();
-      return {
-        mode: "local",
-        items: cart.map(p => ({
-          id: String(p.id),
-          titulo: p.titulo,
-          precio: Number(p.precio||0),
-          cantidad: Number(p.cantidad||1),
-          imagen: p.imagen || null,
-        })),
-        total: total(cart),
-      };
-    },
-    refreshBadge,
-    list() { return read(); },
-    clear() { write([]); }
-  };
-
-  window.addEventListener("storage", (e) => {
-    if (!e || e.key === null || e.key === LS_KEY) window.CartAPI.refreshBadge();
+// ---------- Local (storage) ----------
+function _readLocal() {
+  try { return JSON.parse(localStorage.getItem("productos-en-carrito") || "[]"); }
+  catch { return []; }
+}
+function _writeLocal(cart) {
+  localStorage.setItem("productos-en-carrito", JSON.stringify(cart || []));
+  refreshBadge();
+}
+function _totalLocal(cart) {
+  return (cart || []).reduce((a,p) => a + Number(p.precio||0) * Number(p.cantidad||1), 0);
+}
+function _addLocal(prod, qty=1) {
+  qty = Math.max(1, Number(qty));
+  const cart = _readLocal();
+  const id = String(prod.id);
+  const i = cart.findIndex(p => String(p.id) === id);
+  if (i >= 0) cart[i].cantidad = Number(cart[i].cantidad||1) + qty;
+  else cart.push({
+    id,
+    titulo: prod.titulo || prod.nombre || "",
+    precio: Number(prod.precio||0),
+    cantidad: qty,
+    imagen: prod.imagen ? toImg(prod.imagen) : null
   });
-  document.addEventListener("DOMContentLoaded", () => window.CartAPI.refreshBadge());
-})();
+  _writeLocal(cart);
+  return true;
+}
+function _setQtyLocal(id, qty) {
+  qty = Math.max(1, Number(qty));
+  const cart = _readLocal();
+  const i = cart.findIndex(p => String(p.id) === String(id));
+  if (i >= 0) {
+    cart[i].cantidad = qty;
+    _writeLocal(cart);
+  }
+  return true;
+}
+function _removeLocal(id) {
+  const cart = _readLocal().filter(p => String(p.id) !== String(id));
+  _writeLocal(cart);
+  return true;
+}
+function _emptyLocal() {
+  _writeLocal([]);
+  return true;
+}
+
+// ---------- Remoto (DB) ----------
+async function _asegurarCarrito() {
+  const { data, error } = await supabase.rpc("asegurar_carrito");
+  if (error) throw error;
+  return data; // carrito_id (uuid)
+}
+
+async function _addRemote(productoId, qty=1) {
+  qty = Math.max(1, Number(qty));
+  const carritoId = await _asegurarCarrito();
+
+  const { data: item, error: e2 } = await supabase
+    .from("carrito_items")
+    .select("id, cantidad")
+    .eq("carrito_id", carritoId)
+    .eq("producto_id", productoId)
+    .maybeSingle();
+  if (e2) throw e2;
+
+  if (item) {
+    const nueva = Number(item.cantidad||1) + qty;
+    const { error: e3 } = await supabase
+      .from("carrito_items")
+      .update({ cantidad: nueva })
+      .eq("id", item.id);
+    if (e3) throw e3;
+  } else {
+    const { error: e4 } = await supabase
+      .from("carrito_items")
+      .insert({ carrito_id: carritoId, producto_id: productoId, cantidad: qty });
+    if (e4) throw e4;
+  }
+  return true;
+}
+
+async function _fetchRemoteItems() {
+  const carritoId = await _asegurarCarrito();
+
+  const { data: items, error: errItems } = await supabase
+    .from("carrito_items")
+    .select("id, producto_id, cantidad")
+    .eq("carrito_id", carritoId);
+  if (errItems) throw errItems;
+
+  if (!items || !items.length) return [];
+
+  const ids = items.map(i => i.producto_id);
+  const { data: prods, error: errProds } = await supabase
+    .from("v_productos_publicos")
+    .select("id, nombre, precio, imagen")
+    .in("id", ids);
+  if (errProds) throw errProds;
+
+  const map = new Map(prods.map(p => [p.id, p]));
+  return items.map(i => {
+    const p = map.get(i.producto_id);
+    return {
+      id: i.producto_id,
+      titulo: p?.nombre || "Producto",
+      precio: Number(p?.precio || 0),
+      cantidad: Number(i.cantidad || 1),
+      imagen: toImg(p?.imagen || ""),
+      _itemId: i.id
+    };
+  });
+}
+
+async function _setQtyRemote(itemId, qty) {
+  qty = Math.max(1, Number(qty));
+  const { error } = await supabase
+    .from("carrito_items")
+    .update({ cantidad: qty })
+    .eq("id", itemId);
+  if (error) throw error;
+  return true;
+}
+
+async function _removeRemote(itemId) {
+  const { error } = await supabase.from("carrito_items").delete().eq("id", itemId);
+  if (error) throw error;
+  return true;
+}
+
+async function _emptyRemote() {
+  const { error } = await supabase.rpc("carrito_vaciar");
+  if (error) throw error;
+  return true;
+}
+
+// ---------- API pública ----------
+async function getSnapshot() {
+  const uid = await getUserId();
+  if (uid) {
+    try {
+      const items = await _fetchRemoteItems();
+      const total = items.reduce((a,p)=> a + Number(p.precio)*Number(p.cantidad||1), 0);
+      return { mode: "remote", items, total };
+    } catch {
+      // fallback local si falla
+    }
+  }
+  const cart = _readLocal();
+  return {
+    mode: "local",
+    items: cart.map(p => ({ ...p, imagen: toImg(p.imagen) })),
+    total: _totalLocal(cart)
+  };
+}
+
+async function addById(productoId, qty=1) {
+  const uid = await getUserId();
+  if (uid) return _addRemote(productoId, qty);
+  // invitado: intentar tener el objeto desde __PRODUCTS__
+  const all = window.__PRODUCTS__ || [];
+  const prod = all.find(p => String(p.id) === String(productoId));
+  if (!prod) throw new Error("Producto no encontrado para invitado; usa addProduct(obj, qty).");
+  return _addLocal(prod, qty);
+}
+
+// USAR SIEMPRE DESDE UI (decide local/remote solo)
+async function addProduct(productObj, qty=1) {
+  const uid = await getUserId();
+  if (uid && productObj?.id) return _addRemote(String(productObj.id), qty);
+  return _addLocal(productObj, qty);
+}
+
+async function setQty({ itemId, id }, qty) {
+  const uid = await getUserId();
+  if (uid && itemId) return _setQtyRemote(itemId, qty);
+  if (!uid && id)    return _setQtyLocal(id, qty);
+  return false;
+}
+
+async function remove({ itemId, id }) {
+  const uid = await getUserId();
+  if (uid && itemId) return _removeRemote(itemId);
+  if (!uid && id)    return _removeLocal(id);
+  return false;
+}
+
+async function empty() {
+  const uid = await getUserId();
+  if (uid) return _emptyRemote();
+  return _emptyLocal();
+}
+
+async function refreshBadge() {
+  const el = document.getElementById("numerito");
+  if (!el) return;
+  const snap = await getSnapshot();
+  const totalQty = (snap.items || []).reduce((a,p)=> a + Number(p.cantidad||0), 0);
+  el.textContent = String(totalQty);
+}
+
+window.CartAPI = {
+  // core
+  getSnapshot, addById, addProduct, setQty, remove, empty,
+  // helpers UI
+  refreshBadge,
+};

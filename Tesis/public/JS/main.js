@@ -1,5 +1,6 @@
 // JS/main.js
 import { supabase } from "./ScriptLogin.js";
+import "./cart-api.js"; // asegura CartAPI en window
 
 const contenedorProductos = document.querySelector("#contenedor-productos");
 const botonesCategorias = document.querySelectorAll(".boton-categoria");
@@ -35,7 +36,7 @@ async function fetchProductos() {
   }));
 }
 
-function render(productos) {
+function montar(productos) {
   contenedorProductos.innerHTML = "";
   if (!productos.length) {
     contenedorProductos.innerHTML = `<div class="alerta-vacia">No hay productos para mostrar.</div>`;
@@ -54,20 +55,18 @@ function render(productos) {
     div.querySelector(".producto-imagen")?.addEventListener("error", (e) => e.currentTarget.src = IMG_FALLBACK);
     contenedorProductos.appendChild(div);
   }
+  // Agregar: SIEMPRE usar addProduct(producto, 1). CartAPI decide local/remote.
   document.querySelectorAll(".producto-agregar").forEach(btn => {
     btn.addEventListener("click", async (e) => {
       const id = e.currentTarget.dataset.id;
+      const prod = CATALOGO.find(p => String(p.id) === String(id));
+      if (!prod) return;
       try {
-        // Preferimos addById si __PRODUCTS__ está cargado
-        await window.CartAPI.addById(id, 1);
-      } catch {
-        // Fallback seguro para invitados
-        const prod = CATALOGO.find(p => String(p.id) === String(id));
-        if (prod) {
-          await window.CartAPI.addProduct({
-            id: prod.id, titulo: prod.titulo, precio: prod.precio, imagen: prod.imagen
-          }, 1);
-        }
+        await window.CartAPI.addProduct(prod, 1);
+        await window.CartAPI.refreshBadge();
+      } catch (err) {
+        console.error("addProduct:", err);
+        alert("No se pudo agregar. Intenta de nuevo.");
       }
     });
   });
@@ -82,39 +81,18 @@ function wireCategorias() {
       if (filtro && filtro !== "todos") {
         const alguno = CATALOGO.find(p => p.categoria.id === filtro);
         tituloPrincipal.textContent = alguno?.categoria?.nombre || "Productos";
-        render(CATALOGO.filter(p => p.categoria.id === filtro));
+        montar(CATALOGO.filter(p => p.categoria.id === filtro));
       } else {
         tituloPrincipal.textContent = "Todos los productos";
-        render(CATALOGO);
+        montar(CATALOGO);
       }
     });
   });
 }
 
-async function init() {
-  CATALOGO = await fetchProductos();
-
-  // Catálogo accesible para el Chat y CartAPI.addById
-  window.__PRODUCTS__ = CATALOGO.map(p => ({
-    id: p.id, nombre: p.nombre, titulo: p.titulo, precio: p.precio, imagen: p.imagen
-  }));
-
-  render(CATALOGO);
-  wireCategorias();
-  window.CartAPI.refreshBadge();
-
-  // Búsqueda
-  const form = document.getElementById("searchForm");
-  const input = document.getElementById("searchInput");
-  form?.addEventListener("submit", (e)=>{ e.preventDefault(); doSearch(input.value); });
-  input?.addEventListener("keyup", (e)=>{
-    if (e.key === "Enter") doSearch(input.value);
-    if (!input.value) { tituloPrincipal.textContent = "Todos los productos"; render(CATALOGO); }
-  });
-}
-async function doSearch(q) {
+async function buscar(q) {
   const s = (q||"").trim();
-  if (!s) { tituloPrincipal.textContent = "Todos los productos"; render(CATALOGO); return; }
+  if (!s) { tituloPrincipal.textContent = "Todos los productos"; montar(CATALOGO); return; }
   const { data, error } = await supabase
     .from("v_productos_publicos")
     .select("*")
@@ -126,7 +104,24 @@ async function doSearch(q) {
     categoria:{ id:p.categoria_slug, nombre:p.categoria_nombre }
   }));
   tituloPrincipal.textContent = `Resultados para "${s}" (${resultados.length})`;
-  render(resultados);
+  montar(resultados);
 }
 
+async function init() {
+  CATALOGO = await fetchProductos();
+  // expone para el bot (NLU)
+  window.__PRODUCTS__ = CATALOGO.map(p => ({ id:p.id, nombre:p.nombre, titulo:p.titulo, precio:p.precio, imagen:p.imagen }));
+
+  montar(CATALOGO);
+  wireCategorias();
+  await window.CartAPI.refreshBadge();
+
+  const form = document.getElementById("searchForm");
+  const input = document.getElementById("searchInput");
+  form?.addEventListener("submit", (e)=>{ e.preventDefault(); buscar(input.value); });
+  input?.addEventListener("keyup", (e)=>{
+    if (e.key === "Enter") buscar(input.value);
+    if (!input.value) { tituloPrincipal.textContent = "Todos los productos"; montar(CATALOGO); }
+  });
+}
 init();

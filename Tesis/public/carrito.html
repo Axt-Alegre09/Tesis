@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Paniquiños</title>
+  <title>Paniquiños - Carrito</title>
   <link rel="shortcut icon" href="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinosico.ico" type="image/x-icon">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
@@ -43,11 +43,11 @@
 
       <div id="carrito-acciones" class="carrito-acciones disabled">
         <div class="carrito-acciones-izquierda">
-          <button id="carrito-acciones-vaciar" class="carrito-acciones-vaciar">Vaciar carrito</button>
+          <button id="btn-vaciar" class="carrito-acciones-vaciar">Vaciar carrito</button>
         </div>
         <div class="carrito-acciones-derecha">
           <div class="carrito-acciones-total">Total: <p id="total">0 Gs</p></div>
-          <button id="carrito-acciones-comprar" class="carrito-acciones-comprar">Comprar ahora</button>
+          <button id="btn-comprar" class="carrito-acciones-comprar">Comprar ahora</button>
         </div>
       </div>
 
@@ -55,10 +55,142 @@
     </main>
   </div>
 
+  <!-- Scripts -->
+  <script type="module">
+    import { supabase } from "./JS/ScriptLogin.js";
+    import "./JS/cart-api.js";
 
-  <script src="JS/cart-api.js"></script>
-  <script src="JS/cart-page.js"></script> 
+    const contVacio   = document.getElementById("carrito-vacio");
+    const contProds   = document.getElementById("carrito-productos");
+    const contAcc     = document.getElementById("carrito-acciones");
+    const totalEl     = document.getElementById("total");
+    const btnVaciar   = document.getElementById("btn-vaciar");
+    const btnComprar  = document.getElementById("btn-comprar");
 
+    const IMG_FALLBACK = "https://placehold.co/256x256?text=Imagen";
 
+    const fmtGs = (n) => new Intl.NumberFormat("es-PY").format(Number(n||0)) + " Gs";
+
+    function setEstado(vacio){
+      if (vacio) {
+        contVacio.classList.remove("disabled");
+        contProds.classList.add("disabled");
+        contAcc.classList.add("disabled");
+      } else {
+        contVacio.classList.add("disabled");
+        contProds.classList.remove("disabled");
+        contAcc.classList.remove("disabled");
+      }
+    }
+
+    async function render() {
+      const snap = await window.CartAPI.getSnapshot();
+      const items = snap.items || [];
+      totalEl.textContent = fmtGs(snap.total || 0);
+
+      if (!items.length) {
+        contProds.innerHTML = "";
+        setEstado(true);
+        return;
+      }
+
+      setEstado(false);
+      contProds.innerHTML = "";
+
+      for (const it of items) {
+        const row = document.createElement("div");
+        row.className = "carrito-producto";
+        // remoto trae _itemId, local no
+        const idAttrKey = snap.mode === "remote" ? "data-itemid" : "data-id";
+        const idAttrVal = snap.mode === "remote" ? String(it._itemId) : String(it.id);
+
+        row.innerHTML = `
+          <img class="carrito-producto-imagen" src="${it.imagen || IMG_FALLBACK}" alt="${it.titulo}">
+          <div class="carrito-producto-titulo">
+            <h6>Título</h6><h4>${it.titulo}</h4>
+          </div>
+          <div class="carrito-producto-cantidad">
+            <h6>Cantidad</h6>
+            <div class="qty-ctrl">
+              <button class="qty-btn" data-action="dec" ${idAttrKey}="${idAttrVal}" aria-label="Disminuir">−</button>
+              <span class="qty" data-qty>${Number(it.cantidad||1)}</span>
+              <button class="qty-btn" data-action="inc" ${idAttrKey}="${idAttrVal}" aria-label="Aumentar">+</button>
+            </div>
+          </div>
+          <div class="carrito-producto-precio">
+            <h6>Precio</h6><p>${fmtGs(it.precio)}</p>
+          </div>
+          <div class="carrito-producto-subtotal">
+            <h6>Subtotal</h6><p>${fmtGs(it.precio * (it.cantidad||1))}</p>
+          </div>
+          <button class="carrito-producto-eliminar" title="Eliminar" ${idAttrKey}="${idAttrVal}">
+            <i class="bi bi-trash"></i>
+          </button>
+        `;
+        row.querySelector(".carrito-producto-imagen")?.addEventListener("error", (e)=> e.currentTarget.src = IMG_FALLBACK);
+        contProds.appendChild(row);
+      }
+    }
+
+    // Delegación para +/− y eliminar
+    contProds.addEventListener("click", async (e) => {
+      const btn = e.target.closest(".qty-btn, .carrito-producto-eliminar");
+      if (!btn) return;
+
+      const isRemote = btn.hasAttribute("data-itemid");
+      const idKey = isRemote ? "data-itemid" : "data-id";
+      const idVal = btn.getAttribute(idKey);
+
+      if (btn.classList.contains("carrito-producto-eliminar")) {
+        await window.CartAPI.remove({ [isRemote?"itemId":"id"]: idVal });
+        await render();
+        await window.CartAPI.refreshBadge();
+        return;
+      }
+
+      if (btn.classList.contains("qty-btn")) {
+        const action = btn.getAttribute("data-action"); // inc/dec
+        const row = btn.closest(".carrito-producto");
+        const qEl = row?.querySelector("[data-qty]");
+        const qty = Number(qEl?.textContent || "1");
+        const nueva = Math.max(1, qty + (action === "inc" ? 1 : -1));
+        await window.CartAPI.setQty({ [isRemote?"itemId":"id"]: idVal }, nueva);
+        await render();
+        await window.CartAPI.refreshBadge();
+      }
+    });
+
+    // Vaciar
+    btnVaciar.addEventListener("click", async () => {
+      await window.CartAPI.empty();
+      await render();
+      await window.CartAPI.refreshBadge();
+    });
+
+    // Comprar ahora: genera snapshot y navega a pasarela
+    btnComprar.addEventListener("click", async () => {
+      const snap = await window.CartAPI.getSnapshot();
+      const items = snap.items || [];
+      if (!items.length) { alert("Tu carrito está vacío."); return; }
+
+      // Guardamos un snapshot corto para la pasarela
+      const payload = {
+        source: snap.mode,
+        items: items.map(it => ({
+          id: it.id,
+          titulo: it.titulo,
+          precio: it.precio,
+          cantidad: it.cantidad
+        })),
+        total: snap.total,
+        ts: Date.now()
+      };
+      sessionStorage.setItem("checkout_snapshot", JSON.stringify(payload));
+      window.location.assign(new URL("./pasarelaPagos.html", window.location.href).toString());
+    });
+
+    // Inicio
+    await render();
+  </script>
 </body>
 </html>
