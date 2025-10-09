@@ -201,6 +201,14 @@
 
 
 
+<script type="module">
+  import { autoWireAuthMenu } from "./JS/ScriptLogin.js";
+  autoWireAuthMenu();
+  document.getElementById("updateProfileBtn")?.addEventListener("click", () => {
+    window.location.assign("misdatos.html");
+  });
+</script>
+
 
 </body>
 </html>
