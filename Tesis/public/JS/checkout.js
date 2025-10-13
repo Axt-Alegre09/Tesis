@@ -150,7 +150,6 @@
     const { total, source } = getCheckoutData();
 
     if (source !== 'remote' && (!isFinite(total) || total <= 0)) {
-      alert('Tu carrito está vacío. Volvé al carrito e iniciá el pago desde allí.');
       return;
     }
 
