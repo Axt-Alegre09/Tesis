@@ -1,136 +1,46 @@
-// JS/pasarelaPagos.js
-// Valida contexto + ejecuta RPC al pagar + log claro de errores.
+// JS/ScriptLogin.js
+// ÚNICO lugar donde se crea el cliente de Supabase.
+// ❗️No importes este archivo dentro de sí mismo.
 
-import { supabase } from "./JS/ScriptLogin.js";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const QS = new URLSearchParams(location.search);
+// Pone tus credenciales aquí (o léelas de window.__ENV si ya las guardaste allí)
+const SUPABASE_URL  = window.__ENV?.SUPABASE_URL  ?? "https://jyygevitfnbwrvxrjexp.supabase.co";
+const SUPABASE_ANON = window.__ENV?.SUPABASE_ANON ?? "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5eWdldml0Zm5id3J2eHJqZXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2OTQ2OTYsImV4cCI6MjA3MTI3MDY5Nn0.St0IiSZSeELESshctneazCJHXCDBi9wrZ28UkiEDXYo";
 
-// ---------- Utils ----------
-const fmtGs = (n) => new Intl.NumberFormat("es-PY").format(Number(n || 0)) + " Gs";
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
 
-function putMessage(msg, type = "error") {
-  let box = document.querySelector("[data-checkout-msg]");
-  if (!box) {
-    box = document.createElement("div");
-    box.setAttribute("data-checkout-msg", "1");
-    box.style.border = "2px solid #6f5c38";
-    box.style.background = "#fff";
-    box.style.borderRadius = "12px";
-    box.style.padding = "14px";
-    box.style.margin = "10px 0";
-    box.style.maxWidth = "980px";
-    box.style.fontSize = "14px";
-    document.body.prepend(box);
+/* ========= Helpers básicos de sesión ========= */
+
+export async function requireAuth() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) window.location.assign("login.html");
+}
+
+export async function logout() {
+  try {
+    await supabase.auth.signOut();
+  } finally {
+    window.location.reload();
   }
-  const title = (type === "ok" ? "Listo" : "Atención") + ": ";
-  box.innerHTML = `<b>${title}</b>${msg}`;
 }
 
-function hasValidPedido(qs = QS) {
-  const raw = qs.get("pedido");
-  if (raw == null) return false;
-  const v = String(raw).trim().toLowerCase();
-  return v !== "" && v !== "null" && v !== "undefined";
-}
+/* ========= Menú de usuario en topbar ========= */
 
-function snapshotVigente(snap) {
-  if (!snap || !snap.ts) return false;
-  return (Date.now() - Number(snap.ts)) <= 5 * 60 * 1000; // 5 min
-}
+export async function autoWireAuthMenu() {
+  const btn = document.getElementById("userMenuBtn");
+  if (!btn) return;
 
-function readSnapshot() {
-  let a = null, b = null;
-  try { a = JSON.parse(sessionStorage.getItem("checkout_snapshot")); } catch {}
-  try { b = JSON.parse(sessionStorage.getItem("checkout")); } catch {}
-  if (a && b) return (Number(a.ts || 0) >= Number(b.ts || 0)) ? a : b;
-  return a || b || null;
-}
+  const nameEl = btn.querySelector(".user-name");
+  const { data: { user } } = await supabase.auth.getUser();
 
-// ---------- Ejecutar el RPC (compra real) ----------
-async function confirmarCompra() {
-  console.log("[checkout] confirmando compra…");
-  const { data: sess } = await supabase.auth.getSession();
-  if (!sess?.session?.user?.id) {
-    console.warn("[checkout] No hay sesión, abortando RPC.");
-    throw new Error("Debes iniciar sesión para confirmar la compra.");
-  }
-
-  // Llamada al RPC (usa carrito_items del usuario y vacía al terminar)
-  const { data, error } = await supabase.rpc("checkout_crear_pedido");
-  if (error) {
-    console.error("[checkout] RPC error:", error);
-    throw error;
-  }
-  console.log("[checkout] RPC ok:", data);
-  return data; // { pedido_id, items, total }
-}
-
-// ---------- UI principal ----------
-async function init() {
-  // Mostrar contexto (invitado o remoto con pedido)
-  const snapshot = readSnapshot();
-
-  if (hasValidPedido(QS)) {
-    const pedidoId = QS.get("pedido");
-    if (!snapshotVigente(snapshot) || snapshot?.source !== "remote" || snapshot?.pedidoId !== pedidoId) {
-      putMessage("No se encontró el resumen del pedido o está vencido. Volvé al carrito y repetí la operación.");
-    } else {
-      putMessage(`Pedido listo para pagar.`, "ok");
-    }
-  } else if (QS.has("monto")) {
-    const montoUrl = Number(QS.get("monto") || 0);
-    const isSourceLocal = snapshot?.source === "local" || snapshot?.source === "legacy";
-    if (!snapshotVigente(snapshot) || !isSourceLocal) {
-      putMessage("No se encontró el resumen de compra. Volvé al carrito para iniciar el pago.");
-    } else {
-      const totalSnap = Number(snapshot.total || 0);
-      if (Math.abs(totalSnap - montoUrl) > 1) {
-        putMessage("Detectamos un desajuste en el total. Volvé al carrito y reintentá.");
-      } else {
-        putMessage(`Total a pagar: ${fmtGs(totalSnap)}. Completá el formulario y simulá el pago.`, "ok");
-      }
-    }
+  if (user) {
+    nameEl.textContent = user.email || "Mi cuenta";
+    document.getElementById("logoutBtn")?.classList.remove("disabled");
+    document.getElementById("updateProfileLink")?.classList.remove("disabled");
   } else {
-    putMessage('Faltan datos del checkout. Accedé aquí usando “Comprar ahora” del carrito.');
+    nameEl.textContent = "Cuenta";
+    document.getElementById("logoutBtn")?.classList.add("disabled");
+    document.getElementById("updateProfileLink")?.classList.add("disabled");
   }
-
-  // Enganchar el botón Pagar (submit del form)
-  const form = document.getElementById("checkout-form");
-  form?.addEventListener("submit", async (e) => {
-    e.preventDefault();
-
-    // Debug de sesión
-    const { data: sess } = await supabase.auth.getSession();
-    console.log("[checkout] session.user:", sess?.session?.user);
-
-    try {
-      // 1) Ejecutamos el RPC (guarda pedido + detalle y vacía carrito)
-      const res = await confirmarCompra(); // { pedido_id, items, total }
-      // 2) Guardar un snapshot “remote” para esta página (opcional)
-      const snap = {
-        source: "remote",
-        pedidoId: res?.[0]?.pedido_id || res?.pedido_id,
-        ts: Date.now(),
-        items: res?.[0]?.items ?? res?.items,
-        total: res?.[0]?.total ?? res?.total
-      };
-      sessionStorage.setItem("checkout_snapshot", JSON.stringify(snap));
-
-      // 3) Mostrar éxito y botones
-      document.getElementById("checkout-success")?.classList.remove("disabled");
-      putMessage(`✅ Pedido confirmado. N°: ${snap.pedidoId || "(s/d)"} — Total: ${fmtGs(snap.total || 0)}.`, "ok");
-
-      // 4) (Opcional) deshabilitar botón pagar para no duplicar
-      const btn = form.querySelector('button[type="submit"]');
-      btn?.setAttribute("disabled", "true");
-    } catch (err) {
-      // Errores comunes: no logueado, RLS, policies, o carrito vacío
-      console.error("[checkout] Error general:", err);
-      const msg = err?.message || err?.error_description || "No se pudo confirmar la compra.";
-      putMessage(msg);
-      alert(msg);
-    }
-  });
 }
-
-init();

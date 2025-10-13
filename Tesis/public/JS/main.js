@@ -6,7 +6,7 @@ const contenedorProductos = document.querySelector("#contenedor-productos");
 const botonesCategorias = document.querySelectorAll(".boton-categoria");
 const tituloPrincipal = document.querySelector("#titulo-principal");
 
-let CATALOGO = [];  // cache del catálogo público (para categorías/búsqueda)
+let CATALOGO = [];  // cache del catálogo público
 
 const IMG_FALLBACK = "https://placehold.co/512x512?text=Imagen";
 const STORAGE_BASE = "https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/";
@@ -27,7 +27,7 @@ const toImg = (v) => {
 
 /* =================== Data sources =================== */
 
-// 1) Catálogo público (tu vista existente v_productos_publicos)
+// 1) Catálogo público (vista v_productos_publicos)
 async function fetchProductosCatalogo() {
   const { data, error } = await supabase
     .from("v_productos_publicos")
@@ -41,13 +41,13 @@ async function fetchProductosCatalogo() {
     id: p.id,
     nombre: p.nombre,
     titulo: p.nombre,
-    imagen: toImg(p.imagen || p.url_imagen),      // tolerante a ambos nombres
+    imagen: toImg(p.imagen || p.url_imagen),
     precio: p.precio,
     categoria: { id: p.categoria_slug, nombre: p.categoria_nombre }
   }));
 }
 
-// 2) Populares para portada (fallback cuando no hay historial)
+// 2) Populares para portada
 async function fetchPopularesPortada(limit = 12) {
   const { data, error } = await supabase
     .from("populares_para_portada")
@@ -61,7 +61,7 @@ async function fetchPopularesPortada(limit = 12) {
     id: p.id,
     nombre: p.nombre,
     titulo: p.nombre,
-    imagen: toImg(p.url_imagen || p.imagen), // vista devuelve url_imagen
+    imagen: toImg(p.url_imagen || p.imagen),
     precio: p.precio
   }));
 }
@@ -80,7 +80,7 @@ async function fetchPensadoParaVos(limit = 12) {
     id: p.id,
     nombre: p.nombre,
     titulo: p.nombre,
-    imagen: toImg(p.url_imagen || p.imagen), // RPC devuelve url_imagen = imagen
+    imagen: toImg(p.url_imagen || p.imagen),
     precio: p.precio
   }));
 }
@@ -106,13 +106,10 @@ function montar(productos) {
     div.querySelector(".producto-imagen")?.addEventListener("error", (e) => (e.currentTarget.src = IMG_FALLBACK));
     contenedorProductos.appendChild(div);
   }
-  // Agregar: SIEMPRE usar addProduct(producto, 1). CartAPI decide local/remote.
   document.querySelectorAll(".producto-agregar").forEach((btn) => {
     btn.addEventListener("click", async (e) => {
       const id = e.currentTarget.dataset.id;
-      const prod = [...CATALOGO].find((p) => String(p.id) === String(id)) // buscar en catálogo
-                || null;
-      // si no está en CATALOGO (porque viene de recos/populares), armamos objeto mínimo:
+      const prod = [...CATALOGO].find((p) => String(p.id) === String(id)) || null;
       const fallbackProd = prod || (() => {
         const card = e.currentTarget.closest(".producto");
         const nombre = card?.querySelector(".producto-titulo")?.textContent?.trim() || "Producto";
@@ -133,7 +130,6 @@ function montar(productos) {
 }
 
 function wireCategorias() {
-  // filtra sobre CATALOGO (catálogo público)
   botonesCategorias.forEach((boton) => {
     boton.addEventListener("click", () => {
       botonesCategorias.forEach((b) => b.classList.remove("active"));
@@ -184,11 +180,9 @@ async function buscar(q) {
 /* =================== Init =================== */
 
 async function init() {
-  // 1) Cargar catálogo para categorías y búsqueda
   CATALOGO = await fetchProductosCatalogo();
   window.__PRODUCTS__ = CATALOGO.map((p) => ({ id: p.id, nombre: p.nombre, titulo: p.titulo, precio: p.precio, imagen: p.imagen }));
 
-  // 2) Intentar “Pensado para vos” si hay usuario; si no, fallback a Populares; si nada, Todos.
   let itemsHome = [];
   try {
     const { data: { user } } = await supabase.auth.getUser();
@@ -220,7 +214,6 @@ async function init() {
   wireCategorias();
   await window.CartAPI.refreshBadge();
 
-  // 3) Búsqueda
   const form = document.getElementById("searchForm");
   const input = document.getElementById("searchInput");
   form?.addEventListener("submit", (e) => {

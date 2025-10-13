@@ -13,7 +13,7 @@
 </head>
 <body>
   <div class="wrapper has-topbar">
-    <!-- ASIDE (off-canvas en móvil) -->
+    <!-- ASIDE -->
     <aside id="mobileAside" aria-label="Menú lateral">
       <header class="aside-header">
         <h1 class="logo">
@@ -63,17 +63,16 @@
             <i class="bi bi-chevron-down chevron"></i>
           </button>
           <div class="user-dropdown" id="userDropdown" role="menu">
-            <a class="dropdown-item" id="updateProfileLink" href="misdatos.html">
+            <a class="dropdown-item disabled" id="updateProfileLink" href="misdatos.html">
               <i class="bi bi-gear"></i> Actualizar datos
             </a>
-            <button class="dropdown-item" id="logoutBtn" type="button">
+            <button class="dropdown-item disabled" id="logoutBtn" type="button">
               <i class="bi bi-box-arrow-right"></i> Cerrar sesión
             </button>
           </div>
         </div>
       </div>
     </div>
-    <!-- FIN TOPBAR -->
 
     <main>
       <h2 id="titulo-principal" class="titulo-principal">Todos los productos</h2>
@@ -81,10 +80,9 @@
     </main>
   </div>
 
-  <!-- Backdrop para el menú móvil -->
   <div id="backdrop" class="backdrop" aria-hidden="true"></div>
 
-  <!-- Auth UI helpers (no forzar login en index) -->
+  <!-- Wire del menú (una sola vez) -->
   <script type="module">
     import { logout, autoWireAuthMenu } from "./JS/ScriptLogin.js";
     autoWireAuthMenu();
@@ -115,7 +113,7 @@
     })();
   </script>
 
-  <!-- Control off-canvas móvil -->
+  <!-- Off-canvas móvil -->
   <script>
     (function () {
       const body = document.body;
@@ -149,12 +147,11 @@
     })();
   </script>
 
-  <!-- Chat flotante (UI) -->
+  <!-- Chat flotante -->
   <button class="chatbot-toggler" aria-label="Abrir chat">
     <i class="bi bi-chat-left-fill"></i>
     <i class="bi bi-x-lg"></i>
   </button>
-
   <div class="chatbot" role="dialog" aria-modal="true" aria-label="Paniquiños Bot">
     <header>
       <h2>
@@ -163,34 +160,23 @@
       </h2>
       <i class="close-btn bi bi-x-lg" role="button" aria-label="Cerrar"></i>
     </header>
-
     <ul class="chatbox" id="chatbox">
       <li class="chat incoming">
         <img class="paniImg" src="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinosico.ico" alt="" />
         <p>¡Hola! 👋🏼 ¿En qué puedo ayudarte hoy?</p>
       </li>
     </ul>
-
     <div class="chat-input">
       <textarea id="chatInput" placeholder="Escribe tu mensaje…" required></textarea>
       <i class="bi bi-send-fill" id="sendChatBtn" role="button" aria-label="Enviar"></i>
     </div>
   </div>
 
-  <!-- 1) Catálogo (importa CartAPI dentro) -->
+  <!-- Catálogo -->
   <script type="module" src="JS/main.js"></script>
 
-  <!-- 2) Chat -->
+  <!-- Chat -->
   <script src="JS/chatbot.brain.js" defer></script>
   <script src="JS/script-chatbot.js" defer></script>
-
-  <!-- Wire del menú de usuario para ir a Mis Datos -->
-  <script type="module">
-    import { autoWireAuthMenu } from "./JS/ScriptLogin.js";
-    autoWireAuthMenu();
-    document.getElementById("updateProfileBtn")?.addEventListener("click", () => {
-      window.location.assign("misdatos.html");
-    });
-  </script>
 </body>
 </html>
