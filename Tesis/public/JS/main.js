@@ -6,12 +6,17 @@ const contenedorProductos = document.querySelector("#contenedor-productos");
 const botonesCategorias = document.querySelectorAll(".boton-categoria");
 const tituloPrincipal = document.querySelector("#titulo-principal");
 
-let CATALOGO = [];
+let CATALOGO = [];  // cache del catálogo público (para categorías/búsqueda)
 
 const IMG_FALLBACK = "https://placehold.co/512x512?text=Imagen";
 const STORAGE_BASE = "https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/";
-const fmtGs = (n) => new Intl.NumberFormat("es-PY").format(Number(n||0)) + " Gs";
-const slug = (s) => String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/\s+/g,"-");
+
+const fmtGs = (n) => new Intl.NumberFormat("es-PY").format(Number(n || 0)) + " Gs";
+const slug = (s) =>
+  String(s || "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase().replace(/\s+/g, "-");
+
 const toImg = (v) => {
   if (!v) return IMG_FALLBACK;
   let s = String(v).trim();
@@ -20,21 +25,67 @@ const toImg = (v) => {
   return STORAGE_BASE + encodeURIComponent(s);
 };
 
-async function fetchProductos() {
+/* =================== Data sources =================== */
+
+// 1) Catálogo público (tu vista existente v_productos_publicos)
+async function fetchProductosCatalogo() {
   const { data, error } = await supabase
     .from("v_productos_publicos")
     .select("*")
     .order("nombre");
-  if (error) { console.error("Carga catálogo:", error); return []; }
-  return (data||[]).map(p => ({
+  if (error) {
+    console.error("Carga catálogo:", error);
+    return [];
+  }
+  return (data || []).map((p) => ({
     id: p.id,
     nombre: p.nombre,
     titulo: p.nombre,
-    imagen: toImg(p.imagen),
+    imagen: toImg(p.imagen || p.url_imagen),      // tolerante a ambos nombres
     precio: p.precio,
     categoria: { id: p.categoria_slug, nombre: p.categoria_nombre }
   }));
 }
+
+// 2) Populares para portada (fallback cuando no hay historial)
+async function fetchPopularesPortada(limit = 12) {
+  const { data, error } = await supabase
+    .from("populares_para_portada")
+    .select("*")
+    .limit(limit);
+  if (error) {
+    console.error("Populares:", error);
+    return [];
+  }
+  return (data || []).map((p) => ({
+    id: p.id,
+    nombre: p.nombre,
+    titulo: p.nombre,
+    imagen: toImg(p.url_imagen || p.imagen), // vista devuelve url_imagen
+    precio: p.precio
+  }));
+}
+
+// 3) Recomendaciones personalizadas (RPC)
+async function fetchPensadoParaVos(limit = 12) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data, error } = await supabase
+    .rpc("recomendaciones_productos_para_usuario", { p_usuario: user.id, p_limite: limit });
+  if (error) {
+    console.error("Recos RPC:", error);
+    return [];
+  }
+  return (data || []).map((p) => ({
+    id: p.id,
+    nombre: p.nombre,
+    titulo: p.nombre,
+    imagen: toImg(p.url_imagen || p.imagen), // RPC devuelve url_imagen = imagen
+    precio: p.precio
+  }));
+}
+
+/* =================== UI render =================== */
 
 function montar(productos) {
   contenedorProductos.innerHTML = "";
@@ -52,17 +103,26 @@ function montar(productos) {
         <b><p class="producto-precio">${fmtGs(producto.precio)}</p></b>
         <button class="producto-agregar" data-id="${producto.id}">Agregar</button>
       </div>`;
-    div.querySelector(".producto-imagen")?.addEventListener("error", (e) => e.currentTarget.src = IMG_FALLBACK);
+    div.querySelector(".producto-imagen")?.addEventListener("error", (e) => (e.currentTarget.src = IMG_FALLBACK));
     contenedorProductos.appendChild(div);
   }
   // Agregar: SIEMPRE usar addProduct(producto, 1). CartAPI decide local/remote.
-  document.querySelectorAll(".producto-agregar").forEach(btn => {
+  document.querySelectorAll(".producto-agregar").forEach((btn) => {
     btn.addEventListener("click", async (e) => {
       const id = e.currentTarget.dataset.id;
-      const prod = CATALOGO.find(p => String(p.id) === String(id));
-      if (!prod) return;
+      const prod = [...CATALOGO].find((p) => String(p.id) === String(id)) // buscar en catálogo
+                || null;
+      // si no está en CATALOGO (porque viene de recos/populares), armamos objeto mínimo:
+      const fallbackProd = prod || (() => {
+        const card = e.currentTarget.closest(".producto");
+        const nombre = card?.querySelector(".producto-titulo")?.textContent?.trim() || "Producto";
+        const precioText = card?.querySelector(".producto-precio")?.textContent || "0";
+        const precioNum = Number((precioText.replace(/[^\d]/g, "")) || 0);
+        return { id, nombre, titulo: nombre, precio: precioNum, imagen: card?.querySelector("img")?.src || IMG_FALLBACK };
+      })();
+
       try {
-        await window.CartAPI.addProduct(prod, 1);
+        await window.CartAPI.addProduct(fallbackProd, 1);
         await window.CartAPI.refreshBadge();
       } catch (err) {
         console.error("addProduct:", err);
@@ -73,15 +133,16 @@ function montar(productos) {
 }
 
 function wireCategorias() {
-  botonesCategorias.forEach(boton => {
+  // filtra sobre CATALOGO (catálogo público)
+  botonesCategorias.forEach((boton) => {
     boton.addEventListener("click", () => {
-      botonesCategorias.forEach(b => b.classList.remove("active"));
+      botonesCategorias.forEach((b) => b.classList.remove("active"));
       boton.classList.add("active");
       const filtro = slug(boton.id);
       if (filtro && filtro !== "todos") {
-        const alguno = CATALOGO.find(p => p.categoria.id === filtro);
+        const alguno = CATALOGO.find((p) => p.categoria.id === filtro);
         tituloPrincipal.textContent = alguno?.categoria?.nombre || "Productos";
-        montar(CATALOGO.filter(p => p.categoria.id === filtro));
+        montar(CATALOGO.filter((p) => p.categoria.id === filtro));
       } else {
         tituloPrincipal.textContent = "Todos los productos";
         montar(CATALOGO);
@@ -90,38 +151,89 @@ function wireCategorias() {
   });
 }
 
+/* =================== Búsqueda =================== */
+
 async function buscar(q) {
-  const s = (q||"").trim();
-  if (!s) { tituloPrincipal.textContent = "Todos los productos"; montar(CATALOGO); return; }
+  const s = (q || "").trim();
+  if (!s) {
+    tituloPrincipal.textContent = "Todos los productos";
+    montar(CATALOGO);
+    return;
+  }
   const { data, error } = await supabase
     .from("v_productos_publicos")
     .select("*")
     .or(`nombre.ilike.%${s}%, descripcion.ilike.%${s}%, categoria_nombre.ilike.%${s}%`)
     .order("nombre");
-  if (error) { console.error("buscar:", error); return; }
-  const resultados = (data||[]).map(p=>({
-    id:p.id, nombre:p.nombre, titulo:p.nombre, imagen: toImg(p.imagen), precio:p.precio,
-    categoria:{ id:p.categoria_slug, nombre:p.categoria_nombre }
+  if (error) {
+    console.error("buscar:", error);
+    return;
+  }
+  const resultados = (data || []).map((p) => ({
+    id: p.id,
+    nombre: p.nombre,
+    titulo: p.nombre,
+    imagen: toImg(p.imagen || p.url_imagen),
+    precio: p.precio,
+    categoria: { id: p.categoria_slug, nombre: p.categoria_nombre }
   }));
   tituloPrincipal.textContent = `Resultados para "${s}" (${resultados.length})`;
   montar(resultados);
 }
 
-async function init() {
-  CATALOGO = await fetchProductos();
-  // expone para el bot (NLU)
-  window.__PRODUCTS__ = CATALOGO.map(p => ({ id:p.id, nombre:p.nombre, titulo:p.titulo, precio:p.precio, imagen:p.imagen }));
+/* =================== Init =================== */
 
-  montar(CATALOGO);
+async function init() {
+  // 1) Cargar catálogo para categorías y búsqueda
+  CATALOGO = await fetchProductosCatalogo();
+  window.__PRODUCTS__ = CATALOGO.map((p) => ({ id: p.id, nombre: p.nombre, titulo: p.titulo, precio: p.precio, imagen: p.imagen }));
+
+  // 2) Intentar “Pensado para vos” si hay usuario; si no, fallback a Populares; si nada, Todos.
+  let itemsHome = [];
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const recos = await fetchPensadoParaVos(12);
+      if (recos.length) {
+        tituloPrincipal.textContent = "Pensado para vos";
+        itemsHome = recos;
+      }
+    }
+    if (!itemsHome.length) {
+      const pop = await fetchPopularesPortada(12);
+      if (pop.length) {
+        tituloPrincipal.textContent = "Populares";
+        itemsHome = pop;
+      }
+    }
+    if (!itemsHome.length) {
+      tituloPrincipal.textContent = "Todos los productos";
+      itemsHome = CATALOGO;
+    }
+  } catch (e) {
+    console.warn("Home feed:", e);
+    tituloPrincipal.textContent = "Todos los productos";
+    itemsHome = CATALOGO;
+  }
+
+  montar(itemsHome);
   wireCategorias();
   await window.CartAPI.refreshBadge();
 
+  // 3) Búsqueda
   const form = document.getElementById("searchForm");
   const input = document.getElementById("searchInput");
-  form?.addEventListener("submit", (e)=>{ e.preventDefault(); buscar(input.value); });
-  input?.addEventListener("keyup", (e)=>{
+  form?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    buscar(input.value);
+  });
+  input?.addEventListener("keyup", (e) => {
     if (e.key === "Enter") buscar(input.value);
-    if (!input.value) { tituloPrincipal.textContent = "Todos los productos"; montar(CATALOGO); }
+    if (!input.value) {
+      tituloPrincipal.textContent = "Todos los productos";
+      montar(CATALOGO);
+    }
   });
 }
+
 init();

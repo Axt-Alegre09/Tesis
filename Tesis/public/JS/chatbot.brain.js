@@ -32,42 +32,66 @@
   const SYN = {
     empanada: ["empanada","empanadas","empi","empas"],
     alfajor:  ["alfajor","alfajores"],
-    bocadito: ["bocadito","bocaditos","combo","combos"],
-    pan:      ["pan","panificados"],
-    milanesa: ["milanesa","milanesas","sandwich milanesa","sándwich milanesa"]
+    bocadito: ["bocadito","bocaditos","combo","combos","combo bocaditos","combo bocadito"],
+    pan:      ["pan","panes","panificados","baguette","baguet","buguete","gallego","campo","chip","pan del campo","pan gallego","pan casero"],
+    milanesa: ["milanesa","milanesas","sandwich milanesa","sándwich milanesa","sanguche de milanesa","sandwich de milanesa"],
+    croissant:["croissant","croissants","cruasan","cruasán","croisant"],
+    mbeju:    ["mbeju","mbejú"],
+    chipaG:   ["chipaguazu","chipaguazú","chipa guasu","chipa guasú"],
+    sopa:     ["sopa paraguaya","sopa"],
+    dulces:   ["dulce","dulces","caja de dulces","caja 20 dulces","caja veinte dulces"],
   };
 
   const FLAVORS = [
-    "carne","pollo","huevo","mandioca","queso","jamon","jamon y queso","saltena","salteña",
-    "dulce de leche","chocolate","maicena","vainilla","coco","membrillo","frutilla","milanesa"
+    // salados
+    "carne","pollo","huevo","mandioca","queso","jamon","jamón","jamon y queso","jamón y queso",
+    "saltena","salteña","milanesa",
+    // confitería
+    "dulce de leche","chocolate","maicena","vainilla","coco","membrillo","frutilla","guayaba",
+    // panes
+    "baguette","gallego","campo","chip",
+    // otros
+    "anana","ananá","pina","piña","manzana"
   ];
 
   const CAT_SYNONYMS = {
     empanadas: SYN.empanada,
-    confiteria: ["confiteria","confitería","postres","dulces","reposteria","repostería"],
+    confiteria: ["confiteria","confitería","postres","dulces","reposteria","repostería","tortas","flanes","pastaflora","pasta flora","alfajores", ...SYN.croissant, ...SYN.dulces],
     bocaditos: SYN.bocadito,
     alfajores: SYN.alfajor,
-    panificados: SYN.pan,
+    panificados: [...SYN.pan],
     milanesas: SYN.milanesa
   };
 
   // =============== KB (precios / incluye) breve ===============
-  const KB = {
+   const KB = {
+    // -- BOCADITOS
     "bocaditos combo 1": { precio: 55000,  incluye: "2 empanadas (a elegir), 2 sándwiches y 4 chipas" },
-    "bocaditos combo 2": { precio: 50000,  incluye: "3 empanadas, 3 sandwichitos, 2 pajagua, 2 chipaguazú, 4 chipas y 4 mbejú" },
-    "bocaditos combo 3": { precio: 150000, incluye: "4 empanadas, 3 chipas, 3 chipaguazú, 3 sopas, 10 aperitivos, 5 pajagua, 4 milanesas y 5 mbejú" },
+    "bocaditos combo 2": { precio: 50000,  incluye: "3 empanadas, 3 sandwichitos, 2 payagua/pajagua, 2 chipa guasú, 4 chipas y 4 mbejú" },
+    "bocaditos combo 3": { precio: 150000, incluye: "4 empanadas, 3 chipas, 3 chipa guasú, 3 sopas, 10 aperitivos, 5 payagua, 4 milanesas y 5 mbejú" },
     "bocaditos combo 4": { precio: 75000,  incluye: "9 sándwiches de milanesa (pollo y carne)" },
     "bocadito personal": { precio: 35000,  incluye: "5 empanadas + 2 salsas (kétchup y lactonesa)" },
     "bocadito en pareja":{ precio: 65000,  incluye: "11 empanadas + 2 salsas (kétchup y lactonesa)" },
 
+    // -- CONFITERÍA
     "alfajores": { precio: 25000, incluye: "Maicena y maicena bañada en chocolate" },
-    "croissants": { precio: 30000 }, "croisant": { precio: 30000 },
-    "dulces (caja 20)": { precio: 25000, incluye: "1 caja con 20 dulces" },
+    "croissants": { precio: 30000, incluye: "Crujientes de manteca (unidad)" },
+    "dulces (caja 20)": { precio: 25000, incluye: "1 caja con 20 dulces surtidos" },
     "flanes (2)": { precio: 20000, incluye: "2 flanes a elegir" },
-    "pasta floras (kilo)": { precio: 20000 },
-    "torta dulce de leche (pequena congelada)": { precio: 45000 },
+    "pasta floras (kilo)": { precio: 20000, incluye: "Sabores: dulce de leche y dulce de guayaba" },
+    "torta dulce de leche (pequena congelada)": { precio: 45000, incluye: "Torta pequeña congelada de dulce de leche" },
     "pai de manzana": { precio: 35000 },
+    "pai de anana": { precio: 35000, incluye: "También conocido como pai de piña/ananá" },
 
+    // -- PANIFICADOS
+    "pan baguette (1)": { precio: 15000 },
+    "pan casero (1)": { precio: 20000 },
+    "pan chip (pack 10)": { precio: 15000 },
+    "pan del campo (1)": { precio: 22000 },
+    "pan del campo (kilo)": { precio: 22000 },
+    "pan gallego (kilo)": { precio: 19000 },
+
+    // -- ROSTISERÍA / SALADOS
     "empanada de carne": { precio: 19000 },
     "empanada de huevo": { precio: 17000 },
     "empanada de mandioca": { precio: 10000 },
@@ -80,19 +104,32 @@
   };
 
   const ALIAS = new Map([
+    // Bocaditos
     ["combo 1","bocaditos combo 1"],["bocaditos 1","bocaditos combo 1"],
     ["combo 2","bocaditos combo 2"],["bocaditos 2","bocaditos combo 2"],
     ["combo 3","bocaditos combo 3"],["bocaditos 3","bocaditos combo 3"],
     ["combo 4","bocaditos combo 4"],["bocaditos 4","bocaditos combo 4"],
     ["en pareja","bocadito en pareja"],["bocadito pareja","bocadito en pareja"],
-    ["croissants","croissants"],["croisant","croisant"],
+
+    // Confitería
+    ["croissants","croissants"],["croissant","croissants"],["cruasan","croissants"],["cruasán","croissants"],["croisant","croissants"],
     ["caja de dulces","dulces (caja 20)"],["dulces","dulces (caja 20)"],
     ["flanes","flanes (2)"],["flan","flanes (2)"],
-    ["pasta floras","pasta floras (kilo)"],["pasta flora","pasta floras (kilo)"],
+    ["pasta flora","pasta floras (kilo)"],["pastaflora","pasta floras (kilo)"],
     ["torta dulce de leche","torta dulce de leche (pequena congelada)"],
-    ["baguette","pan baguette (1)"],["pan buguete","pan baguette (1)"],
+    ["pai de piña","pai de anana"],["pai de anana","pai de anana"],["pai de ananá","pai de anana"],["pai de allana","pai de anana"],
+
+    // Panificados
+    ["baguette","pan baguette (1)"],["pan buguete","pan baguette (1)"],["baguet","pan baguette (1)"],
+    ["pan casero","pan casero (1)"],
+    ["pan chip","pan chip (pack 10)"],["pack de chip","pan chip (pack 10)"],
+    ["pan del campo unidad","pan del campo (1)"],["pan del campo","pan del campo (1)"],
+    ["pan del campo kilo","pan del campo (kilo)"],
+    ["pan gallego","pan gallego (kilo)"],["pan gallego kilo","pan gallego (kilo)"],
+
+    // Combos salados
     ["combo empanada coca","combo empanada + coca 250 ml"],
-    ["combo saltena","combo empanada saltena + salsa"],
+    ["combo saltena","combo empanada saltena + salsa"],["combo salteña","combo empanada saltena + salsa"],
     ["combo sandwich milanesa","combo sandwich milanesa + papas + coca 350 ml"]
   ]);
 

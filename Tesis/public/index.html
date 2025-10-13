@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -84,15 +84,13 @@
   <!-- Backdrop para el menú móvil -->
   <div id="backdrop" class="backdrop" aria-hidden="true"></div>
 
-  <!-- Auth -->
+  <!-- Auth UI helpers (no forzar login en index) -->
   <script type="module">
-    import { logout, autoWireAuthMenu, requireAuth } from "./JS/ScriptLogin.js";
-    requireAuth();
+    import { logout, autoWireAuthMenu } from "./JS/ScriptLogin.js";
     autoWireAuthMenu();
     document.getElementById("logoutBtn")?.addEventListener("click", logout);
     document.getElementById('searchForm')?.addEventListener('submit', (e) => e.preventDefault());
   </script>
-
 
   <!-- Dropdown usuario -->
   <script>
@@ -179,36 +177,20 @@
     </div>
   </div>
 
+  <!-- 1) Catálogo (importa CartAPI dentro) -->
+  <script type="module" src="JS/main.js"></script>
 
-<!-- Auth (igual que antes) -->
-<script type="module">
-  import { logout, autoWireAuthMenu, requireAuth } from "./JS/ScriptLogin.js";
-  requireAuth();
-  autoWireAuthMenu();
-  document.getElementById("logoutBtn")?.addEventListener("click", logout);
-  document.getElementById('searchForm')?.addEventListener('submit', (e) => e.preventDefault());
-</script>
+  <!-- 2) Chat -->
+  <script src="JS/chatbot.brain.js" defer></script>
+  <script src="JS/script-chatbot.js" defer></script>
 
-<!-- 1) API del carrito (NO module) -->
-<script src="JS/cart-api.js"></script>
-
-<!-- 2) Catálogo -->
-<script type="module" src="JS/main.js"></script>
-
-<!-- 3) Chat -->
-<script src="JS/chatbot.brain.js"></script>
-<script src="JS/script-chatbot.js" defer></script>
-
-
-
-<script type="module">
-  import { autoWireAuthMenu } from "./JS/ScriptLogin.js";
-  autoWireAuthMenu();
-  document.getElementById("updateProfileBtn")?.addEventListener("click", () => {
-    window.location.assign("misdatos.html");
-  });
-</script>
-
-
+  <!-- Wire del menú de usuario para ir a Mis Datos -->
+  <script type="module">
+    import { autoWireAuthMenu } from "./JS/ScriptLogin.js";
+    autoWireAuthMenu();
+    document.getElementById("updateProfileBtn")?.addEventListener("click", () => {
+      window.location.assign("misdatos.html");
+    });
+  </script>
 </body>
 </html>
