@@ -122,4 +122,41 @@ async function init() {
   });
 }
 
+// === Toggle de paneles de método de pago ===
+function setupMetodoPagoUI(snapshotTotal = 0) {
+  const radios = document.querySelectorAll('.metodo-radio');
+  const panels = document.querySelectorAll('.metodo-panel');
+
+  function showPanel(metodo) {
+    panels.forEach(p => {
+      p.classList.toggle('disabled', p.getAttribute('data-metodo') !== metodo);
+    });
+  }
+
+  radios.forEach(r => {
+    r.addEventListener('change', () => showPanel(r.value));
+    if (r.checked) showPanel(r.value);
+  });
+
+  // Completar el total en el panel de efectivo
+  const efTotal = document.getElementById('efectivo-total');
+  if (efTotal) {
+    const fmtGs = (n) => new Intl.NumberFormat('es-PY').format(Number(n || 0)) + ' Gs';
+    efTotal.value = fmtGs(snapshotTotal);
+  }
+}
+
+// Llamalo cuando calculás/lees el snapshot:
+(function initMetodos() {
+  let snap = null;
+  try { snap = JSON.parse(sessionStorage.getItem('checkout_snapshot')); } catch {}
+  try {
+    const legacy = JSON.parse(sessionStorage.getItem('checkout'));
+    if (!snap || (legacy?.ts && legacy.ts > (snap?.ts || 0))) snap = legacy;
+  } catch {}
+  const total = Number(snap?.total || 0);
+  setupMetodoPagoUI(total);
+})();
+
+
 init();
