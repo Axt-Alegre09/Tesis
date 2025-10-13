@@ -1,201 +1,136 @@
-// JS/ScriptLogin.js
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+// JS/pasarelaPagos.js
+// Valida contexto + ejecuta RPC al pagar + log claro de errores.
 
-const SUPABASE_URL = "https://jyygevitfnbwrvxrjexp.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5eWdldml0Zm5id3J2eHJqZXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2OTQ2OTYsImV4cCI6MjA3MTI3MDY5Nn0.St0IiSZSeELESshctneazCJHXCDBi9wrZ28UkiEDXYo";
+import { supabase } from "./JS/ScriptLogin.js";
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const QS = new URLSearchParams(location.search);
 
-const LOGIN_URL = "login.html";
-const DASHBOARD_URL = "index.html";
+// ---------- Utils ----------
+const fmtGs = (n) => new Intl.NumberFormat("es-PY").format(Number(n || 0)) + " Gs";
 
-function go(path) {
-  window.location.href = new URL(path, window.location.href).href;
-}
-function showMsg(text, type = "info") {
-  const box = document.getElementById("msg");
-  if (!box) return;
-  const cls = type === "danger" ? "alert-danger"
-            : type === "warning" ? "alert-warning"
-            : type === "success" ? "alert-success"
-            : "alert-secondary";
-  box.innerHTML = `<div class="alert ${cls}" role="alert">${text}</div>`;
-}
-
-export async function getUser() {
-  const { data } = await supabase.auth.getUser();
-  return data?.user ?? null;
-}
-export function setUserNameUI(nombre) {
-  const el = document.querySelector(".user-name");
-  if (el) el.textContent = nombre || "Cuenta";
-}
-export async function paintUserChip() {
-  const user = await getUser();
-  if (!user) return setUserNameUI("Cuenta");
-  const nombre = user.user_metadata?.nombre || user.email || "Cuenta";
-  setUserNameUI(nombre);
-}
-
-export async function logout(ev) {
-  ev?.preventDefault?.();
-  try { await supabase.auth.signOut(); } catch {}
-  try { localStorage.clear(); } catch {}
-  try { sessionStorage.clear(); } catch {}
-  go(LOGIN_URL);
-}
-export async function updateProfile(ev) {
-  ev?.preventDefault?.();
-  const user = await getUser();
-  if (!user) return alert("Debes iniciar sesión para actualizar tus datos.");
-
-  const actualNombre = user.user_metadata?.nombre || "";
-  const actualAvatar = user.user_metadata?.avatar_url || "";
-
-  const nuevoNombre = prompt("Ingresa tu nombre para mostrar:", actualNombre);
-  if (nuevoNombre === null) return;
-  const nuevoAvatar = prompt("URL de tu foto (opcional):", actualAvatar ?? "");
-
-  const { error } = await supabase.auth.updateUser({
-    data: {
-      nombre: (nuevoNombre || actualNombre || "").trim(),
-      avatar_url: (nuevoAvatar || "").trim(),
-    },
-  });
-
-  if (error) return alert("No se pudo actualizar el perfil.");
-  setUserNameUI(nuevoNombre || user.email || "Cuenta");
-  alert("✅ Perfil actualizado.");
-}
-export function autoWireAuthMenu() {
-  document.getElementById("logoutBtn")?.addEventListener("click", logout);
-  document.getElementById("updateProfileBtn")?.addEventListener("click", updateProfile);
-}
-
-export async function requireAuth() {
-  const { data } = await supabase.auth.getSession();
-  if (!data.session) go(LOGIN_URL);
-}
-
-/* ======= Lógica de login.html ======= */
-async function wireLoginPage() {
-  const wrapper = document.getElementById("authWrapper");
-  const loginForm = document.getElementById("loginForm");
-  const registerForm = document.getElementById("registerForm");
-  const loginBtn = document.querySelector(".login-btn");
-  const registerBtn = document.querySelector(".register-btn");
-  const forgot = document.getElementById("forgotLink");
-
-  // Toggle UI
-  registerBtn?.addEventListener("click", () => wrapper?.classList.add("active"));
-  loginBtn?.addEventListener("click", () => wrapper?.classList.remove("active"));
-
-  // Si hay sesión activa => dashboard
-  const { data } = await supabase.auth.getSession();
-  if (data.session) return go(DASHBOARD_URL);
-
-  // --- LOGIN ---
-  loginForm?.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    showMsg("Procesando…", "secondary");
-
-    const email = (document.getElementById("loginEmail")?.value || "").trim();
-    const password = (document.getElementById("loginPassword")?.value || "").trim();
-
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-
-    if (error) {
-      // 1) ¿Falta confirmación?
-      if (/Email not confirmed/i.test(error.message)) {
-        showMsg("Favor confirmar correo desde el email.", "warning");
-        return;
-      }
-
-      // 2) Heurística para diferenciar correo inexistente vs contraseña incorrecta.
-      //    Consultamos tu tabla pública de perfiles por el mail.
-      try {
-        const { data: perfil, error: qErr, status } = await supabase
-          .from("clientes_perfil")
-          .select("user_id")
-          .eq("mail", email)
-          .maybeSingle();
-
-        if (!qErr && perfil) {
-          showMsg("Contraseña incorrecta.", "danger");
-        } else {
-          // si tabla no tiene fila o RLS impide leer, mostramos esta
-          showMsg("Correo no registrado o mal escrito.", "danger");
-        }
-      } catch {
-        showMsg("Correo o contraseña inválidos.", "danger");
-      }
-      return;
-    }
-
-    showMsg("✅ Bienvenido. Redirigiendo…", "success");
-    go(DASHBOARD_URL);
-  });
-
-  // --- REGISTRO ---
-  registerForm?.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    showMsg("Procesando registro…", "secondary");
-
-    const email = (document.getElementById("registerEmail")?.value || "").trim();
-    const password = (document.getElementById("registerPassword")?.value || "").trim();
-
-    // Validación simple de contraseña
-    if (password.length < 8) {
-      showMsg("Contraseña insegura, agrega más caracteres (mínimo 8).", "warning");
-      return;
-    }
-
-    const { error } = await supabase.auth.signUp({
-      email, password,
-      options: { data: { nombre: email.split("@")[0] } },
-    });
-
-    if (error) {
-      if (/already registered/i.test(error.message)) {
-        showMsg("Correo ya registrado, vaya al inicio de sesión.", "warning");
-      } else {
-        showMsg("No se pudo registrar. Revisa el correo o la contraseña.", "danger");
-      }
-      return;
-    }
-
-    showMsg("✅ Cuenta creada. Revisá tu correo para confirmar.", "success");
-    wrapper?.classList.remove("active");
-  });
-
-  // --- OLVIDÉ MI CONTRASEÑA ---
-  forgot?.addEventListener("click", async (e) => {
-    e.preventDefault();
-    const email = (document.getElementById("loginEmail")?.value || "").trim()
-               || prompt("Ingresá tu correo:");
-    if (!email) return;
-
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      // Te trae a MIS DATOS para que cambies la clave ahí (no pasamos email/clave en URL)
-      redirectTo: `${window.location.origin}/misdatos.html#type=recovery`,
-    });
-    if (error) {
-      showMsg("No se pudo enviar el correo de recuperación.", "danger");
-      return;
-    }
-    showMsg("📧 Te enviamos un enlace para cambiar tu contraseña.", "info");
-  });
-}
-
-/* ======= Auto-init ======= */
-(async function init() {
-  try {
-    paintUserChip();
-    autoWireAuthMenu();
-    if (document.getElementById("loginForm") || document.getElementById("registerForm")) {
-      await wireLoginPage();
-    }
-  } catch (e) {
-    console.warn("init:", e);
+function putMessage(msg, type = "error") {
+  let box = document.querySelector("[data-checkout-msg]");
+  if (!box) {
+    box = document.createElement("div");
+    box.setAttribute("data-checkout-msg", "1");
+    box.style.border = "2px solid #6f5c38";
+    box.style.background = "#fff";
+    box.style.borderRadius = "12px";
+    box.style.padding = "14px";
+    box.style.margin = "10px 0";
+    box.style.maxWidth = "980px";
+    box.style.fontSize = "14px";
+    document.body.prepend(box);
   }
-})();
+  const title = (type === "ok" ? "Listo" : "Atención") + ": ";
+  box.innerHTML = `<b>${title}</b>${msg}`;
+}
+
+function hasValidPedido(qs = QS) {
+  const raw = qs.get("pedido");
+  if (raw == null) return false;
+  const v = String(raw).trim().toLowerCase();
+  return v !== "" && v !== "null" && v !== "undefined";
+}
+
+function snapshotVigente(snap) {
+  if (!snap || !snap.ts) return false;
+  return (Date.now() - Number(snap.ts)) <= 5 * 60 * 1000; // 5 min
+}
+
+function readSnapshot() {
+  let a = null, b = null;
+  try { a = JSON.parse(sessionStorage.getItem("checkout_snapshot")); } catch {}
+  try { b = JSON.parse(sessionStorage.getItem("checkout")); } catch {}
+  if (a && b) return (Number(a.ts || 0) >= Number(b.ts || 0)) ? a : b;
+  return a || b || null;
+}
+
+// ---------- Ejecutar el RPC (compra real) ----------
+async function confirmarCompra() {
+  console.log("[checkout] confirmando compra…");
+  const { data: sess } = await supabase.auth.getSession();
+  if (!sess?.session?.user?.id) {
+    console.warn("[checkout] No hay sesión, abortando RPC.");
+    throw new Error("Debes iniciar sesión para confirmar la compra.");
+  }
+
+  // Llamada al RPC (usa carrito_items del usuario y vacía al terminar)
+  const { data, error } = await supabase.rpc("checkout_crear_pedido");
+  if (error) {
+    console.error("[checkout] RPC error:", error);
+    throw error;
+  }
+  console.log("[checkout] RPC ok:", data);
+  return data; // { pedido_id, items, total }
+}
+
+// ---------- UI principal ----------
+async function init() {
+  // Mostrar contexto (invitado o remoto con pedido)
+  const snapshot = readSnapshot();
+
+  if (hasValidPedido(QS)) {
+    const pedidoId = QS.get("pedido");
+    if (!snapshotVigente(snapshot) || snapshot?.source !== "remote" || snapshot?.pedidoId !== pedidoId) {
+      putMessage("No se encontró el resumen del pedido o está vencido. Volvé al carrito y repetí la operación.");
+    } else {
+      putMessage(`Pedido listo para pagar.`, "ok");
+    }
+  } else if (QS.has("monto")) {
+    const montoUrl = Number(QS.get("monto") || 0);
+    const isSourceLocal = snapshot?.source === "local" || snapshot?.source === "legacy";
+    if (!snapshotVigente(snapshot) || !isSourceLocal) {
+      putMessage("No se encontró el resumen de compra. Volvé al carrito para iniciar el pago.");
+    } else {
+      const totalSnap = Number(snapshot.total || 0);
+      if (Math.abs(totalSnap - montoUrl) > 1) {
+        putMessage("Detectamos un desajuste en el total. Volvé al carrito y reintentá.");
+      } else {
+        putMessage(`Total a pagar: ${fmtGs(totalSnap)}. Completá el formulario y simulá el pago.`, "ok");
+      }
+    }
+  } else {
+    putMessage('Faltan datos del checkout. Accedé aquí usando “Comprar ahora” del carrito.');
+  }
+
+  // Enganchar el botón Pagar (submit del form)
+  const form = document.getElementById("checkout-form");
+  form?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    // Debug de sesión
+    const { data: sess } = await supabase.auth.getSession();
+    console.log("[checkout] session.user:", sess?.session?.user);
+
+    try {
+      // 1) Ejecutamos el RPC (guarda pedido + detalle y vacía carrito)
+      const res = await confirmarCompra(); // { pedido_id, items, total }
+      // 2) Guardar un snapshot “remote” para esta página (opcional)
+      const snap = {
+        source: "remote",
+        pedidoId: res?.[0]?.pedido_id || res?.pedido_id,
+        ts: Date.now(),
+        items: res?.[0]?.items ?? res?.items,
+        total: res?.[0]?.total ?? res?.total
+      };
+      sessionStorage.setItem("checkout_snapshot", JSON.stringify(snap));
+
+      // 3) Mostrar éxito y botones
+      document.getElementById("checkout-success")?.classList.remove("disabled");
+      putMessage(`✅ Pedido confirmado. N°: ${snap.pedidoId || "(s/d)"} — Total: ${fmtGs(snap.total || 0)}.`, "ok");
+
+      // 4) (Opcional) deshabilitar botón pagar para no duplicar
+      const btn = form.querySelector('button[type="submit"]');
+      btn?.setAttribute("disabled", "true");
+    } catch (err) {
+      // Errores comunes: no logueado, RLS, policies, o carrito vacío
+      console.error("[checkout] Error general:", err);
+      const msg = err?.message || err?.error_description || "No se pudo confirmar la compra.";
+      putMessage(msg);
+      alert(msg);
+    }
+  });
+}
+
+init();

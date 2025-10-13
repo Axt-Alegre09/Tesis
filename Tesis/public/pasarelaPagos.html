@@ -198,6 +198,8 @@
   <!--Para autocompletar desde mis datos en la pasarela de pago-->
 
   <script type="module">
+
+  
   import { supabase } from "./JS/ScriptLogin.js";
 
   const $ = (id) => document.getElementById(id);
@@ -230,6 +232,12 @@
   preloadProfileIntoForm();
 </script>
 
+<!-- Requiere sesión para poder pagar -->
+<script type="module">
+  import { requireAuth, paintUserChip } from "./JS/ScriptLogin.js";
+  await requireAuth();
+  paintUserChip();
+</script>
 
 
 
