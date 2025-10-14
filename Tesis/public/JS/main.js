@@ -6,7 +6,7 @@ const contenedorProductos = document.querySelector("#contenedor-productos");
 const botonesCategorias = document.querySelectorAll(".boton-categoria");
 const tituloPrincipal = document.querySelector("#titulo-principal");
 
-let CATALOGO = [];  // cache del catálogo público
+let CATALOGO = []; // cache del catálogo público
 
 const IMG_FALLBACK = "https://placehold.co/512x512?text=Imagen";
 const STORAGE_BASE = "https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/";
@@ -26,6 +26,10 @@ const toImg = (v) => {
 };
 
 /* =================== Data sources =================== */
+
+// Flag post-compra (para “inmediatas” y UX)
+const justBought = sessionStorage.getItem("just_bought") === "1";
+if (justBought) sessionStorage.removeItem("just_bought");
 
 // 1) Catálogo público (vista v_productos_publicos)
 async function fetchProductosCatalogo() {
@@ -66,7 +70,7 @@ async function fetchPopularesPortada(limit = 12) {
   }));
 }
 
-// 3) Recomendaciones personalizadas (RPC)
+// 3) Recomendaciones personalizadas (RPC ML)
 async function fetchPensadoParaVos(limit = 12) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return [];
@@ -82,6 +86,26 @@ async function fetchPensadoParaVos(limit = 12) {
     titulo: p.nombre,
     imagen: toImg(p.url_imagen || p.imagen),
     precio: p.precio
+  }));
+}
+
+// 4) NUEVO: recos inmediatas post-compra
+async function fetchInmediatas(limit = 12) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data, error } = await supabase
+    .rpc("recomendaciones_inmediatas", { p_usuario: user.id, p_limite: limit });
+  if (error) {
+    console.warn("Inmediatas RPC:", error);
+    return [];
+  }
+  return (data || []).map((p) => ({
+    id: p.id,
+    nombre: p.nombre,
+    titulo: p.nombre,
+    imagen: toImg(p.url_imagen || p.imagen),
+    precio: p.precio,
+    motivo: p.motivo
   }));
 }
 
@@ -106,6 +130,7 @@ function montar(productos) {
     div.querySelector(".producto-imagen")?.addEventListener("error", (e) => (e.currentTarget.src = IMG_FALLBACK));
     contenedorProductos.appendChild(div);
   }
+  // handler Agregar
   document.querySelectorAll(".producto-agregar").forEach((btn) => {
     btn.addEventListener("click", async (e) => {
       const id = e.currentTarget.dataset.id;
@@ -180,19 +205,34 @@ async function buscar(q) {
 /* =================== Init =================== */
 
 async function init() {
+  // 1) Cargar catálogo base
   CATALOGO = await fetchProductosCatalogo();
   window.__PRODUCTS__ = CATALOGO.map((p) => ({ id: p.id, nombre: p.nombre, titulo: p.titulo, precio: p.precio, imagen: p.imagen }));
 
+  // 2) Home feed: Inmediatas → ML → Populares → Catálogo
   let itemsHome = [];
   try {
     const { data: { user } } = await supabase.auth.getUser();
+
     if (user) {
-      const recos = await fetchPensadoParaVos(12);
-      if (recos.length) {
-        tituloPrincipal.textContent = "Pensado para vos";
-        itemsHome = recos;
+      // Inmediatas si hay compra reciente
+      const inmediatas = await fetchInmediatas(12);
+      if (inmediatas.length) {
+        tituloPrincipal.textContent = "Para continuar con lo tuyo";
+        itemsHome = inmediatas;
+      }
+
+      // ML si no hubo inmediatas
+      if (!itemsHome.length) {
+        const recos = await fetchPensadoParaVos(12);
+        if (recos.length) {
+          tituloPrincipal.textContent = "Pensado para vos";
+          itemsHome = recos;
+        }
       }
     }
+
+    // Populares si no hay user/recos
     if (!itemsHome.length) {
       const pop = await fetchPopularesPortada(12);
       if (pop.length) {
@@ -200,6 +240,8 @@ async function init() {
         itemsHome = pop;
       }
     }
+
+    // Fallback catálogo
     if (!itemsHome.length) {
       tituloPrincipal.textContent = "Todos los productos";
       itemsHome = CATALOGO;
@@ -214,6 +256,7 @@ async function init() {
   wireCategorias();
   await window.CartAPI.refreshBadge();
 
+  // 3) Búsqueda
   const form = document.getElementById("searchForm");
   const input = document.getElementById("searchInput");
   form?.addEventListener("submit", (e) => {
