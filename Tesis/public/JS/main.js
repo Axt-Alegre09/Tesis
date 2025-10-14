@@ -218,7 +218,7 @@ async function init() {
       // Inmediatas si hay compra reciente
       const inmediatas = await fetchInmediatas(12);
       if (inmediatas.length) {
-        tituloPrincipal.textContent = "Para continuar con lo tuyo";
+        tituloPrincipal.textContent = "Pensado para vos";
         itemsHome = inmediatas;
       }
 
