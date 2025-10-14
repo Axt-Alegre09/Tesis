@@ -157,7 +157,6 @@ async function init() {
       console.error("[checkout] Error general:", err);
       const msg = err?.message || err?.error_description || "No se pudo confirmar la compra.";
       putMessage(msg);
-      alert(msg);
     }
   });
 }
