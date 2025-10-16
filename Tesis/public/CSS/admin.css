@@ -1,0 +1,77 @@
+/* ====== Lápices y edición ====== */
+.editable-wrap { position: relative; }
+.edit-btn{
+  position: absolute;
+  right: .25rem;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 2px solid #e6e6e6;
+  background: #fff;
+  color: #6f5c38;
+  border-radius: 999px;
+  width: 32px; height: 32px;
+  display: grid; place-items: center;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0,0,0,.08);
+}
+.edit-btn i{ font-size: 1rem; }
+.edit-btn:hover{ background: #f0efe9; }
+.edit-btn.active{ border-color: var(--clr-main); background:#fff5df; }
+
+.edit-btn--inline{
+  position: static; margin-left: .5rem; transform:none;
+}
+
+.editable-row{
+  display:flex; align-items:center; justify-content:space-between; gap:.5rem;
+}
+.edit-btn.small{
+  position: static; transform:none; width: 28px; height: 28px; font-size:.9rem;
+}
+
+/* Campo en edición */
+[contenteditable="true"].is-editing{
+  outline: 3px dashed rgba(111,92,56,.35);
+  background: #fffcee;
+  border-radius: .5rem;
+  padding: .1rem .25rem;
+}
+
+/* ====== Menú usuario (admin ampliado) ====== */
+.user-dropdown--admin{ min-width: 260px; }
+.user-dropdown .dropdown-sep{ height:1px;background:#eee;margin:.25rem .35rem; }
+.user-dropdown .dropdown-item.danger{ color:#8a2b2b; }
+.user-dropdown .dropdown-item.danger:hover{ background:#fff1f1; }
+
+/* ====== Lápiz de logo ====== */
+.aside-header { position: relative; }
+.edit-logo{ right: .75rem; top: .75rem; transform:none; }
+
+/* ====== Producto: card editable ====== */
+.editable-card .producto-detalles{ position: relative; }
+.editable-card .editable-row + .editable-row{ margin-top: .2rem; }
+
+/* ====== Card “Agregar producto” (mismo tamaño) ====== */
+.producto.producto--add{
+  display:flex; align-items:center; justify-content:center;
+  border: 2px dashed rgba(0,0,0,.15);
+  background: #f8f8f8;
+}
+.add-box{
+  display:grid; place-items:center; text-align:center;
+  color:#6f5c38; font-weight:800; font-size:1.3rem;
+  border: 2px solid #e6e6e6; padding: 1.25rem 1.5rem; border-radius: 1rem;
+  background:#fff;
+  box-shadow: 0 6px 14px rgba(0,0,0,.06);
+}
+.add-box i{ font-size:1.6rem; margin-top:.4rem }
+.add-box:hover{ background:#fffaf1; }
+
+/* ====== Ajustes: lápiz en aside (lista) ====== */
+.menu .editable-wrap{ position: relative; }
+.menu .editable-wrap .edit-btn{ right: .75rem; }
+
+/* ====== Título principal con lápiz al lado ====== */
+.titulo-principal.editable-wrap{
+  display:flex; align-items:center; justify-content:center; gap:.35rem;
+}

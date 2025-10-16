@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Informe de Ventas</title>
+  <link rel="shortcut icon" href="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinosico.ico" type="image/x-icon">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="CSS/informeVentas.css" />
+</head>
+<body>
+  <div class="wrapper">
+    <!-- Topbar -->
+    <header class="topbar">
+      <button class="back" aria-label="Volver">←</button>
+      <h1>Informe de Ventas</h1>
+    </header>
+
+    <!-- Opcional: subtítulo/fecha -->
+    <p class="fecha">Últimos 14 días</p>
+
+    <!-- Layout principal -->
+    <main class="dashboard">
+
+      <!-- Métricas superiores (izquierda/centro) -->
+      <section class="metrics">
+        <article class="card kpi">
+          <div class="kpi__icon" aria-hidden="true">🗂️</div>
+          <div class="kpi__title">Ventas Totales</div>
+          <div class="kpi__sub">700 ventas</div>
+          <div class="kpi__value">Gs&nbsp;20.000.000</div>
+          <div class="kpi__foot">
+            <span class="arrow">↑</span>
+            <span>+ %</span>
+            <span class="sep"></span>
+            <span>Esta semana</span>
+          </div>
+        </article>
+
+        <article class="card kpi">
+          <div class="kpi__icon" aria-hidden="true">👁️</div>
+          <div class="kpi__title">Vistas</div>
+          <div class="kpi__sub">&nbsp;</div>
+          <div class="kpi__value">Gs&nbsp;20.000.000</div>
+          <div class="kpi__foot">
+            <span class="arrow">↑</span>
+            <span>+ %</span>
+          </div>
+        </article>
+      </section>
+
+      <!-- Widgets laterales (derecha) -->
+      <aside class="side">
+        <article class="card widget">
+          <h3 class="widget__title">Top Productos</h3>
+          <div class="donut">
+            <div class="donut__ring"></div>
+            <div class="donut__center">
+              <strong>$6.2k</strong>
+            </div>
+          </div>
+          <ul class="list">
+            <li>Panadería</li>
+            <li>Confitería</li>
+            <li>Bocaditos</li>
+            <li>Rosticería</li>
+          </ul>
+        </article>
+
+        <article class="card widget">
+          <h3 class="widget__title">Ubicación de Clientes</h3>
+          <div class="donut">
+            <div class="donut__ring"></div>
+            <div class="donut__center">
+              <strong>$6.2k</strong>
+            </div>
+          </div>
+          <ul class="list">
+            <li>San Antonio</li>
+            <li>Ñemby</li>
+            <li>Villa Elisa</li>
+          </ul>
+        </article>
+      </aside>
+
+      <!-- Gráfico central -->
+      <section class="card chart">
+        <header class="chart__bar">
+          <div class="spacer"></div>
+          <div class="actions">
+            <button class="btn brown">Exportar datos</button>
+            <div class="select">
+              <select aria-label="Rango">
+                <option>Últimos 14 días</option>
+                <option>Últimos 30 días</option>
+                <option>Este mes</option>
+                <option>Último mes</option>
+              </select>
+            </div>
+          </div>
+        </header>
+
+        <!-- Placeholder visual del gráfico (líneas) -->
+        <div class="chart__canvas" role="img" aria-label="Performance de ventas">
+          <div class="legend">
+            <span class="dot"></span> Earnings
+            <span class="dot hollow"></span> Costs
+          </div>
+          <div class="gridlines">
+            <span></span><span></span><span></span><span></span><span></span>
+          </div>
+          <svg viewBox="0 0 100 40" preserveAspectRatio="none" class="line earnings">
+            <polyline fill="none" points="0,30 10,35 20,25 30,28 40,18 50,26 60,22 70,34 80,38 90,20 100,10"></polyline>
+          </svg>
+          <svg viewBox="0 0 100 40" preserveAspectRatio="none" class="line costs">
+            <polyline fill="none" points="0,35 10,25 20,30 30,22 40,28 50,35 60,30 70,33 80,26 90,28 100,32"></polyline>
+          </svg>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</body>
+</html>

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Reporte del día</title>
+  <link rel="shortcut icon" href="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinosico.ico" type="image/x-icon">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="CSS/reporteDia.css" />
+</head>
+<body>
+  <div class="wrapper">
+    <!-- Encabezado -->
+    <header class="topbar">
+      <button class="back" aria-label="Volver">←</button>
+      <h1>Reporte del día</h1>
+    </header>
+
+    <!-- KPIs -->
+    <section class="kpis">
+      <article class="kpi card">
+        <div class="kpi__icon">▦</div>
+        <div class="kpi__title">Pedidos totales</div>
+        <div class="kpi__value">16</div>
+      </article>
+
+      <article class="kpi card">
+        <div class="kpi__icon">🪙</div>
+        <div class="kpi__title">Ventas totales</div>
+        <div class="kpi__value">965,000 Gs</div>
+      </article>
+
+      <article class="kpi card">
+        <div class="kpi__icon">✓</div>
+        <div class="kpi__title">Pedidos entregados</div>
+        <div class="kpi__value">7</div>
+      </article>
+
+      <article class="kpi card">
+        <div class="kpi__icon">⚠️</div>
+        <div class="kpi__title">Pedidos pendientes</div>
+        <div class="kpi__value">4</div>
+      </article>
+
+      <article class="kpi card">
+        <div class="kpi__icon">!</div>
+        <div class="kpi__title">Pagos pendientes</div>
+        <div class="kpi__value">1</div>
+      </article>
+    </section>
+
+    <!-- Contenido -->
+    <main class="grid">
+      <!-- Ventas del día + Productos más vendidos -->
+      <section class="card sales">
+        <div class="sales__left">
+          <h3>Ventas del día</h3>
+          <div class="trend">
+            <span class="up">+29&nbsp;%</span>
+          </div>
+
+          <div class="bar-chart">
+            <div class="bars">
+              <div class="bar">
+                <div class="col" style="--h:42%"></div>
+                <span class="date">15/09</span>
+              </div>
+              <div class="bar">
+                <div class="col highlight" style="--h:78%"></div>
+                <span class="date">16/09</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sales__right">
+          <h3>Productos más vendidos del día</h3>
+          <ul class="list kv">
+            <li><b>Bocaditos Combo I</b><span>195.000 Gs</span></li>
+            <li><b>Bocaditos Combo II</b><span>120.000 Gs</span></li>
+            <li>Alfajores<span>105.000 Gs</span></li>
+            <li>Empanadas de carne<span>75.000 Gs</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Catering/Eventos próximos -->
+      <aside class="card upcoming">
+        <h3>Catering/Ev. próximos</h3>
+        <ul class="rows">
+          <li>
+            <b>María López</b>
+            <span class="status ok">Confirmado</span>
+          </li>
+          <li>
+            <span>Cumplea SanLio</span>
+            <span class="status warn">Pendiente</span>
+          </li>
+          <li>
+            <b>Juan Gómez</b>
+            <span class="status warn">Pendiente</span>
+          </li>
+        </ul>
+      </aside>
+
+      <!-- Placeholder de otro widget -->
+      <section class="card placeholder"></section>
+    </main>
+  </div>
+</body>
+</html>

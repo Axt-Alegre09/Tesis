@@ -1,0 +1,158 @@
+:root{
+  /* misma paleta que “Pendientes” */
+  --brown-900:#3c2e1a;
+  --brown-700:#7a623c;
+  --cream-50:#fbf8f3;
+  --cream-100:#f2eadf;
+  --gray-bg:#e9edf1;
+  --ok:#34a853;
+  --warn:#d8a033;
+
+  --radius:22px;
+  --shadow-deep:0 25px 40px rgba(0,0,0,.15);
+  --shadow-card:0 8px 15px rgba(0,0,0,.10);
+}
+
+/* ====== BASE / WRAPPER ====== */
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:Poppins,system-ui,Segoe UI,Roboto,Arial,sans-serif;
+  background:#a98a58;                    /* marco marrón */
+}
+.wrapper{
+  margin:18px;
+  background:var(--gray-bg);
+  border-radius:20px;
+  box-shadow: inset 0 0 0 2px rgba(0,0,0,.08), var(--shadow-deep);
+  padding:25px;
+  min-height:calc(100vh - 36px);         /* gris hasta abajo */
+  display:flex; flex-direction:column;
+}
+
+/* ====== HEADER ====== */
+.topbar{
+  display:flex; align-items:center; justify-content:center;
+  position:relative;
+}
+.back{
+  position:absolute; left:0;
+  width:38px; height:38px; border-radius:999px;
+  border:2px solid var(--brown-900);
+  background:var(--cream-100);
+  cursor:pointer; font-size:20px;
+}
+h1{
+  margin:0; font-weight:800; font-size:36px; color:var(--brown-900);
+}
+.fecha{
+  text-align:center; margin:8px 0 20px; font-weight:700; color:#333;
+}
+
+/* ====== LAYOUT ====== */
+.layout-3{
+  display:grid;
+  grid-template-columns: 1.2fr 0.9fr 0.9fr; /* calendario más ancho */
+  gap:22px;
+  align-items:start;
+}
+@media (max-width: 1150px){
+  .layout-3{ grid-template-columns: 1fr 1fr; }
+  .calendar{ grid-column: 1 / -1; }
+}
+@media (max-width: 760px){
+  .layout-3{ grid-template-columns: 1fr; }
+}
+
+/* ====== CARD BASE ====== */
+.card{
+  background:#fff;
+  border-radius:26px;
+  border:2px solid var(--brown-900);
+  box-shadow:var(--shadow-card);
+  padding:14px;
+}
+
+/* ====== CALENDARIO ====== */
+.calendar{ padding:14px 16px }
+.calendar__header{
+  display:flex; align-items:center; justify-content:space-between;
+  background:var(--cream-100);
+  border:2px solid var(--brown-900);
+  border-radius:14px;
+  padding:8px 12px; margin-bottom:12px;
+}
+.month-nav{display:flex; align-items:center; gap:12px}
+.month-title{margin:0; font-weight:800; color:var(--brown-900)}
+.icon-btn{
+  width:36px; height:36px; border-radius:999px;
+  border:2px solid var(--brown-900); background:#fff; cursor:pointer;
+}
+.icon-btn:hover{background:var(--cream-50)}
+.flag{font-size:24px}
+
+.calendar__table{
+  display:grid;
+  grid-template-columns: 64px repeat(7, 1fr);
+  grid-auto-rows: 108px;
+  border:2px solid var(--brown-900);
+  border-radius:14px; overflow:hidden;
+  background:#fff;
+}
+.head,.wcol{
+  background:#e7dece;
+  border-right:2px solid var(--brown-900);
+  border-bottom:2px solid var(--brown-900);
+  display:grid; place-items:center;
+  font-weight:700; color:var(--brown-900);
+}
+.wcol{font-variant-numeric:tabular-nums}
+.day{
+  position:relative; padding:10px 8px 8px;
+  border-right:2px solid var(--brown-900);
+  border-bottom:2px solid var(--brown-900);
+  background:#fff;
+}
+.muted{background:#fafafa}
+.weekend{background:#f1f1f1}
+.num{position:absolute; top:8px; left:10px; font-weight:700; color:#333}
+
+/* Chips */
+.chip{
+  display:inline-block; margin-top:8px; padding:5px 10px;
+  border-radius:999px; font-size:12px; font-weight:600;
+  background:var(--brown-700); color:#fff; border:2px solid var(--brown-900);
+}
+
+/* ====== FORMULARIOS ====== */
+.form-card{ padding:14px 16px 16px; display:flex; flex-direction:column; }
+.card__title{
+  margin:4px 0 12px; text-align:center; font-weight:800; color:var(--brown-900);
+  background:var(--cream-100); border:2px solid var(--brown-900);
+  padding:8px 12px; border-radius:14px;
+}
+.form{ display:flex; flex-direction:column; gap:10px; }
+.form-grid{
+  display:grid; grid-template-columns: 1fr 1fr; gap:12px;
+}
+@media (max-width: 760px){ .form-grid{ grid-template-columns:1fr; } }
+label{ display:flex; flex-direction:column; gap:6px; font-size:13px; font-weight:600; color:#3b3b3b }
+input{
+  height:40px; border-radius:12px; border:2px solid var(--brown-900);
+  background:var(--cream-100); padding:0 12px; outline:none; font-size:14px;
+}
+input::placeholder{ color:#8a8a8a }
+
+/* Botones (estilo “Pendientes”) */
+.acciones{
+  margin-top:8px; display:flex; justify-content:center; gap:12px; flex-wrap:wrap;
+}
+.btn{
+  border:2px solid var(--brown-900);
+  border-radius:999px; padding:8px 16px; font-weight:700; font-size:13px; cursor:pointer;
+}
+.btn.brown{ background:var(--cream-100); color:var(--brown-900) }
+.btn.green{ background:var(--ok); color:#fff }
+.btn.warn{  background:var(--warn); color:#212121 }
+.btn.primary{background:var(--brown-700); color:#fff}
+.btn:hover{ opacity:.92 }
