@@ -10,10 +10,25 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet" />
   <link rel="stylesheet" href="CSS/main.css" />
   <link rel="stylesheet" href="CSS/styleschat.css" />
+  <style>
+    /* Overlay de cierre de sesión */
+    #logoutOverlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(255,255,255,0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      color: #333;
+      z-index: 9999;
+    }
+    #logoutOverlay[hidden] { display: none; }
+  </style>
 </head>
 <body>
   <div class="wrapper has-topbar">
-    <!-- ASIDE -->
+    <!-- ASIDE (off-canvas en móvil) -->
     <aside id="mobileAside" aria-label="Menú lateral">
       <header class="aside-header">
         <h1 class="logo">
@@ -26,7 +41,7 @@
 
       <nav aria-label="Categorías">
         <ul class="menu" id="menuList">
-          <li><button id="todos" class="boton-menu boton-categoria active"><i class="bi bi-hand-index-fill"></i>   Todos los productos</button></li>
+          <li><button id="todos" class="boton-menu boton-categoria active"><i class="bi bi-hand-index-fill"></i> Todos los productos</button></li>
           <li><button id="bocaditos" class="boton-menu boton-categoria"><i class="bi bi-hand-index"></i> Bocaditos</button></li>
           <li><button id="confiteria" class="boton-menu boton-categoria"><i class="bi bi-hand-index"></i> Confitería</button></li>
           <li><button id="panificados" class="boton-menu boton-categoria"><i class="bi bi-hand-index"></i> Panificados</button></li>
@@ -62,17 +77,20 @@
             <span class="user-name">Cuenta</span>
             <i class="bi bi-chevron-down chevron"></i>
           </button>
+
+          <!-- Menú de cuenta -->
           <div class="user-dropdown" id="userDropdown" role="menu">
-            <a class="dropdown-item disabled" id="updateProfileLink" href="misdatos.html">
+            <button class="dropdown-item" id="updateProfileBtn" type="button">
               <i class="bi bi-gear"></i> Actualizar datos
-            </a>
-            <button class="dropdown-item disabled" id="logoutBtn" type="button">
+            </button>
+            <button class="dropdown-item" id="logoutBtn" type="button">
               <i class="bi bi-box-arrow-right"></i> Cerrar sesión
             </button>
           </div>
         </div>
       </div>
     </div>
+    <!-- FIN TOPBAR -->
 
     <main>
       <h2 id="titulo-principal" class="titulo-principal">Todos los productos</h2>
@@ -80,13 +98,23 @@
     </main>
   </div>
 
+  <!-- Backdrop global -->
   <div id="backdrop" class="backdrop" aria-hidden="true"></div>
 
-  <!-- Wire del menú (una sola vez) -->
+  <!-- Overlay de cierre de sesión -->
+  <div id="logoutOverlay" hidden>
+    <div class="spinner-border me-2" role="status"></div> Cerrando sesión…
+  </div>
+
+  <!-- Wire del menú -->
   <script type="module">
     import { logout, autoWireAuthMenu } from "./JS/ScriptLogin.js";
     autoWireAuthMenu();
-    document.getElementById("logoutBtn")?.addEventListener("click", logout);
+    document.getElementById("logoutBtn")?.addEventListener("click", async (e) => {
+      const overlay = document.getElementById("logoutOverlay");
+      overlay.hidden = false;
+      try { await logout(e); } finally { overlay.hidden = true; }
+    });
     document.getElementById('searchForm')?.addEventListener('submit', (e) => e.preventDefault());
   </script>
 
