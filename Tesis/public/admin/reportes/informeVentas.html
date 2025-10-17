@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Informe de Ventas</title>
+  <link rel="shortcut icon" href="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinosico.ico" type="image/x-icon">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/informeVentas.css" />
+</head>
+<body>
+  <div class="wrapper">
+    <header class="topbar">
+      <button class="back" aria-label="Volver" id="btn-back">←</button>
+      <h1>Informe de Ventas</h1>
+    </header>
+
+    <p class="fecha" id="lbl-rango">Últimos 14 días</p>
+
+    <main class="dashboard">
+      <section class="metrics">
+        <article class="card kpi">
+          <div class="kpi__icon" aria-hidden="true">🗂️</div>
+          <div class="kpi__title">Ventas Totales</div>
+          <div class="kpi__sub" id="kpi-ventas-sub">— ventas</div>
+          <div class="kpi__value" id="kpi-ventas-gs">—</div>
+          <div class="kpi__foot">
+            <span class="arrow">↑</span>
+            <span id="kpi-variacion">— %</span>
+            <span class="sep"></span>
+            <span>vs. periodo previo</span>
+          </div>
+        </article>
+
+        <article class="card kpi">
+          <div class="kpi__icon" aria-hidden="true">🎟️</div>
+          <div class="kpi__title">Ticket Promedio</div>
+          <div class="kpi__sub">&nbsp;</div>
+          <div class="kpi__value" id="kpi-ticket">—</div>
+          <div class="kpi__foot">
+            <span class="arrow">↑</span>
+            <span id="kpi-ticket-var">— %</span>
+          </div>
+        </article>
+      </section>
+
+      <aside class="side">
+        <article class="card widget">
+          <h3 class="widget__title">Top Productos</h3>
+          <div class="donut">
+            <div class="donut__ring"></div>
+            <div class="donut__center">
+              <strong id="donut-top-total">—</strong>
+            </div>
+          </div>
+          <ul class="list" id="donut-top-list">
+            <li>Cargando…</li>
+          </ul>
+        </article>
+
+        <article class="card widget">
+          <h3 class="widget__title">Ubicación de Clientes</h3>
+          <div class="donut">
+            <div class="donut__ring"></div>
+            <div class="donut__center">
+              <strong id="ubicacion-donut-total">—</strong>
+            </div>
+          </div>
+          <ul class="list" id="ubicacion-list">
+            <li>Sin datos (definir fuente de ciudad/barrio)</li>
+          </ul>
+        </article>
+      </aside>
+
+      <section class="card chart">
+        <header class="chart__bar">
+          <div class="spacer"></div>
+          <div class="actions">
+            <button class="btn brown" id="btn-export">Exportar datos</button>
+            <div class="select">
+              <select aria-label="Rango" id="sel-rango">
+                <option value="14" selected>Últimos 14 días</option>
+                <option value="30">Últimos 30 días</option>
+              </select>
+            </div>
+          </div>
+        </header>
+
+        <div class="chart__canvas" role="img" aria-label="Performance de ventas" id="chart-canvas">
+          <div class="legend">
+            <span class="dot"></span> Ventas
+            <span class="dot" style="background:#d08a00; margin-left:16px;"></span> Periodo previo
+          </div>
+          <div class="gridlines"><span></span><span></span><span></span><span></span><span></span></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module">
+    import {
+      getVentasPorDia,
+      fmtGs,
+      getTopProductos,
+      getClientesPorCiudad
+    } from "./js/reports-core.js";
+
+    const $ = (s) => document.querySelector(s);
+
+    const lblRango     = $("#lbl-rango");
+    const kpiVentasSub = $("#kpi-ventas-sub");
+    const kpiVentasGs  = $("#kpi-ventas-gs");
+    const kpiVar       = $("#kpi-variacion");
+    const kpiTicket    = $("#kpi-ticket");
+    const kpiTicketVar = $("#kpi-ticket-var");
+
+    const chartCanvas  = $("#chart-canvas");
+    const btnExport    = $("#btn-export");
+    const selRango     = $("#sel-rango");
+    $("#btn-back")?.addEventListener("click", ()=> history.back());
+
+    const nf = new Intl.NumberFormat("es-PY");
+    const fmtNum = n => nf.format(n || 0);
+
+    // ventana [hoy - offsetDays - (days-1) , hoy - offsetDays]
+    function filterRowsOffset(rows, days, offsetDays){
+      const today = new Date(); today.setHours(0,0,0,0);
+      const end   = new Date(today); end.setDate(end.getDate() - offsetDays);
+      const start = new Date(end);   start.setDate(start.getDate() - (days - 1));
+
+      const map = new Map(rows.map(r => [String(r.dia).slice(0,10), r]));
+      const out = [];
+      for(let d = new Date(start); d <= end; d.setDate(d.getDate()+1)){
+        const key = d.toISOString().slice(0,10);
+        const r = map.get(key);
+        out.push({ dia:key, pedidos:r?.pedidos||0, total_gs:r?.total_gs||0 });
+      }
+      return out;
+    }
+
+    // Suavizado ligero
+    function smooth(values, w=3){
+      if (values.length <= 2) return values;
+      const out = [];
+      for (let i=0;i<values.length;i++){
+        const a = Math.max(0, i - Math.floor(w/2));
+        const b = Math.min(values.length, i + Math.ceil(w/2));
+        const s = values.slice(a,b);
+        out.push(s.reduce((x,y)=>x+y,0)/s.length);
+      }
+      return out;
+    }
+
+    function polylineFrom(rows){
+      if (!rows?.length) return "";
+      const totals = rows.map(r=>r.total_gs||0);
+      const sm  = smooth(totals, 3);
+      const max = Math.max(...sm, 1);
+      const denom = Math.max(rows.length - 1, 1);
+      return sm.map((val, i) => {
+        const x = (i/denom) * 100;
+        const y = 40 - (val / max) * 36 - 2;
+        return `${x.toFixed(2)},${y.toFixed(2)}`;
+      }).join(" ");
+    }
+
+    function renderChart(currentRows, prevRows){
+      chartCanvas.querySelectorAll("svg").forEach(n => n.remove());
+
+      // periodo previo (debajo)
+      if (prevRows?.length) {
+        const svgPrev = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svgPrev.setAttribute("viewBox","0 0 100 40");
+        svgPrev.setAttribute("preserveAspectRatio","none");
+        svgPrev.classList.add("line","earnings");
+        const plPrev = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+        plPrev.setAttribute("fill","none");
+        plPrev.setAttribute("points", polylineFrom(prevRows));
+        plPrev.setAttribute("stroke", "#d08a00");
+        plPrev.setAttribute("stroke-width", "1.0");
+        plPrev.setAttribute("stroke-linejoin","round");
+        plPrev.setAttribute("stroke-linecap","round");
+        svgPrev.appendChild(plPrev);
+        chartCanvas.appendChild(svgPrev);
+      }
+
+      // periodo actual (encima)
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("viewBox","0 0 100 40");
+      svg.setAttribute("preserveAspectRatio","none");
+      svg.classList.add("line","earnings");
+      const pl = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+      pl.setAttribute("fill","none");
+      pl.setAttribute("points", polylineFrom(currentRows));
+      pl.setAttribute("stroke", "#000");
+      pl.setAttribute("stroke-width", "1.0");     // más fino
+      pl.setAttribute("stroke-linejoin","round");
+      pl.setAttribute("stroke-linecap","round");
+      svg.appendChild(pl);
+      chartCanvas.appendChild(svg);
+    }
+
+    function calcKPIs(rows, prevRows){
+      const tot  = rows.reduce((a,r)=>a+(r.total_gs||0),0);
+      const cnt  = rows.reduce((a,r)=>a+(r.pedidos||0),0);
+      const tkt  = cnt ? tot/cnt : 0;
+
+      const prevTot = prevRows.reduce((a,r)=>a+(r.total_gs||0),0);
+      const prevCnt = prevRows.reduce((a,r)=>a+(r.pedidos||0),0);
+      const prevTkt = prevCnt ? prevTot/prevCnt : 0;
+
+      const varTot = prevTot ? Math.round(((tot - prevTot)/prevTot)*100) : 100;
+      const varTkt = prevTkt ? Math.round(((tkt - prevTkt)/prevTkt)*100) : 100;
+
+      kpiVentasSub.textContent = `${fmtNum(cnt)} ventas`;
+      kpiVentasGs.textContent  = fmtGs(tot);
+      kpiVar.textContent       = (varTot>=0?"+":"") + varTot + " %";
+      kpiTicket.textContent    = fmtGs(tkt);
+      kpiTicketVar.textContent = (varTkt>=0?"+":"") + varTkt + " %";
+    }
+
+    function toCsv(rows){
+      const head = "dia,pedidos,total_gs";
+      const lines = rows.map(r => `${r.dia},${r.pedidos},${r.total_gs}`);
+      return [head, ...lines].join("\n");
+    }
+    function download(name, content, mime="text/csv;charset=utf-8"){
+      const blob = new Blob([content], { type:mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    async function fillTopProductosWidget() {
+      try {
+        const rows = await getTopProductos(5);
+        const ul = document.querySelector("#donut-top-list");
+        if (!rows.length) {
+          $("#donut-top-total").textContent = "—";
+          ul.innerHTML = `<li>No hay ventas en el período</li>`;
+          return;
+        }
+        const total = rows.reduce((a,r)=>a+(r.total_gs||0),0);
+        $("#donut-top-total").textContent = fmtGs(total);
+        ul.innerHTML = rows.map(r =>
+          `<li>${r.nombre ?? "—"} – ${fmtGs(r.total_gs || 0)}</li>`
+        ).join("");
+      } catch (e) {
+        console.error("Top Productos:", e);
+      }
+    }
+
+    async function fillUbicacionClientesWidget() {
+      try {
+        const rows = await getClientesPorCiudad(8); // top 8 ciudades
+        const total = rows.reduce((a, r) => a + (r.clientes || 0), 0);
+
+        $("#ubicacion-donut-total").textContent = total ? fmtNum(total) : "—";
+
+        const ul = $("#ubicacion-list");
+        if (!rows.length) {
+          ul.innerHTML = `<li>Sin datos (definir fuente de ciudad/barrio)</li>`;
+          return;
+        }
+        ul.innerHTML = rows
+          .map((r) => `<li>${r.ciudad} – ${fmtNum(r.clientes)} clientes</li>`)
+          .join("");
+      } catch (e) {
+        console.error("Ubicación de Clientes:", e);
+        $("#ubicacion-donut-total").textContent = "—";
+        $("#ubicacion-list").innerHTML = `<li>Sin datos (definir fuente de ciudad/barrio)</li>`;
+      }
+    }
+
+    async function main(days=14){
+      try{
+        lblRango.textContent = `Últimos ${days} días`;
+        const all  = await getVentasPorDia();
+
+        const cur  = filterRowsOffset(all, days, 0);
+        const prev = filterRowsOffset(all, days, days);
+
+        renderChart(cur, prev);
+        calcKPIs(cur, prev);
+
+        btnExport.onclick = () => download(`ventas_${days}d.csv`, toCsv(cur));
+
+        await fillTopProductosWidget();
+        await fillUbicacionClientesWidget();
+      }catch(err){
+        alert("Error cargando Informe de Ventas: " + (err?.message || err));
+        console.error(err);
+      }
+    }
+
+    selRango.addEventListener("change", e => {
+      const d = parseInt(e.target.value, 10) || 14;
+      main(d);
+    });
+
+    main(14);
+  </script>
+</body>
+</html>

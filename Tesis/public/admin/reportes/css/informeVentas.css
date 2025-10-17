@@ -1,5 +1,4 @@
 :root{
-  /* Paleta y tokens compartidos con las otras plantillas */
   --brown-900:#3c2e1a;
   --brown-700:#7a623c;
   --cream-50:#fbf8f3;
@@ -18,7 +17,7 @@
 body{
   margin:0;
   font-family:Poppins,system-ui,Segoe UI,Roboto,Arial,sans-serif;
-  background:#a98a58;                        /* marco marrón */
+  background:#a98a58;
 }
 .wrapper{
   margin:18px;
@@ -31,9 +30,7 @@ body{
 }
 
 /* ===== Header ===== */
-.topbar{
-  display:flex; align-items:center; justify-content:center; position:relative;
-}
+.topbar{ display:flex; align-items:center; justify-content:center; position:relative; }
 .back{
   position:absolute; left:0;
   width:38px; height:38px; border-radius:999px;
@@ -46,7 +43,7 @@ h1{margin:0; font-weight:800; font-size:36px; color:var(--brown-900)}
 /* ===== Layout ===== */
 .dashboard{
   display:grid;
-  grid-template-columns: 1.4fr 1fr;   /* izquierda: KPIs + chart, derecha: widgets */
+  grid-template-columns: 1.4fr 1fr;
   grid-template-areas:
     "kpis side"
     "chart side";
@@ -77,7 +74,7 @@ h1{margin:0; font-weight:800; font-size:36px; color:var(--brown-900)}
 
 .kpi{
   padding:18px 18px 14px;
-  background:#6f5c38;            /* bloque café */
+  background:#6f5c38;
   color:#fff;
   border-color:var(--brown-900);
   border-radius:26px;
@@ -85,14 +82,8 @@ h1{margin:0; font-weight:800; font-size:36px; color:var(--brown-900)}
 .kpi__icon{ font-size:26px; margin-bottom:4px }
 .kpi__title{ font-weight:800; font-size:22px; line-height:1.2 }
 .kpi__sub{ font-size:11px; opacity:.9; margin-top:4px }
-.kpi__value{
-  margin-top:10px;
-  font-weight:800;
-  font-size:28px;
-}
-.kpi__foot{
-  margin-top:8px; display:flex; align-items:center; gap:10px; font-weight:600;
-}
+.kpi__value{ margin-top:10px; font-weight:800; font-size:28px; }
+.kpi__foot{ margin-top:8px; display:flex; align-items:center; gap:10px; font-weight:600; }
 .kpi__foot .arrow{ font-size:18px }
 .kpi__foot .sep{ flex:1 }
 
@@ -118,19 +109,17 @@ h1{margin:0; font-weight:800; font-size:36px; color:var(--brown-900)}
   display:grid; place-items:center;
 }
 .donut__ring{
-  width:120px; height:120px;
-  border-radius:50%;
+  width:120px; height:120px; border-radius:50%;
   background:
     radial-gradient(#fff 58%, transparent 60%),
     conic-gradient(#000 0 260deg, #ddd 260deg 360deg);
   border:2px solid var(--brown-900);
 }
-.donut__center{
-  position:absolute; text-align:center; font-weight:800; color:#222;
-}
+.donut__center{ position:absolute; text-align:center; font-weight:800; color:#222; }
 
-/* Listas */
-.list{ list-style:none; margin:8px 0 0; padding:0; color:#fff; font-weight:700 }
+/* Listas (oscuro para fondo blanco del widget) */
+.widget .list, .widget .list li, .donut__center strong { color:#3c2e1a; font-weight:700; }
+.list{ list-style:none; margin:8px 0 0; padding:0 }
 .list li{ margin:4px 0 }
 
 /* ===== Chart ===== */
@@ -147,41 +136,25 @@ h1{margin:0; font-weight:800; font-size:36px; color:var(--brown-900)}
   height:36px; border-radius:999px; padding:0 12px;
   border:2px solid var(--brown-900); background:#fff; font-weight:700;
 }
-.btn{
-  border:2px solid var(--brown-900);
-  border-radius:999px; padding:8px 16px; font-weight:700; cursor:pointer;
-}
+.btn{ border:2px solid var(--brown-900); border-radius:999px; padding:8px 16px; font-weight:700; cursor:pointer; }
 .btn.brown{ background:var(--cream-100); color:var(--brown-900) }
 
-/* Lienzo del gráfico (placeholder) */
 .chart__canvas{
-  position:relative;
-  height: 420px;
+  position:relative; height:420px;
   border:2px solid var(--brown-900);
-  border-radius:14px;
-  background:#fff;
-  overflow:hidden;
+  border-radius:14px; background:#fff; overflow:hidden;
 }
-.legend{
-  position:absolute; top:10px; left:12px; display:flex; gap:14px; font-weight:700;
-}
+.legend{ position:absolute; top:10px; left:12px; display:flex; gap:14px; font-weight:700; }
 .dot{ width:10px; height:10px; border-radius:50%; background:#000; display:inline-block }
-.dot.hollow{ background:transparent; border:2px solid #000; width:10px; height:10px; border-radius:50% }
 
-.gridlines{
-  position:absolute; inset:0; display:grid; grid-template-rows:repeat(5,1fr);
-}
-.gridlines span{
-  border-top:1px solid #eee;
-}
+/* Grid de fondo */
+.gridlines{ position:absolute; inset:0; display:grid; grid-template-rows:repeat(5,1fr); }
+.gridlines span{ border-top:1px solid #eee; }
 
-/* Líneas del chart en SVG (decorativas) */
-.line{
-  position:absolute; inset:0; width:100%; height:100%;
-}
-.line polyline{
-  stroke:#000; stroke-width:1.8; fill:none;
-}
-.line.costs polyline{
-  stroke:#777; stroke-dasharray:2.5 2.5;
-}
+/* Líneas del chart (control por clase, NO forzar grosor aquí) */
+.line{ position:absolute; inset:0; width:100%; height:100%; }
+.line polyline{ fill:none; }
+
+/* Series */
+.current-line polyline { stroke:#000;    stroke-width:1; }
+.prev-line    polyline { stroke:#d08a00; stroke-width:1; stroke-linejoin:round; stroke-linecap:round; }

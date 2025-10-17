@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Productos más vendidos</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="shortcut icon" href="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinosico.ico" type="image/x-icon">
+
+  <!-- tu CSS (minúsculas) -->
+  <link rel="stylesheet" href="reportes/css/topProductos.css" />
+
+  <!-- core (minúsculas) -->
+  <script type="module" src="reportes/js/reports-core.js"></script>
+</head>
+<body>
+  <div class="wrapper">
+    <header class="topbar">
+      <button class="back" aria-label="Volver" id="btn-back">←</button>
+      <h1>Productos más vendidos</h1>
+    </header>
+
+    <section class="metrics">
+      <article class="card kpi">
+        <div class="kpi__title">Total ventas</div>
+        <div class="kpi__value" id="kpi-total">—</div>
+        <div class="kpi__sub">Últimos 30 días</div>
+      </article>
+      <article class="card kpi">
+        <div class="kpi__title">Unidades</div>
+        <div class="kpi__value" id="kpi-unidades">—</div>
+        <div class="kpi__sub">Top 10</div>
+      </article>
+      <article class="card kpi">
+        <div class="kpi__title">Ticket prom.</div>
+        <div class="kpi__value" id="kpi-ticket">—</div>
+        <div class="kpi__sub">Ingreso / unidad (Top 10)</div>
+      </article>
+    </section>
+
+    <main class="dashboard">
+      <section class="card rank">
+        <header class="rank__bar">
+          <h3>Top 10 productos</h3>
+          <div class="actions">
+            <button class="btn brown" id="btn-export">Exportar CSV</button>
+            <div class="select">
+              <select aria-label="Rango" id="sel-rango">
+                <option selected>Últimos 30 días</option>
+                <option disabled>Últimos 14 días</option>
+                <option disabled>Este mes</option>
+                <option disabled>Último mes</option>
+              </select>
+            </div>
+          </div>
+        </header>
+
+        <div class="rank__chart">
+          <ul class="bars" id="bars-list"></ul>
+        </div>
+      </section>
+
+      <aside class="side">
+        <article class="card table">
+          <h3 class="table__title">Detalle top</h3>
+          <div class="table__wrap" role="table" aria-label="Top productos">
+            <div class="thead" role="row">
+              <span>#</span><span>Producto</span><span>Unid.</span><span>Ingreso</span>
+            </div>
+            <div class="tbody" role="rowgroup" id="table-body"></div>
+          </div>
+        </article>
+
+        <article class="card donut-card">
+          <h3 class="donut__title">Ventas por categoría</h3>
+          <div class="donut">
+            <div class="donut__ring"></div>
+            <div class="donut__center">
+              <strong>—</strong>
+              <small>categorías</small>
+            </div>
+          </div>
+          <ul class="legend">
+            <li><span class="swatch a"></span>Bocaditos</li>
+            <li><span class="swatch b"></span>Confitería</li>
+            <li><span class="swatch c"></span>Panificados</li>
+            <li><span class="swatch d"></span>Rosticería</li>
+          </ul>
+        </article>
+      </aside>
+    </main>
+  </div>
+
+  <script type="module">
+    import { getTopProductos, fmtGs } from "./reportes/js/reports-core.js";
+
+    const $ = (s) => document.querySelector(s);
+    const barsList  = $("#bars-list");
+    const tableBody = $("#table-body");
+    const kpiTotal   = $("#kpi-total");
+    const kpiUnidades= $("#kpi-unidades");
+    const kpiTicket  = $("#kpi-ticket");
+    const btnExport  = $("#btn-export");
+    const btnBack    = $("#btn-back");
+
+    btnBack?.addEventListener("click", () => history.back());
+
+    function toCsv(rows) {
+      const head = ["rank","producto","unidades","total_gs"];
+      const lines = rows.map((r,i)=>[i+1,(r.nombre??"").replaceAll('"','""'),r.cantidad_vendida??0,r.total_gs??0]);
+      return [head.join(","), ...lines.map(a=>a.map(v=>typeof v==="string" ? `"${v}"` : v).join(","))].join("\n");
+    }
+    function download(name, content, mime="text/csv;charset=utf-8"){
+      const blob = new Blob([content], { type:mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a"); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    }
+    btnExport?.addEventListener("click", ()=>{
+      if(!window.__topRows?.length) return alert("No hay datos para exportar.");
+      download("top_productos_30d.csv", toCsv(window.__topRows));
+    });
+
+    function renderBars(rows){
+      barsList.innerHTML = "";
+      if(!rows.length) return;
+      const maxQty = Math.max(...rows.map(r=>r.cantidad_vendida||0)) || 1;
+      rows.forEach(r=>{
+        const pct = Math.round(((r.cantidad_vendida||0)/maxQty)*100);
+        const li = document.createElement("li");
+        li.innerHTML = `
+          <span class="label">${r.nombre ?? "—"}</span>
+          <span class="bar" style="--w:${pct}%"></span>
+          <span class="val">${new Intl.NumberFormat("es-PY").format(r.cantidad_vendida || 0)}</span>
+        `;
+        barsList.appendChild(li);
+      });
+    }
+    function renderTable(rows){
+      tableBody.innerHTML = "";
+      rows.forEach((r,i)=>{
+        const row = document.createElement("div");
+        row.className="tr"; row.setAttribute("role","row");
+        row.innerHTML = `
+          <span>${i+1}</span>
+          <span>${r.nombre ?? "—"}</span>
+          <span>${new Intl.NumberFormat("es-PY").format(r.cantidad_vendida || 0)}</span>
+          <span>${fmtGs(r.total_gs || 0)}</span>
+        `;
+        tableBody.appendChild(row);
+      });
+    }
+    function renderKpis(rows){
+      const totalGs = rows.reduce((a,r)=>a+(r.total_gs||0),0);
+      const unid    = rows.reduce((a,r)=>a+(r.cantidad_vendida||0),0);
+      const ticket  = unid ? totalGs/unid : 0;
+      kpiTotal.textContent    = fmtGs(totalGs);
+      kpiUnidades.textContent = new Intl.NumberFormat("es-PY").format(unid);
+      kpiTicket.textContent   = fmtGs(ticket);
+    }
+    async function main(){
+      try{
+        const rows = await getTopProductos(10);
+        window.__topRows = rows;
+        renderKpis(rows);
+        renderBars(rows);
+        renderTable(rows);
+      }catch(err){
+        alert("Error cargando Top productos: " + (err?.message || err));
+        console.error(err);
+      }
+    }
+    main();
+  </script>
+</body>
+</html>

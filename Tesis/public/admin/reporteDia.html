@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Reporte del día</title>
+  <link rel="shortcut icon" href="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinosico.ico" type="image/x-icon">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800&display=swap" rel="stylesheet" />
+  <!-- RUTA CORRECTA a tu css -->
+  <link rel="stylesheet" href="reportes/css/reporteDia.css" />
+</head>
+<body>
+  <div class="wrapper">
+    <!-- Encabezado -->
+    <header class="topbar">
+      <button class="back" aria-label="Volver" id="btn-back">←</button>
+      <h1>Reporte del día</h1>
+    </header>
+
+    <!-- KPIs (ahora con IDs para rellenar) -->
+    <section class="kpis">
+      <article class="kpi card">
+        <div class="kpi__icon">▦</div>
+        <div class="kpi__title">Pedidos totales</div>
+        <div class="kpi__value" id="kpi-pedidos">—</div>
+      </article>
+
+      <article class="kpi card">
+        <div class="kpi__icon">🪙</div>
+        <div class="kpi__title">Ventas totales</div>
+        <div class="kpi__value" id="kpi-ventas">—</div>
+      </article>
+
+      <article class="kpi card">
+        <div class="kpi__icon">✓</div>
+        <div class="kpi__title">Pedidos entregados</div>
+        <div class="kpi__value" id="kpi-entregados">—</div>
+      </article>
+
+      <article class="kpi card">
+        <div class="kpi__icon">⚠️</div>
+        <div class="kpi__title">Pedidos pendientes</div>
+        <div class="kpi__value" id="kpi-pendientes">—</div>
+      </article>
+
+      <article class="kpi card">
+        <div class="kpi__icon">!</div>
+        <div class="kpi__title">Pagos pendientes</div>
+        <div class="kpi__value" id="kpi-pagos">—</div>
+      </article>
+    </section>
+
+    <!-- Contenido -->
+    <main class="grid">
+      <!-- Ventas del día + Productos más vendidos -->
+      <section class="card sales">
+        <div class="sales__left">
+          <h3>Ventas del día</h3>
+          <div class="trend">
+            <span class="up" id="trend-var">—</span>
+          </div>
+
+          <!-- Barras de ayer vs hoy (mantengo tu markup) -->
+          <div class="bar-chart">
+            <div class="bars">
+              <div class="bar">
+                <div class="col" id="bar-ayer" style="--h:42%"></div>
+                <span class="date" id="lbl-ayer">—</span>
+              </div>
+              <div class="bar">
+                <div class="col highlight" id="bar-hoy" style="--h:78%"></div>
+                <span class="date" id="lbl-hoy">—</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sales__right">
+          <h3>Productos más vendidos del día</h3>
+          <ul class="list kv" id="lista-top-hoy">
+            <!-- Se llena por JS -->
+          </ul>
+        </div>
+      </section>
+
+      <!-- Catering/Eventos próximos (lo dejo igual; si tenés una tabla, lo conectamos luego) -->
+      <aside class="card upcoming">
+        <h3>Catering/Ev. próximos</h3>
+        <ul class="rows" id="catering-prox">
+          <li><b>María López</b><span class="status ok">Confirmado</span></li>
+          <li><span>Cumplea SanLio</span><span class="status warn">Pendiente</span></li>
+          <li><b>Juan Gómez</b><span class="status warn">Pendiente</span></li>
+        </ul>
+      </aside>
+
+      <!-- Placeholder de otro widget -->
+      <section class="card placeholder"></section>
+    </main>
+  </div>
+
+  <!-- LÓGICA: usa tu reports-core.js y NO toca estilos -->
+  <script type="module">
+    import { supa, fmtGs, getResumenHoy, getVentasPorDia, getTopProductosHoy } from "./reportes/js/reports-core.js";
+
+    const $ = (s) => document.querySelector(s);
+
+    const elPedidos    = $("#kpi-pedidos");
+    const elVentas     = $("#kpi-ventas");
+    const elEntregados = $("#kpi-entregados");
+    const elPendientes = $("#kpi-pendientes");
+    const elPagos      = $("#kpi-pagos");
+
+    const elVar        = $("#trend-var");
+    const barAyer      = $("#bar-ayer");
+    const barHoy       = $("#bar-hoy");
+    const lblAyer      = $("#lbl-ayer");
+    const lblHoy       = $("#lbl-hoy");
+
+    const ulTopHoy     = $("#lista-top-hoy");
+
+    $("#btn-back")?.addEventListener("click", ()=> history.back());
+
+    // helpers de fecha (rango día local -> UTC ISO para filtros por created_at)
+    function dayRange(date = new Date()) {
+      const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      const end   = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
+      return { start: start.toISOString(), end: end.toISOString() };
+    }
+    function fmtNum(n){ return new Intl.NumberFormat("es-PY").format(n || 0); }
+
+      async function cargarKPIs() {
+        // 1) Total y ticket del día desde la vista
+        const r = await getResumenHoy();
+        elVentas.textContent  = fmtGs(r.total_hoy || 0);
+        elPedidos.textContent = fmtNum(r.pedidos_hoy || 0);
+
+        // 2) Contadores de estado y pagos con UNA sola query
+        const { start, end } = dayRange();
+        const { data: pedidosHoy, error } = await supa
+          .from("pedidos")
+          .select("id,estado,estado_pago")
+          .gte("creado_en", start)
+          .lt("creado_en", end);
+
+        if (error) throw error;
+
+        // Ajusta los valores según tus enums reales si difieren
+        const ENTREGADOS = new Set(["entregado", "completado"]);
+        const PENDIENTES = new Set(["pendiente", "preparando", "confirmado"]);
+
+        const entregados = pedidosHoy.filter(p => ENTREGADOS.has(p.estado)).length;
+        const pendientes = pedidosHoy.filter(p => PENDIENTES.has(p.estado)).length;
+        const pagosPend  = pedidosHoy.filter(p => p.estado_pago !== "pagado").length;
+
+        elEntregados.textContent = fmtNum(entregados);
+        elPendientes.textContent = fmtNum(pendientes);
+        elPagos.textContent      = fmtNum(pagosPend);
+      }
+
+
+    async function cargarBarrasHoyVsAyer() {
+      const rows = await getVentasPorDia(); // trae últimos 60 días
+      const today  = new Date();
+      const yday   = new Date(); yday.setDate(today.getDate()-1);
+
+      const yyyyMmDd = (d)=> d.toISOString().slice(0,10);
+      const mmmdd = (d)=> d.toLocaleDateString("es-PY", { day:"2-digit", month:"2-digit" });
+
+      const map = new Map(rows.map(r => [String(r.dia).slice(0,10), r.total_gs || 0]));
+      const totHoy  = map.get(yyyyMmDd(today)) || 0;
+      const totAyer = map.get(yyyyMmDd(yday))  || 0;
+
+      // labels
+      lblHoy.textContent  = mmmdd(today);
+      lblAyer.textContent = mmmdd(yday);
+
+      // altura relativa (0..100)
+      const max = Math.max(totHoy, totAyer, 1);
+      barHoy.style.setProperty("--h", Math.round((totHoy / max) * 100) + "%");
+      barAyer.style.setProperty("--h", Math.round((totAyer / max) * 100) + "%");
+
+      // variación
+      const varPct = !totAyer ? 100 : Math.round(((totHoy - totAyer) / totAyer) * 100);
+      elVar.textContent = (varPct >= 0 ? "+" : "") + varPct + " %";
+    }
+
+    async function cargarTopHoy() {
+      const top = await getTopProductosHoy(5);
+      ulTopHoy.innerHTML = top.map(r =>
+        `<li><b>${r.nombre ?? "—"}</b><span>${fmtGs(r.total_gs || 0)}</span></li>`
+      ).join("");
+    }
+
+    (async () => {
+      try {
+        await Promise.all([
+          cargarKPIs(),
+          cargarBarrasHoyVsAyer(),
+          cargarTopHoy(),
+        ]);
+      } catch (err) {
+        alert("Error cargando el reporte: " + (err?.message || err));
+        console.error(err);
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Paniquiños — Acceso Administrativo</title>
+
+  <link rel="shortcut icon" href="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinosico.ico" type="image/x-icon"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet"/>
+
+  <link rel="stylesheet" href="CSS/loginAdmin.css">
+  <style>@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800&display=swap');</style>
+</head>
+<body>
+  <!-- Volver al login normal -->
+  <a class="go-back" href="login.html" aria-label="Volver al login de clientes">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+
+  <div class="wrapper">
+    <div class="card">
+      <header class="card__head">
+        <h1>Acceso</h1>
+        <h2>Administrativo</h2>
+      </header>
+
+      <form class="form" id="adminLoginForm" novalidate>
+        <div class="field">
+          <input type="email" id="adminEmail" placeholder="Correo" required autocomplete="email"/>
+          <i class="bi bi-person-fill"></i>
+        </div>
+
+        <div class="field">
+          <input type="password" id="adminPassword" placeholder="Contraseña" required autocomplete="current-password"/>
+          <i class="bi bi-lock-fill"></i>
+        </div>
+
+        <div class="helper">
+          <a href="#" class="forgot">¿Olvidaste tu contraseña?</a>
+        </div>
+
+        <button type="submit" class="btn-primary">Ingresar</button>
+      </form>
+    </div>
+  </div>
+
+  <script type="module" src="JS/loginAdmin.js"></script>
+</body>
+</html>

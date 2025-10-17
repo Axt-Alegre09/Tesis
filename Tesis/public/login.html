@@ -8,15 +8,38 @@
   <link rel="shortcut icon" href="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinosico.ico" type="image/x-icon" />
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet" />
-
   <link rel="stylesheet" href="CSS/stylesPrueba.css"/>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Devonshire&family=Poppins:wght@100;200;300;400;500;600;700;800;900&display=swap');
+
+    /* Botón flotante ADMIN */
+    .admin-entry{
+      position: fixed; right: 22px; top: 18px; z-index: 50;
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      width: 56px; height: 56px; border-radius: 999px;
+      border: 2px solid #3c2e1a; background: #fff; color: #3c2e1a;
+      text-decoration: none; font-weight: 800;
+      box-shadow: 0 12px 28px rgba(0,0,0,.18);
+      transition: transform .15s ease, background .15s ease;
+    }
+    .admin-entry .icon{ font-size: 22px; line-height: 0; }
+    .admin-entry small{ font-size: 10px; letter-spacing: .3px; margin-top: -2px; }
+    .admin-entry:hover{ background: #f2eadf; transform: translateY(-1px); }
+    @media (max-width: 480px){
+      .admin-entry{ width: 50px; height: 50px; right: 14px; top: 12px; }
+      .admin-entry .icon{ font-size: 20px; }
+    }
   </style>
 </head>
 <body>
-  <!-- Contenedor de alertas (necesario para showMsg) -->
+  <!-- Contenedor de alertas -->
   <div id="msg" aria-live="polite" role="region"></div>
+
+  <!-- Acceso rápido a login de Administrador -->
+  <a class="admin-entry" href="loginAdmin.html" aria-label="Acceso de administrador">
+    <span class="icon"><i class="bi bi-person-gear"></i></span>
+    <small>ADMIN</small>
+  </a>
 
   <div class="wrapper" id="authWrapper">
     <!-- Login -->
@@ -76,7 +99,7 @@
     </div>
   </div>
 
-  <!-- Lógica (un solo archivo) -->
+  <!-- Lógica -->
   <script type="module" src="JS/ScriptLogin.js"></script>
 </body>
 </html>
