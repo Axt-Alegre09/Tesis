@@ -9,10 +9,10 @@
   <link rel="shortcut icon" href="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinosico.ico" type="image/x-icon">
 
   <!-- tu CSS (minúsculas) -->
-  <link rel="stylesheet" href="reportes/css/topProductos.css" />
+  <link rel="stylesheet" href="css/topProductos.css" />
 
   <!-- core (minúsculas) -->
-  <script type="module" src="reportes/js/reports-core.js"></script>
+  <script type="module" src="js/reports-core.js"></script>
 </head>
 <body>
   <div class="wrapper">
@@ -93,7 +93,7 @@
   </div>
 
   <script type="module">
-    import { getTopProductos, fmtGs } from "./reportes/js/reports-core.js";
+    import { getTopProductos, fmtGs } from "./js/reports-core.js";
 
     const $ = (s) => document.querySelector(s);
     const barsList  = $("#bars-list");

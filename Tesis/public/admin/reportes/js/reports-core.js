@@ -87,3 +87,62 @@ export async function getClientesPorCiudad(limit = 10) {
 
   return (limit && limit > 0) ? arr.slice(0, limit) : arr;
 }
+
+
+/* ===== Helper local: rango de HOY en ISO UTC ===== */
+function _todayRangeISO() {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const end   = new Date(start); end.setDate(end.getDate() + 1);
+  return { start: start.toISOString(), end: end.toISOString() };
+}
+
+/* ===== Top Productos de HOY (agregado en front) =====
+   Lee los pedidos de hoy con sus detalles y productos, y agrega en el cliente.
+   Devuelve: [{ nombre, cantidad_vendida, total_gs }, ...] ordenado desc. */
+export async function getTopProductosHoy(limit = 5) {
+  const { start, end } = _todayRangeISO();
+
+  // Traemos SOLO los pedidos de hoy y anidamos sus detalles + producto
+  const { data, error } = await supa
+    .from("pedidos")
+    .select(`
+      id,
+      creado_en,
+      detalles_pedido (
+        cantidad,
+        precio_unitario,
+        productos (
+          id,
+          nombre
+        )
+      )
+    `)
+    .gte("creado_en", start)
+    .lt("creado_en", end);
+
+  if (error) throw error;
+
+  // Agregación en el front
+  const acc = new Map();
+  (data || []).forEach(ped => {
+    (ped.detalles_pedido || []).forEach(det => {
+      const idProd   = det?.productos?.id ?? null;
+      const nombre   = det?.productos?.nombre ?? "(sin nombre)";
+      const qty      = Number(det?.cantidad ?? 0);
+      const unitGs   = Number(det?.precio_unitario ?? 0);
+      const total    = qty * unitGs;
+
+      if (!idProd) return;
+      const prev = acc.get(idProd) || { nombre, cantidad_vendida: 0, total_gs: 0 };
+      prev.cantidad_vendida += qty;
+      prev.total_gs         += total;
+      prev.nombre            = nombre; // por si viene mejorado en otra fila
+      acc.set(idProd, prev);
+    });
+  });
+
+  const rows = [...acc.values()].sort((a, b) => b.total_gs - a.total_gs);
+  return (limit && limit > 0) ? rows.slice(0, limit) : rows;
+}
+
