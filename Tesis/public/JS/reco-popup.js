@@ -212,3 +212,8 @@ async function boot() {
 }
 
 document.addEventListener("DOMContentLoaded", boot);
+
+// DEBUG: Exponer a consola manualmente (solo para pruebas)
+window.supabase = supabase;
+window.__testReco = { loadRecommendations, tryRpcRecomendaciones };
+
