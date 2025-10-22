@@ -10,6 +10,7 @@ const STORAGE_BASE = "https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object
 // Formateo Gs PY
 const fmtGs = (n) => new Intl.NumberFormat("es-PY").format(Number(n || 0)) + " Gs";
 
+/* ============== Helpers modal ============== */
 function openReco() {
   const overlay = document.getElementById(OVERLAY_ID);
   if (overlay) overlay.hidden = false;
@@ -19,12 +20,16 @@ function closeReco() {
   if (overlay) overlay.hidden = true;
 }
 
+/* ============== Render ============== */
 function cardHTML(p) {
   const id = p.id ?? p.producto_id ?? p.slug ?? "";
   const nombre = p.nombre ?? p.titulo ?? "Producto";
   const precio = p.precio ?? p.price ?? 0;
+
   const imgPath = p.imagen_url || p.url_imagen || p.img || p.imagen || p.image_path || "";
-  const img = imgPath?.startsWith("http") ? imgPath : (imgPath ? (STORAGE_BASE + imgPath) : IMG_FALLBACK);
+  const img = imgPath?.startsWith?.("http")
+    ? imgPath
+    : (imgPath ? (STORAGE_BASE + imgPath) : IMG_FALLBACK);
 
   return `
     <article class="reco-card" data-id="${id}">
@@ -53,16 +58,20 @@ function renderList(items = []) {
   list.innerHTML = items.map(cardHTML).join("");
 }
 
-// RPC recomendaciones (ajuste exacto a tus parámetros reales)
+/* ============== Data: RPC + fallback ============== */
+
+// RPC recomendaciones (usa schema explícito para evitar 404 por ambigüedad)
 async function tryRpcRecomendaciones(userId, limit = 8) {
   const { data, error } = await supabase.rpc(
-   "reco_para_usuario",
-   { p_usuario: userId, p_limite: limit }
+    "public.reco_para_usuario",
+    { p_usuario: userId, p_limite: limit }
   );
-  if (!error && data?.length) return { data };
-  return { data: [], error: error ?? new Error("Sin resultados de RPC") };
+  if (error) {
+    console.warn("[reco-popup] RPC error:", error);
+    return { data: [], error };
+  }
+  return { data: data || [], error: null };
 }
-
 
 // Fallback: productos públicos
 async function fetchFallback(limit = 8) {
@@ -71,7 +80,7 @@ async function fetchFallback(limit = 8) {
     .select("id, nombre, precio, imagen")
     .limit(limit);
   if (error) {
-    console.warn("Fallback error:", error.message);
+    console.warn("[reco-popup] Fallback error:", error.message || error);
     return [];
   }
   return data ?? [];
@@ -82,22 +91,23 @@ async function loadRecommendations() {
     const { data: { user } } = await supabase.auth.getUser();
     if (user?.id) {
       const { data } = await tryRpcRecomendaciones(user.id, 8);
-      if (data?.length) return data;
+      if (Array.isArray(data) && data.length) return data;
     }
     return await fetchFallback(8);
   } catch (e) {
-    console.warn("loadRecommendations error:", e);
+    console.warn("[reco-popup] loadRecommendations error:", e);
     return [];
   }
 }
 
+/* ============== Interacción ============== */
 function wireModalActions() {
   const overlay = document.getElementById(OVERLAY_ID);
   const closeBtn = document.getElementById("recoCloseBtn");
   const closeSecondary = document.getElementById("recoCloseSecondary");
 
-  closeBtn?.addEventListener("click", () => closeReco());
-  closeSecondary?.addEventListener("click", () => closeReco());
+  closeBtn?.addEventListener("click", closeReco);
+  closeSecondary?.addEventListener("click", closeReco);
 
   overlay?.addEventListener("click", (ev) => {
     if (ev.target === overlay) closeReco();
@@ -116,7 +126,7 @@ function wireModalActions() {
       if (window.CartAPI?.addById) {
         window.CartAPI.addById(id, 1);
       } else if (window.CartAPI?.addProduct) {
-        // fallback mínimo
+        // Fallback mínimo
         const nombre = card?.querySelector(".reco-title")?.textContent?.trim() ?? "Producto";
         const precioText = card?.querySelector(".reco-price")?.textContent || "0";
         const precioNum = Number((precioText.replace(/[^\d]/g, "")) || 0);
@@ -129,8 +139,10 @@ function wireModalActions() {
 
     if (btn.hasAttribute("data-view")) {
       closeReco();
-      const anchor = document.querySelector("#contenedor-productos");
-      if (anchor) anchor.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.querySelector("#contenedor-productos")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
     }
   });
 }
@@ -174,9 +186,10 @@ async function personalizeTitle() {
       const h2 = document.getElementById("recoModalTitle");
       if (h2) h2.textContent = `Recomendado para vos, ${display}`;
     }
-  } catch {}
+  } catch (e) {
+    console.warn("[reco-popup] personalizeTitle error:", e);
+  }
 }
-
 
 function wireLogoClick() {
   const candidates = [
@@ -185,17 +198,19 @@ function wireLogoClick() {
     "aside header img",
     "header .logo img"
   ];
-  let logoEl = null;
   for (const sel of candidates) {
     const el = document.querySelector(sel);
-    if (el) { logoEl = el; break; }
+    if (el) {
+      el.addEventListener("click", (e) => {
+        e.preventDefault();
+        openReco();
+      });
+      break;
+    }
   }
-  logoEl?.addEventListener("click", (e) => {
-    e.preventDefault();
-    openReco();
-  });
 }
 
+/* ============== Boot ============== */
 async function boot() {
   const overlay = document.getElementById(OVERLAY_ID);
   const list = document.getElementById(LIST_ID);
@@ -213,10 +228,9 @@ async function boot() {
 
 document.addEventListener("DOMContentLoaded", boot);
 
-// DEBUG: Exponer a consola manualmente (solo para pruebas)
+/* ============== Debug opcional (consola) ============== */
 window.supabase = supabase;
-window.__testReco = { loadRecommendations, tryRpcRecomendaciones };
-window.supabase = supabase;
-window.__testReco = { loadRecommendations: loadRecommendations };
-
-
+window.__testReco = {
+  loadRecommendations,
+  tryRpcRecomendaciones
+};
