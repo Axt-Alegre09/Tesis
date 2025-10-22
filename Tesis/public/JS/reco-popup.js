@@ -23,7 +23,7 @@ function cardHTML(p) {
   const id = p.id ?? p.producto_id ?? p.slug ?? "";
   const nombre = p.nombre ?? p.titulo ?? "Producto";
   const precio = p.precio ?? p.price ?? 0;
-  const imgPath = p.imagen_url || p.img || p.imagen || p.image_path || "";
+  const imgPath = p.imagen_url || p.url_imagen || p.img || p.imagen || p.image_path || "";
   const img = imgPath?.startsWith("http") ? imgPath : (imgPath ? (STORAGE_BASE + imgPath) : IMG_FALLBACK);
 
   return `
@@ -53,14 +53,16 @@ function renderList(items = []) {
   list.innerHTML = items.map(cardHTML).join("");
 }
 
-// RPC recomendaciones (ajusta parámetros si tu función usa otros nombres)
+// RPC recomendaciones (ajuste exacto a tus parámetros reales)
 async function tryRpcRecomendaciones(userId, limit = 8) {
-  const { data, error } = await supabase.rpc("recomendaciones_productos_para_usuario", {
-    p_usuario: userId, p_limite: limit
-  });
+  const { data, error } = await supabase.rpc(
+    "recomendaciones_productos_para_usuario",
+    { p_usuario: userId, p_limite: limit } 
+  );
   if (!error && data?.length) return { data };
   return { data: [], error: error ?? new Error("Sin resultados de RPC") };
 }
+
 
 // Fallback: productos públicos
 async function fetchFallback(limit = 8) {
@@ -133,16 +135,48 @@ function wireModalActions() {
   });
 }
 
-function personalizeTitle() {
-  // Cambia el H2 a “Recomendado para vos, {Nombre}”
-  supabase.auth.getUser().then(({ data: { user } }) => {
+async function personalizeTitle() {
+  // Título: razón social > nombre (profiles) > metadata > email
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    const nombre = user.user_metadata?.nombre || user.email?.split("@")[0] || "";
-    if (!nombre) return;
-    const h2 = document.getElementById("recoModalTitle");
-    if (h2) h2.textContent = `Recomendado para vos, ${nombre}`;
-  }).catch(() => {});
+
+    let display = "";
+
+    // 1) clientes_perfil.razon
+    const { data: cp } = await supabase
+      .from("clientes_perfil")
+      .select("razon")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (cp?.razon) display = String(cp.razon).trim();
+
+    // 2) profiles.nombre (si no hubo razón)
+    if (!display) {
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("nombre")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (prof?.nombre) display = String(prof.nombre).trim();
+    }
+
+    // 3) user_metadata.nombre
+    if (!display) {
+      const metaName = user.user_metadata?.nombre;
+      if (metaName) display = String(metaName).trim();
+    }
+
+    // 4) email como último recurso
+    if (!display) display = user.email?.split("@")[0] || "";
+
+    if (display) {
+      const h2 = document.getElementById("recoModalTitle");
+      if (h2) h2.textContent = `Recomendado para vos, ${display}`;
+    }
+  } catch {}
 }
+
 
 function wireLogoClick() {
   const candidates = [
