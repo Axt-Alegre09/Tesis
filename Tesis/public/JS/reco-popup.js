@@ -60,18 +60,18 @@ function renderList(items = []) {
 
 /* ============== Data: RPC + fallback ============== */
 
-// RPC recomendaciones (usa schema explícito para evitar 404 por ambigüedad)
+// ✅ IMPORTANTE: llamar a la RPC sin prefijo de esquema
 async function tryRpcRecomendaciones(userId, limit = 8) {
-  const { data, error } = await supabase.rpc(
-   "public.reco_para_usuario_v1",
-   { p_usuario: userId, p_limite: limit }
-  );
+  const { data, error } = await supabase.rpc("reco_para_usuario_v1", {
+    p_usuario: userId,
+    p_limite: limit,
+  });
   if (error) {
     console.warn("[reco-popup] RPC error:", {
       code: error.code,
       message: error.message,
       details: error.details,
-      hint: error.hint
+      hint: error.hint,
     });
     return { data: [], error };
   }
@@ -84,6 +84,7 @@ async function fetchFallback(limit = 8) {
     .from("v_productos_publicos")
     .select("id, nombre, precio, imagen")
     .limit(limit);
+
   if (error) {
     console.warn("[reco-popup] Fallback error:", error.message || error);
     return [];
@@ -118,7 +119,6 @@ function wireModalActions() {
     if (ev.target === overlay) closeReco();
   });
 
-  // Delegación: Agregar / Ver
   const list = document.getElementById(LIST_ID);
   list?.addEventListener("click", (ev) => {
     const btn = ev.target.closest("button");
@@ -131,7 +131,6 @@ function wireModalActions() {
       if (window.CartAPI?.addById) {
         window.CartAPI.addById(id, 1);
       } else if (window.CartAPI?.addProduct) {
-        // Fallback mínimo
         const nombre = card?.querySelector(".reco-title")?.textContent?.trim() ?? "Producto";
         const precioText = card?.querySelector(".reco-price")?.textContent || "0";
         const precioNum = Number((precioText.replace(/[^\d]/g, "")) || 0);
@@ -146,7 +145,7 @@ function wireModalActions() {
       closeReco();
       document.querySelector("#contenedor-productos")?.scrollIntoView({
         behavior: "smooth",
-        block: "start"
+        block: "start",
       });
     }
   });
@@ -168,7 +167,7 @@ async function personalizeTitle() {
       .maybeSingle();
     if (cp?.razon) display = String(cp.razon).trim();
 
-    // 2) profiles.nombre (si no hubo razón)
+    // 2) profiles.nombre
     if (!display) {
       const { data: prof } = await supabase
         .from("profiles")
@@ -187,10 +186,8 @@ async function personalizeTitle() {
     // 4) email como último recurso
     if (!display) display = user.email?.split("@")[0] || "";
 
-    if (display) {
-      const h2 = document.getElementById("recoModalTitle");
-      if (h2) h2.textContent = `Recomendado para vos, ${display}`;
-    }
+    const h2 = document.getElementById("recoModalTitle");
+    if (display && h2) h2.textContent = `Recomendado para vos, ${display}`;
   } catch (e) {
     console.warn("[reco-popup] personalizeTitle error:", e);
   }
@@ -201,7 +198,7 @@ function wireLogoClick() {
     ".logo-principal",
     ".logo img",
     "aside header img",
-    "header .logo img"
+    "header .logo img",
   ];
   for (const sel of candidates) {
     const el = document.querySelector(sel);
@@ -237,5 +234,5 @@ document.addEventListener("DOMContentLoaded", boot);
 window.supabase = supabase;
 window.__testReco = {
   loadRecommendations,
-  tryRpcRecomendaciones
+  tryRpcRecomendaciones,
 };
