@@ -60,7 +60,7 @@ function renderList(items = []) {
 
 /* ============== Data: RPC + fallback ============== */
 
-// ✅ IMPORTANTE: llamar a la RPC sin prefijo de esquema
+// ✅ Llamar a la RPC SIN prefijo de esquema para evitar 404
 async function tryRpcRecomendaciones(userId, limit = 8) {
   const { data, error } = await supabase.rpc("reco_para_usuario_v1", {
     p_usuario: userId,
@@ -119,6 +119,7 @@ function wireModalActions() {
     if (ev.target === overlay) closeReco();
   });
 
+  // Delegación: Agregar / Ver
   const list = document.getElementById(LIST_ID);
   list?.addEventListener("click", (ev) => {
     const btn = ev.target.closest("button");
@@ -131,6 +132,7 @@ function wireModalActions() {
       if (window.CartAPI?.addById) {
         window.CartAPI.addById(id, 1);
       } else if (window.CartAPI?.addProduct) {
+        // Fallback mínimo
         const nombre = card?.querySelector(".reco-title")?.textContent?.trim() ?? "Producto";
         const precioText = card?.querySelector(".reco-price")?.textContent || "0";
         const precioNum = Number((precioText.replace(/[^\d]/g, "")) || 0);
