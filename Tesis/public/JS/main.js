@@ -27,10 +27,6 @@ const toImg = (v) => {
 
 /* =================== Data sources =================== */
 
-// Flag post-compra (para “inmediatas” y UX)
-const justBought = sessionStorage.getItem("just_bought") === "1";
-if (justBought) sessionStorage.removeItem("just_bought");
-
 // 1) Catálogo público (vista v_productos_publicos)
 async function fetchProductosCatalogo() {
   const { data, error } = await supabase
@@ -67,45 +63,6 @@ async function fetchPopularesPortada(limit = 12) {
     titulo: p.nombre,
     imagen: toImg(p.url_imagen || p.imagen),
     precio: p.precio
-  }));
-}
-
-// 3) Recomendaciones personalizadas (RPC ML)
-async function fetchPensadoParaVos(limit = 12) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
-  const { data, error } = await supabase
-    .rpc("recomendaciones_productos_para_usuario", { p_usuario: user.id, p_limite: limit });
-  if (error) {
-    console.error("Recos RPC:", error);
-    return [];
-  }
-  return (data || []).map((p) => ({
-    id: p.id,
-    nombre: p.nombre,
-    titulo: p.nombre,
-    imagen: toImg(p.url_imagen || p.imagen),
-    precio: p.precio
-  }));
-}
-
-// 4) NUEVO: recos inmediatas post-compra
-async function fetchInmediatas(limit = 12) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
-  const { data, error } = await supabase
-    .rpc("recomendaciones_inmediatas", { p_usuario: user.id, p_limite: limit });
-  if (error) {
-    console.warn("Inmediatas RPC:", error);
-    return [];
-  }
-  return (data || []).map((p) => ({
-    id: p.id,
-    nombre: p.nombre,
-    titulo: p.nombre,
-    imagen: toImg(p.url_imagen || p.imagen),
-    precio: p.precio,
-    motivo: p.motivo
   }));
 }
 
@@ -209,39 +166,14 @@ async function init() {
   CATALOGO = await fetchProductosCatalogo();
   window.__PRODUCTS__ = CATALOGO.map((p) => ({ id: p.id, nombre: p.nombre, titulo: p.titulo, precio: p.precio, imagen: p.imagen }));
 
-  // 2) Home feed: Inmediatas → ML → Populares → Catálogo
+  // 2) Home feed: Populares → Catálogo
   let itemsHome = [];
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (user) {
-      // Inmediatas si hay compra reciente
-      const inmediatas = await fetchInmediatas(12);
-      if (inmediatas.length) {
-        tituloPrincipal.textContent = "Pensado para vos";
-        itemsHome = inmediatas;
-      }
-
-      // ML si no hubo inmediatas
-      if (!itemsHome.length) {
-        const recos = await fetchPensadoParaVos(12);
-        if (recos.length) {
-          tituloPrincipal.textContent = "Pensado para vos";
-          itemsHome = recos;
-        }
-      }
+    const pop = await fetchPopularesPortada(12);
+    if (pop.length) {
+      tituloPrincipal.textContent = "Populares";
+      itemsHome = pop;
     }
-
-    // Populares si no hay user/recos
-    if (!itemsHome.length) {
-      const pop = await fetchPopularesPortada(12);
-      if (pop.length) {
-        tituloPrincipal.textContent = "Populares";
-        itemsHome = pop;
-      }
-    }
-
-    // Fallback catálogo
     if (!itemsHome.length) {
       tituloPrincipal.textContent = "Todos los productos";
       itemsHome = CATALOGO;

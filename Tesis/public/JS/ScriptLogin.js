@@ -21,12 +21,16 @@ function showMsg(text, type = "info") {
   box.innerHTML = `<div class="alert alert-${type}" role="alert">${text}</div>`;
 }
 
-/* ========= Perfil / Roles ========= */
+/* ========= Sesión ========= */
 export async function getUser() {
   const { data } = await supabase.auth.getUser();
   return data?.user ?? null;
 }
 
+/* ========= Perfiles =========
+   - profiles: rol/nombre base del sistema
+   - clientes_perfil: datos comerciales del cliente (usa razon)
+*/
 export async function getProfile() {
   const user = await getUser();
   if (!user) return null;
@@ -35,10 +39,45 @@ export async function getProfile() {
     .select("id, email, nombre, role")
     .eq("id", user.id)
     .maybeSingle();
-  if (error) { console.error(error); return null; }
+  if (error) { console.error("[profiles]", error); return null; }
   return data;
 }
 
+export async function getClientePerfil() {
+  const user = await getUser();
+  if (!user) return null;
+  // Tabla: clientes_perfil(user_id, ruc, razon, tel, mail, ...)
+  const { data, error } = await supabase
+    .from("clientes_perfil")
+    .select("user_id, razon, ruc, tel, mail")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (error) { console.error("[clientes_perfil]", error); return null; }
+  return data;
+}
+
+/* ========= Nombre visible en el chip =========
+   Prioridad: clientes_perfil.razon  >  profiles.nombre  >  user_metadata.nombre
+*/
+async function getDisplayName() {
+  const user = await getUser();
+  if (!user) return ""; // sin sesión -> "Cuenta"
+
+  const cp = await getClientePerfil();              // 1) razón comercial
+  const razon = cp?.razon?.trim();
+  if (razon) return razon;
+
+  const p = await getProfile();                     // 2) nombre de profiles
+  const nomPerfil = p?.nombre?.trim();
+  if (nomPerfil) return nomPerfil;
+
+  const nomMeta = user.user_metadata?.nombre?.trim(); // 3) metadata de auth
+  if (nomMeta) return nomMeta;
+
+  return "";
+}
+
+/* ========= Navegación por rol ========= */
 export async function goByRole() {
   const p = await getProfile();
   if (!p) return;
@@ -56,17 +95,23 @@ export async function requireRole(roleNeeded = "cliente") {
   }
 }
 
-/* ========= Cuenta: chip / logout / datos ========= */
+/* ========= Menú de cuenta / Chip ========= */
 export function setUserNameUI(nombre) {
   const el = document.querySelector(".user-name");
   if (el) el.textContent = nombre || "Cuenta";
 }
+
+/** Pinta el chip:
+ *  - Con sesión: nombre visible (razon/nombre/metadata)
+ *  - Sin sesión: "Cuenta"
+ */
 export async function paintUserChip() {
-  const user = await getUser();
-  if (!user) return setUserNameUI("Cuenta");
-  const nombre = user.user_metadata?.nombre || user.email || "Cuenta";
-  setUserNameUI(nombre);
+  const { data } = await supabase.auth.getSession();
+  if (!data?.session) return setUserNameUI("Cuenta");
+  const display = await getDisplayName();
+  setUserNameUI(display || "Cuenta");
 }
+
 export async function logout(ev) {
   ev?.preventDefault?.();
   try { await supabase.auth.signOut(); } catch {}
@@ -74,13 +119,36 @@ export async function logout(ev) {
   try { sessionStorage.clear(); } catch {}
   go(LOGIN_URL);
 }
-export function autoWireAuthMenu() {
-  document.getElementById("logoutBtn")?.addEventListener("click", logout);
+
+/** Ajusta el item de acción (id="logoutBtn"):
+ *  - Con sesión:  "Cerrar sesión"  -> logout()
+ *  - Sin sesión:  "Iniciar sesión" -> ir a login.html
+ * Además, deja funcionando "Actualizar datos" -> misdatos.html
+ */
+export async function autoWireAuthMenu() {
+  const authBtn = document.getElementById("logoutBtn");
   const upd = document.getElementById("updateProfileBtn");
+
   if (upd) upd.addEventListener("click", (ev) => {
     ev?.preventDefault?.();
     window.location.href = "misdatos.html";
   });
+
+  if (authBtn) {
+    const { data } = await supabase.auth.getSession();
+    const hasSession = !!data?.session;
+
+    if (hasSession) {
+      authBtn.innerHTML = `<i class="bi bi-box-arrow-right"></i> Cerrar sesión`;
+      authBtn.onclick = (e) => logout(e);
+    } else {
+      authBtn.innerHTML = `<i class="bi bi-box-arrow-in-right"></i> Iniciar sesión`;
+      authBtn.onclick = () => go(LOGIN_URL);
+    }
+  }
+
+  // Finalmente, pinta el chip
+  await paintUserChip();
 }
 
 /* ========= Lógica específica de login.html ========= */
@@ -160,8 +228,7 @@ async function wireLoginPage() {
 /* ========= Auto-init ========= */
 (async function init() {
   try {
-    paintUserChip();
-    autoWireAuthMenu();
+    await autoWireAuthMenu();
 
     // Si estamos en login.html
     if (document.getElementById("loginForm") || document.getElementById("registerForm")) {
