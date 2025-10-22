@@ -68,7 +68,7 @@ async function tryRpcRecomendaciones(userId, limit = 8) {
 async function fetchFallback(limit = 8) {
   const { data, error } = await supabase
     .from("v_productos_publicos")
-    .select("id, nombre, precio, imagen_url")
+    .select("id, nombre, precio, imagen")
     .limit(limit);
   if (error) {
     console.warn("Fallback error:", error.message);
