@@ -56,8 +56,8 @@ function renderList(items = []) {
 // RPC recomendaciones (ajuste exacto a tus parámetros reales)
 async function tryRpcRecomendaciones(userId, limit = 8) {
   const { data, error } = await supabase.rpc(
-    "recomendaciones_productos_para_usuario",
-    { p_usuario: userId, p_limite: limit } 
+   "reco_para_usuario",
+   { p_usuario: userId, p_limite: limit }
   );
   if (!error && data?.length) return { data };
   return { data: [], error: error ?? new Error("Sin resultados de RPC") };
@@ -216,4 +216,7 @@ document.addEventListener("DOMContentLoaded", boot);
 // DEBUG: Exponer a consola manualmente (solo para pruebas)
 window.supabase = supabase;
 window.__testReco = { loadRecommendations, tryRpcRecomendaciones };
+window.supabase = supabase;
+window.__testReco = { loadRecommendations: loadRecommendations };
+
 
