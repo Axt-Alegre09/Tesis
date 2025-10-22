@@ -63,11 +63,16 @@ function renderList(items = []) {
 // RPC recomendaciones (usa schema explícito para evitar 404 por ambigüedad)
 async function tryRpcRecomendaciones(userId, limit = 8) {
   const { data, error } = await supabase.rpc(
-    "public.reco_para_usuario",
-    { p_usuario: userId, p_limite: limit }
+   "public.reco_para_usuario_v1",
+   { p_usuario: userId, p_limite: limit }
   );
   if (error) {
-    console.warn("[reco-popup] RPC error:", error);
+    console.warn("[reco-popup] RPC error:", {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint
+    });
     return { data: [], error };
   }
   return { data: data || [], error: null };
