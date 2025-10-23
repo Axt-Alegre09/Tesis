@@ -1,14 +1,25 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Paniquiños</title>
-
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Paniquiños — Pasarela</title>
   <link rel="shortcut icon" href="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinosico.ico" type="image/x-icon">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
   <link rel="stylesheet" href="CSS/main.css">
+  <style>
+    /* dejo el panel de éxito con el mismo look que usás en checkout */
+    .success-wrap{
+      margin: 18px auto;
+      max-width: 980px;
+      background:#fff;border:1px solid rgba(0,0,0,.15);
+      border-radius:12px;padding:18px 16px;
+    }
+    .success-cta{ display:flex; gap:12px; justify-content:flex-end; }
+    .success-cta .btn{ font-weight:700; border-radius:12px; }
+    .btn-ghost{ background:#eee; border:1px solid #ddd; }
+  </style>
 </head>
 <body>
   <div class="wrapper">
@@ -18,217 +29,38 @@
           <img class="logo-principal" src="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinos.png" alt="logo">
         </h1>
       </header>
-
       <nav>
         <ul>
           <li><a class="boton-menu boton-volver" href="index.html"><i class="bi bi-arrow-return-left"></i> Seguir comprando</a></li>
           <li><a class="boton-menu" href="carrito.html"><i class="bi bi-cart-fill"></i> Carrito</a></li>
         </ul>
       </nav>
-
       <footer><p class="texto-footer">© Paniquiños</p></footer>
     </aside>
 
     <main>
       <h2 class="titulo-principal">Datos de Facturación y Envío</h2>
 
-      <!-- ÉXITO -->
-      <section id="checkout-success" class="checkout-success disabled">
-        <h3>¡Pedido confirmado! 🎉</h3>
-        <div class="acciones-checkout" style="gap:.5rem; flex-wrap: wrap;">
-          <button id="btn-descargar-factura" class="carrito-acciones-comprar" type="button">Descargar factura (PDF)</button>
-          <a class="carrito-acciones-comprar" href="index.html">Volver al inicio</a>
-          <a class="carrito-acciones-vaciar" href="carrito.html">Ver carrito</a>
+      <!-- ================= VISTA DE ÉXITO ================= -->
+      <section id="successView" class="success-wrap">
+        <div class="checkout-success" style="margin-bottom:12px;">
+          <h3 style="margin:0;">¡Pedido confirmado! 🎉</h3>
+        </div>
+
+        <div class="success-cta">
+          <!-- Importante: type="button" para no disparar submit ni navegación -->
+          <button id="btnDescargarFactura" type="button" class="btn carrito-acciones-comprar">
+            DESCARGAR FACTURA (PDF)
+          </button>
+          <a href="index.html" class="btn carrito-acciones-comprar">VOLVER AL INICIO</a>
+          <a href="carrito.html" class="btn btn-ghost">VER CARRITO</a>
         </div>
       </section>
-
-      <!-- FORMULARIO -->
-      <form id="checkout-form" class="checkout-form" action="#" method="post" novalidate>
-        <!-- Datos de Facturación -->
-        <section class="checkout-panel">
-          <h3 class="checkout-title">Datos de Facturación</h3>
-          <div class="form-col">
-            <label class="form-label" for="ruc">RUC</label>
-            <input class="form-input" id="ruc" name="ruc" type="text" placeholder="Ej: 800000-1" required>
-            <label class="form-label" for="razon">Razón Social</label>
-            <input class="form-input" id="razon" name="razon" type="text" placeholder="Tu empresa o nombre" required>
-            <label class="form-label" for="tel">Teléfono</label>
-            <input class="form-input" id="tel" name="tel" type="tel" placeholder="+595 ..." required>
-            <label class="form-label" for="mail">Mail</label>
-            <input class="form-input" id="mail" name="mail" type="email" placeholder="tucorreo@ejemplo.com" required>
-            <label class="form-label" for="contacto">Contacto</label>
-            <input class="form-input" id="contacto" name="contacto" type="text" placeholder="Persona de contacto" required>
-          </div>
-        </section>
-
-        <!-- Datos de envío -->
-        <section class="checkout-panel">
-          <h3 class="checkout-title">Datos de envío</h3>
-          <div class="form-col">
-            <label class="form-label" for="ciudad">Ciudad</label>
-            <input class="form-input" id="ciudad" name="ciudad" type="text" required>
-            <label class="form-label" for="barrio">Barrio</label>
-            <input class="form-input" id="barrio" name="barrio" type="text" required>
-            <label class="form-label" for="depto">Departamento</label>
-            <input class="form-input" id="depto" name="depto" type="text" required>
-            <label class="form-label" for="postal">Dirección postal</label>
-            <input class="form-input" id="postal" name="postal" type="text" required>
-
-            <div class="grid-2">
-              <div>
-                <label class="form-label" for="calle1">Calle 1</label>
-                <input class="form-input" id="calle1" name="calle1" type="text" required>
-              </div>
-              <div>
-                <label class="form-label" for="calle2">Calle 2</label>
-                <input class="form-input" id="calle2" name="calle2" type="text">
-              </div>
-            </div>
-
-            <label class="form-label" for="nro">Nro Casa</label>
-            <input class="form-input" id="nro" name="nro" type="text">
-
-            <div class="grid-2">
-              <div>
-                <label class="form-label" for="hora-desde">Hora disponible (desde)</label>
-                <input class="form-input" id="hora-desde" name="hora-desde" type="time" required>
-              </div>
-              <div>
-                <label class="form-label" for="hora-hasta">Hora disponible (hasta)</label>
-                <input class="form-input" id="hora-hasta" name="hora-hasta" type="time" required>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- Forma de pago -->
-        <section class="checkout-panel">
-          <h3 class="checkout-title">Forma de Pago</h3>
-
-          <div class="metodos">
-            <label class="metodo-chip">
-              <input type="radio" name="metodo" value="transferencia" class="metodo-radio" checked>
-              <i class="bi bi-bank"></i> Transferencia
-            </label>
-
-            <label class="metodo-chip">
-              <input type="radio" name="metodo" value="tarjeta" class="metodo-radio">
-              <i class="bi bi-credit-card-2-front"></i> Tarjeta Crédito
-            </label>
-
-            <label class="metodo-chip">
-              <input type="radio" name="metodo" value="efectivo" class="metodo-radio">
-              <i class="bi bi-cash"></i> Efectivo
-            </label>
-          </div>
-
-          <!-- TRANSFERENCIA -->
-          <div class="metodo-panel" data-metodo="transferencia">
-            <p class="hint">Transferí y subí tu comprobante. Estos son los datos:</p>
-            <ul class="list">
-              <li><strong>Alias:</strong> Ci 5.773.660</li>
-              <li><strong>Banco:</strong> Ueno Bank</li>
-              <li><strong>Cuenta:</strong> 61967185</li>
-              <li><strong>Titular:</strong> Marcos Alegre</li>
-              <li><strong>Concepto:</strong> Pedido #0001</li>
-            </ul>
-            <div class="grid-2" style="margin-top:.5rem;">
-              <div>
-                <label class="form-label" for="comprobante">Subir comprobante (PDF o imagen)</label><br>
-                <input class="form-input" id="comprobante" name="comprobante" type="file" accept=".pdf,image/*" required>
-              </div>
-            </div>
-          </div>
-
-          <!-- TARJETA -->
-          <div class="metodo-panel disabled" data-metodo="tarjeta">
-            <div class="grid-2">
-              <div>
-                <label class="form-label" for="card-name">Nombre en la tarjeta</label>
-                <input class="form-input" id="card-name" name="card-name" type="text" placeholder="Juan Pérez" required>
-              </div>
-              <div>
-                <label class="form-label" for="card-number">N° de tarjeta</label>
-                <input class="form-input" id="card-number" name="card-number" inputmode="numeric" maxlength="19" placeholder="0000 0000 0000 0000" required>
-              </div>
-              <div>
-                <label class="form-label" for="card-exp">Vencimiento</label>
-                <input class="form-input" id="card-exp" name="card-exp" type="text" placeholder="MM/AA" required>
-              </div>
-              <div>
-                <label class="form-label" for="card-cvv">CVV</label>
-                <input class="form-input" id="card-cvv" name="card-cvv" type="password" maxlength="4" placeholder="***" required>
-              </div>
-            </div>
-            <p class="hint">Es un simulador: no se procesa el pago real.</p>
-          </div>
-
-          <!-- EFECTIVO -->
-          <div class="metodo-panel disabled" data-metodo="efectivo">
-            <p class="hint">Pagarás al momento de la entrega.</p>
-            <div class="grid-2">
-              <div>
-                <label class="form-label" for="efectivo-monto">Monto con el que pagás</label>
-                <input class="form-input" id="efectivo-monto" name="efectivo-monto" type="number" min="0" step="1000" placeholder="100000" required>
-              </div>
-              <div>
-                <label class="form-label">Total de tu pedido</label>
-                <input class="form-input" id="efectivo-total" type="text" value="0 Gs" disabled>
-              </div>
-            </div>
-          </div>
-
-          <div class="acciones-checkout">
-            <button type="submit" class="carrito-acciones-comprar">Pagar</button>
-          </div>
-        </section>
-      </form>
+      <!-- =============== /VISTA DE ÉXITO =============== -->
     </main>
   </div>
 
-  <!-- ========== Scripts ========== -->
-  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
-
-  <!-- Carrito (necesario para snapshot/limpieza) -->
-  <script type="module" src="JS/cart-api.js"></script>
-
-  <!-- Lógica de la pasarela (importa ./ScriptLogin.js internamente) -->
-  <script type="module" src="JS/pasarelaPagos.js"></script>
-
-  <!-- Autocompletar desde clientes_perfil -->
-  <script type="module">
-    import { supabase } from "./JS/ScriptLogin.js";
-
-    const $ = (id) => document.getElementById(id);
-    const FIELD_IDS = ["ruc","razon","tel","mail","contacto","ciudad","barrio","depto","postal","calle1","calle2","nro"];
-    const isEmpty = (v) => v == null || String(v).trim() === "";
-
-    async function preloadProfileIntoForm() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data, error } = await supabase
-        .from("clientes_perfil")
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (error || !data) return;
-
-      FIELD_IDS.forEach(id => {
-        const el = $(id);
-        if (el && isEmpty(el.value) && typeof data[id] !== "undefined" && data[id] !== null) {
-          el.value = String(data[id]);
-        }
-      });
-    }
-    preloadProfileIntoForm();
-  </script>
-  <!-- Requiere sesión para poder pagar -->
-  <script type="module">
-    import { requireAuth } from "./JS/ScriptLogin.js";
-    await requireAuth();
-  </script>
-  <script src="JS/checkout.js"></script>
+  <!-- JS: solo controla la descarga; no hace redirecciones -->
+  <script type="module" src="JS/pasarela-success.js"></script>
 </body>
 </html>
