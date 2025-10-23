@@ -1,5 +1,5 @@
 // Cliente que ya exportás en /admin/reportes/js/reports-core.js
-import { supa } from "../admin/reportes/js/reports-core.js";
+import { supa } from "/JS/reports-core.js";
 
 /* 1) Asegura overlay oculto al iniciar (si alguien lo dejó visible) */
 document.getElementById("logoutOverlay")?.setAttribute("hidden", "");
@@ -7,7 +7,7 @@ document.getElementById("logoutOverlay")?.setAttribute("hidden", "");
 /* Helpers */
 const $  = (s, r=document)=>r.querySelector(s);
 const $$ = (s, r=document)=>[...r.querySelectorAll(s)];
-const REPORT_BASE = "admin/reportes/";
+const REPORT_BASE = "../loginAdmin.html";
 function buildReportUrl(route) {
   const r = (route || "").replace(/^[./\\]+/, "").trim();
   if (!/^[\w-]+\.html$/i.test(r)) return null;
@@ -18,7 +18,7 @@ function buildReportUrl(route) {
 async function assertAdmin() {
   const { data: { user }, error } = await supa.auth.getUser();
   if (error || !user) {
-    window.location.href = "/admin/reportes/loginAdmin.html";
+    window.location.href = "loginAdmin.html";
     throw new Error("No session");
   }
   // muestra email en el chip si existe
@@ -28,7 +28,7 @@ async function assertAdmin() {
   // usa DEFAULT auth.uid() en la función SQL
   const { data, error: rpcErr } = await supa.rpc("is_admin", {});
   if (rpcErr || !data) {
-    window.location.href = "/admin/reportes/loginAdmin.html";
+    window.location.href = "loginAdmin.html";
     throw new Error("Not admin");
   }
 }
@@ -48,7 +48,7 @@ function wireNav() {
     try {
       await supa.auth.signOut();
     } finally {
-      window.location.href = "/admin/reportes/loginAdmin.html";
+      window.location.href = "loginAdmin.html";
     }
   });
 }
