@@ -23,7 +23,7 @@ async function getProfileRole() {
   if (data.session) {
     const role = await getProfileRole();
     if (role === "admin") {
-      window.location.href = "indexAdmin.html";     // ABSOLUTO
+      window.location.href = "../indexAdmin.html";     // ABSOLUTO
     } else {
       await supabase.auth.signOut();
     }
@@ -46,5 +46,5 @@ document.getElementById("adminLoginForm")?.addEventListener("submit", async (e) 
     alert("⚠️ Tu cuenta no tiene permisos de administrador.");
     return;
   }
-  window.location.href = "indexAdmin.html";         // ABSOLUTO
+  window.location.href = "../indexAdmin.html";         // ABSOLUTO
 });
