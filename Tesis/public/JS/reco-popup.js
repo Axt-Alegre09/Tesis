@@ -10,7 +10,13 @@ const STORAGE_BASE = "https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object
 // Formateo Gs PY
 const fmtGs = (n) => new Intl.NumberFormat("es-PY").format(Number(n || 0)) + " Gs";
 
-/* ============== Helpers modal ============== */
+/* ===================== Helpers de estado ===================== */
+// Guardo una marca por sesión/usuario para no mostrar el popup repetidamente
+function recoKey(uid) { return `recoShown:${uid}`; }
+function markShown(uid) { try { sessionStorage.setItem(recoKey(uid), "1"); } catch {} }
+function wasShown(uid)  { try { return sessionStorage.getItem(recoKey(uid)) === "1"; } catch { return false; } }
+
+/* ===================== Helpers modal ===================== */
 function openReco() {
   const overlay = document.getElementById(OVERLAY_ID);
   if (overlay) overlay.hidden = false;
@@ -20,13 +26,13 @@ function closeReco() {
   if (overlay) overlay.hidden = true;
 }
 
-/* ============== Render ============== */
+/* ===================== Render ===================== */
 function cardHTML(p) {
   const id = p.id ?? p.producto_id ?? p.slug ?? "";
   const nombre = p.nombre ?? p.titulo ?? "Producto";
   const precio = p.precio ?? p.price ?? 0;
 
-  const imgPath = p.imagen_url || p.url_imagen || p.img || p.imagen || p.image_path || "";
+  const imgPath = p.imagen_url || p.url_imagen || p.img || p.imagen || p.image_path || p.imagen_url_portada || "";
   const img = imgPath?.startsWith?.("http")
     ? imgPath
     : (imgPath ? (STORAGE_BASE + imgPath) : IMG_FALLBACK);
@@ -42,7 +48,7 @@ function cardHTML(p) {
       </div>
       <div class="reco-actions">
         <button class="reco-btn primary" data-add="${id}">Agregar</button>
-        <button class="reco-btn ghost" data-view="${id}">Ver</button>
+        <button class="reco-btn ghost"  data-view="${id}">Ver</button>
       </div>
     </article>
   `;
@@ -52,15 +58,14 @@ function renderList(items = []) {
   const list = document.getElementById(LIST_ID);
   if (!list) return;
   if (!items.length) {
-    list.innerHTML = `<div style="padding:16px">No tenemos recomendaciones por ahora. ¡Explorá nuestros <a href="#contenedor-productos">productos</a>!</div>`;
+    list.innerHTML = `<div style="padding:16px">No tengo recomendaciones por ahora. Explorá nuestros <a href="#contenedor-productos">productos</a> 👇</div>`;
     return;
   }
   list.innerHTML = items.map(cardHTML).join("");
 }
 
-/* ============== Data: RPC + fallback ============== */
-
-// ✅ Llamar a la RPC SIN prefijo de esquema para evitar 404
+/* ===================== Data: RPC + fallback ===================== */
+// Llamo a la RPC sin prefijo de esquema (mantengo el nombre que definí en la DB)
 async function tryRpcRecomendaciones(userId, limit = 8) {
   const { data, error } = await supabase.rpc("reco_para_usuario_v1", {
     p_usuario: userId,
@@ -78,7 +83,7 @@ async function tryRpcRecomendaciones(userId, limit = 8) {
   return { data: data || [], error: null };
 }
 
-// Fallback: productos públicos
+// Si no hay recomendaciones o la RPC falla, cargo productos públicos
 async function fetchFallback(limit = 8) {
   const { data, error } = await supabase
     .from("v_productos_publicos")
@@ -94,7 +99,7 @@ async function fetchFallback(limit = 8) {
 
 async function loadRecommendations() {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user} } = await supabase.auth.getUser();
     if (user?.id) {
       const { data } = await tryRpcRecomendaciones(user.id, 8);
       if (Array.isArray(data) && data.length) return data;
@@ -106,15 +111,15 @@ async function loadRecommendations() {
   }
 }
 
-/* ============== Interacción ============== */
+/* ===================== Interacción ===================== */
 function wireModalActions() {
   const overlay = document.getElementById(OVERLAY_ID);
   const closeBtn = document.getElementById("recoCloseBtn");
   const closeSecondary = document.getElementById("recoCloseSecondary");
 
+  // Cierro el modal desde los botones y también clic afuera
   closeBtn?.addEventListener("click", closeReco);
   closeSecondary?.addEventListener("click", closeReco);
-
   overlay?.addEventListener("click", (ev) => {
     if (ev.target === overlay) closeReco();
   });
@@ -129,10 +134,10 @@ function wireModalActions() {
     if (!id) return;
 
     if (btn.hasAttribute("data-add")) {
+      // Agrego al carrito con la API que ya tengo en window
       if (window.CartAPI?.addById) {
         window.CartAPI.addById(id, 1);
       } else if (window.CartAPI?.addProduct) {
-        // Fallback mínimo
         const nombre = card?.querySelector(".reco-title")?.textContent?.trim() ?? "Producto";
         const precioText = card?.querySelector(".reco-price")?.textContent || "0";
         const precioNum = Number((precioText.replace(/[^\d]/g, "")) || 0);
@@ -154,7 +159,7 @@ function wireModalActions() {
 }
 
 async function personalizeTitle() {
-  // Título: razón social > nombre (profiles) > metadata > email
+  // Personalizo el título con el nombre visible que ya uso en el chip (misma prioridad)
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -195,6 +200,7 @@ async function personalizeTitle() {
   }
 }
 
+// Siempre dejo el click en el logo como atajo manual para abrir el popup
 function wireLogoClick() {
   const candidates = [
     ".logo-principal",
@@ -214,27 +220,39 @@ function wireLogoClick() {
   }
 }
 
-/* ============== Boot ============== */
+/* ===================== Boot ===================== */
 async function boot() {
   const overlay = document.getElementById(OVERLAY_ID);
   const list = document.getElementById(LIST_ID);
   if (!overlay || !list) return;
 
+  // Cargo al menos una vez la lista de items (así el modal abre rápido)
   list.innerHTML = `<div style="padding:16px">Cargando recomendaciones…</div>`;
   const items = await loadRecommendations();
   renderList(items);
-
-  personalizeTitle();
-  openReco();
   wireModalActions();
   wireLogoClick();
+
+  // Solo muestro automáticamente al iniciar sesión (una vez por sesión/usuario)
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user?.id && !wasShown(user.id)) {
+      await personalizeTitle();
+      openReco();
+      markShown(user.id); // dejo registrado que ya se mostró en esta sesión
+    }
+  } catch (e) {
+    console.warn("[reco-popup] boot auto-show error:", e);
+  }
 }
 
 document.addEventListener("DOMContentLoaded", boot);
 
-/* ============== Debug opcional (consola) ============== */
+/* ===================== Debug de consola ===================== */
 window.supabase = supabase;
 window.__testReco = {
   loadRecommendations,
   tryRpcRecomendaciones,
+  openReco,
+  closeReco,
 };

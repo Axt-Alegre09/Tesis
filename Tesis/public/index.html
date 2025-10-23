@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="CSS/styleschat.css" />
 
   <style>
-    /* ============ Overlay de cierre de sesión ============ */
+    /* ===== Overlay de cierre de sesión ===== */
     #logoutOverlay {
       position: fixed;
       inset: 0;
@@ -26,7 +26,7 @@
     }
     #logoutOverlay[hidden] { display: none; }
 
-    /* ============ POPUP Recomendaciones ============ */
+    /* ===== POPUP Recomendaciones ===== */
     #recoModalOverlay[hidden] { display: none; }
     #recoModalOverlay {
       position: fixed; inset: 0;
@@ -222,7 +222,7 @@
     <div class="spinner-border me-2" role="status"></div> Cerrando sesión…
   </div>
 
-  <!-- ========== POPUP Recomendaciones ========== -->
+  <!-- ===== POPUP Recomendaciones ===== -->
   <div id="recoModalOverlay" hidden>
     <div id="recoModal" role="dialog" aria-modal="true" aria-labelledby="recoModalTitle">
       <header class="reco-header">
@@ -244,7 +244,7 @@
   <!-- Wire del menú -->
   <script type="module">
     import { logout, autoWireAuthMenu } from "./JS/ScriptLogin.js";
-    autoWireAuthMenu();
+    autoWireAuthMenu(); // pinto el chip y preparo “Actualizar datos / Cerrar sesión”
     document.getElementById("logoutBtn")?.addEventListener("click", async (e) => {
       const overlay = document.getElementById("logoutOverlay");
       overlay.hidden = false;
@@ -285,6 +285,7 @@
       const backdrop = document.getElementById('backdrop');
       const menuList = document.getElementById('menuList');
 
+      // Abro y cierro el aside en móvil
       const openAside = () => {
         body.classList.add('aside-open');
         toggle?.setAttribute('aria-expanded', 'true');
@@ -300,10 +301,12 @@
       closeBtn?.addEventListener('click', closeAside);
       backdrop?.addEventListener('click', closeAside);
 
+      // Cierro el aside si el usuario toca alguna opción
       menuList?.querySelectorAll('a,button').forEach(el => {
         el.addEventListener('click', closeAside);
       });
 
+      // Escape también cierra
       document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') closeAside();
       });
