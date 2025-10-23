@@ -238,3 +238,16 @@ async function wireLoginPage() {
     console.warn("init:", e);
   }
 })();
+
+
+// --- NUEVO: exige sesión o redirige a login ---
+export async function requireAuth() {
+  const { data } = await supabase.auth.getSession();
+  if (!data?.session) {
+    // sin sesión -> al login y corta el flujo
+    window.location.href = "login.html";
+    throw new Error("Auth requerida");
+  }
+  return data.session.user; // por si querés usar el user
+}
+
