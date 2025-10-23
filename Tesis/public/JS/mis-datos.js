@@ -136,7 +136,7 @@ async function init() {
         if (passChanged)          extra.push("contraseña");
         const suf = extra.length ? ` (actualizado: ${extra.join(", ")})` : "";
 
-        showMsg("Datos actualizados correctamente ✔️" + suf, "ok");
+        alert("Datos actualizados correctamente ✔️" + suf, "ok");
       } catch (err) {
         console.error(err);
         showMsg("No se pudieron guardar los datos. " + (err?.message ?? ""), "error");
