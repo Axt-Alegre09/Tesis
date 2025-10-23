@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Paniquiños — Admin</title>
+
+  <!-- CSP ajustada para tu uso -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'self' https://cdn.jsdelivr.net https://esm.sh;
+    style-src  'self' 'unsafe-inline' https://cdn.jsdelivr.net;
+    img-src    'self' https://jyygevitfnbwrvxrjexp.supabase.co data:;
+    font-src   'self' https://cdn.jsdelivr.net data:;
+    connect-src 'self' https://*.supabase.co wss://*.supabase.co;
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+  ">
+
+  <meta name="referrer" content="no-referrer" />
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta http-equiv="X-Frame-Options" content="DENY">
+  <meta name="permissions-policy" content="geolocation=(), microphone=(), camera=()">
+
+  <link rel="icon" href="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinosico.ico" type="image/x-icon">
+
+  <!-- Bootstrap + Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+
+  <!-- Tus estilos (asegúrate de que existan) -->
+  <link rel="stylesheet" href="CSS/main.css">
+  <!-- Quitar si no existen para evitar 404
+  <link rel="stylesheet" href="CSS/styleschat.css">
+  <link rel="stylesheet" href="CSS/admin.css">
+  -->
+</head>
+<body>
+  <div class="wrapper has-topbar">
+    <!-- Tu aside/topbar/contenido EXISTENTES tal cual los tenías -->
+    <!-- … -->
+  </div>
+
+  <!-- Backdrop global -->
+  <div id="backdrop" class="backdrop" aria-hidden="true"></div>
+
+  <!-- Overlay logout: SIEMPRE oculto al iniciar -->
+  <div id="logoutOverlay" hidden
+       style="position:fixed;inset:0;background:rgba(255,255,255,.8);display:flex;align-items:center;justify-content:center;font-size:1.1rem;color:#333;z-index:9999">
+    <div class="spinner-border me-2" role="status" aria-hidden="true"></div> Cerrando sesión…
+  </div>
+
+  <script type="module" src="JS/main.js"></script>
+  <script type="module" src="JS/admin-index-secure.js"></script>
+</body>
+</html>
