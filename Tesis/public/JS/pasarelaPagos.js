@@ -152,7 +152,7 @@ async function init() {
       sessionStorage.setItem("just_bought", "1");
       setTimeout(() => {
         window.location.assign("index.html");
-      }, 900); // pequeño delay
+      }, 3000); // pequeño delay
     } catch (err) {
       console.error("[checkout] Error general:", err);
       const msg = err?.message || err?.error_description || "No se pudo confirmar la compra.";
