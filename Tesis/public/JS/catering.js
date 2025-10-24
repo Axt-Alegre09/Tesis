@@ -1,7 +1,6 @@
 // JS/catering.js
 // Panel Pedidos Catering — calendario 100% funcional con Supabase
-// Usa la sesión real (admin) importando el cliente que ya configuraste.
-import { supabase } from "../JS/ScriptLogin.js"; // ajusta ruta si es necesario
+import { supabase, requireAuth } from "./ScriptLogin.js";
 
 /* ========= Utiles de fecha ========= */
 const ymd  = d => d.toISOString().slice(0,10);
@@ -179,14 +178,13 @@ D.btnEditar?.addEventListener("click", async () => {
     return;
   }
 
-  // Guardar
   const payload = {
     p_id:          selectedId,
     p_razonsocial: D.nombre.value.trim(),
-    p_ruc:         "", // opcional agregar input en detalle
+    p_ruc:         "",
     p_tipoevento:  D.tipo.value.trim(),
     p_fecha:       D.fecha.value,
-    p_hora:        D.hora.value.trim(), // texto HH:MM
+    p_hora:        D.hora.value.trim(),
     p_tipocomida:  D.menu.value.trim(),
     p_lugar:       D.direccion.value.trim(),
     p_observaciones: "",
@@ -197,7 +195,6 @@ D.btnEditar?.addEventListener("click", async () => {
   const { data, error } = await supabase.rpc("catering_editar", payload);
   if (error){ alert(error.message || "No se pudo guardar cambios"); return; }
 
-  // actualizar cache (puede que cambie de fecha/orden)
   const idx = cache.findIndex(r => r.id === selectedId);
   if (idx >= 0) cache[idx] = data;
   await reload();
@@ -245,13 +242,13 @@ D.btnFin?.addEventListener("click", async () => {
 });
 
 /* ========= Agendar ========= */
-A.btnCancel?.addEventListener("click", () => {
+A.btnCancel?.addEventListener("click", (e) => {
+  e.preventDefault();
   if (confirm("¿Desea limpiar todos los campos?")) A.form.reset();
 });
 
 A.form?.addEventListener("submit", async (e) => {
   e.preventDefault();
-  // Validación básica
   const req = [A.nombre, A.telefono, A.invitados, A.fecha, A.hora];
   const miss = req.filter(el => !String(el.value||"").trim());
   if (miss.length){
@@ -269,10 +266,10 @@ A.form?.addEventListener("submit", async (e) => {
 
   const payload = {
     p_razonsocial: A.nombre.value.trim(),
-    p_ruc:         "", // agrega input si lo necesitas
+    p_ruc:         "",
     p_tipoevento:  (A.tipo.value || "Catering").trim(),
     p_fecha:       A.fecha.value,
-    p_hora:        A.hora.value.trim(), // "HH:MM"
+    p_hora:        A.hora.value.trim(),
     p_tipocomida:  A.menu.value.trim(),
     p_lugar:       A.direccion.value.trim(),
     p_observaciones: "",
@@ -284,7 +281,6 @@ A.form?.addEventListener("submit", async (e) => {
   const { data, error } = await supabase.rpc("catering_agendar", payload);
   if (error) return alert(error.message || "No se pudo agendar");
 
-  // Si cae en el mes visible, lo agregamos y refrescamos vista
   if (data.fecha.slice(0,7) === ymd(pivot).slice(0,7)) {
     cache.push(data);
     renderCalendar();
@@ -299,13 +295,16 @@ prevBtn?.addEventListener("click", async () => { pivot.setMonth(pivot.getMonth()
 nextBtn?.addEventListener("click", async () => { pivot.setMonth(pivot.getMonth()+1); await reload(); });
 
 backBtn?.addEventListener("click", () => {
-  // retroceso suave; si querés fijo: location.href = "indexAdmin.html";
   if (history.length > 1) history.back(); else location.href = "index.html";
 });
 
 async function reload(){ await loadMes(pivot); renderCalendar(); }
 
 (async function init(){
+  try {
+    await requireAuth();    // asegura sesión activa
+  } catch { return; }       // si redirige a login, corta flujo
+
   await reload();
   disableDetalle(true);
 })();
