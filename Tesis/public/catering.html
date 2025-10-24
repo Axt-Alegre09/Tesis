@@ -15,7 +15,7 @@
       <h1>Pedidos Catering</h1>
     </header>
 
-    <p class="fecha">Noviembre 2025</p>
+    <p class="fecha">Mes actual</p>
 
     <main class="layout-3">
       <!-- CALENDARIO -->
@@ -23,96 +23,40 @@
         <header class="calendar__header">
           <div class="month-nav">
             <button class="icon-btn" aria-label="Mes anterior">‹</button>
-            <h2 class="month-title">Noviembre 2025</h2>
+            <h2 class="month-title">Mes</h2>
             <button class="icon-btn" aria-label="Mes siguiente">›</button>
           </div>
           <span class="flag" role="img" aria-label="Bandera de Paraguay">🇵🇾</span>
         </header>
 
+        <!-- el JS reemplaza este contenido completamente -->
         <div class="calendar__table">
-          <!-- Encabezados -->
           <div class="wcol head">Sem</div>
           <div class="head">Dom</div><div class="head">Lun</div><div class="head">Mar</div>
           <div class="head">Mié</div><div class="head">Jue</div><div class="head">Vie</div><div class="head">Sáb</div>
-
-          <!-- Fila 1 -->
-          <div class="wcol">44</div>
-          <div class="day muted"></div><div class="day muted"></div><div class="day muted"></div>
-          <div class="day muted"></div><div class="day muted"></div><div class="day muted"></div>
-          <div class="day weekend">
-            <span class="num">1</span>
-            <span class="chip">Nombre | Hora</span>
-            <span class="chip">Nombre | Hora</span>
-          </div>
-
-          <!-- Fila 2 -->
-          <div class="wcol">45</div>
-          <div class="day weekend"><span class="num">2</span></div>
-          <div class="day"><span class="num">3</span><span class="chip">Nombre | Hora</span></div>
-          <div class="day"><span class="num">4</span></div>
-          <div class="day"><span class="num">5</span><span class="chip">Nombre | Hora</span></div>
-          <div class="day"><span class="num">6</span></div>
-          <div class="day"><span class="num">7</span></div>
-          <div class="day weekend"><span class="num">8</span></div>
-
-          <!-- Fila 3 -->
-          <div class="wcol">46</div>
-          <div class="day weekend"><span class="num">9</span></div>
-          <div class="day"><span class="num">10</span></div>
-          <div class="day"><span class="num">11</span><span class="chip">Nombre | Hora</span></div>
-          <div class="day"><span class="num">12</span></div>
-          <div class="day"><span class="num">13</span><span class="chip">Nombre | Hora</span></div>
-          <div class="day"><span class="num">14</span><span class="chip">Nombre | Hora</span></div>
-          <div class="day weekend"><span class="num">15</span><span class="chip">Nombre | Hora</span></div>
-
-          <!-- Fila 4 -->
-          <div class="wcol">47</div>
-          <div class="day weekend"><span class="num">16</span><span class="chip">Nombre | Hora</span></div>
-          <div class="day"><span class="num">17</span></div>
-          <div class="day"><span class="num">18</span></div>
-          <div class="day"><span class="num">19</span></div>
-          <div class="day"><span class="num">20</span></div>
-          <div class="day"><span class="num">21</span><span class="chip">Nombre | Hora</span><span class="chip">Nombre | Hora</span></div>
-          <div class="day weekend"><span class="num">22</span><span class="chip">Nombre | Hora</span></div>
-
-          <!-- Fila 5 -->
-          <div class="wcol">48</div>
-          <div class="day weekend"><span class="num">23</span><span class="chip">Nombre | Hora</span><span class="chip">Nombre | Hora</span></div>
-          <div class="day"><span class="num">24</span><span class="chip">Nombre | Hora</span></div>
-          <div class="day"><span class="num">25</span><span class="chip">Nombre | Hora</span></div>
-          <div class="day"><span class="num">26</span><span class="chip">Nombre | Hora</span></div>
-          <div class="day"><span class="num">27</span><span class="chip">Nombre | Hora</span></div>
-          <div class="day"><span class="num">28</span><span class="chip">Nombre | Hora</span></div>
-          <div class="day weekend"><span class="num">29</span></div>
-
-          <!-- Fila 6 -->
-          <div class="wcol"></div>
-          <div class="day weekend"><span class="num">30</span></div>
-          <div class="day muted"></div><div class="day muted"></div>
-          <div class="day muted"></div><div class="day muted"></div>
-          <div class="day muted"></div><div class="day muted"></div>
         </div>
       </section>
 
       <!-- DATOS DEL SERVICIO -->
       <section class="card form-card">
         <h3 class="card__title">Datos del Servicio</h3>
-        <form class="form">
+        <form class="form" id="formDetalle">
           <div class="form-grid">
-            <label>Nombre<input type="text" placeholder="Nombre del cliente" /></label>
-            <label>Teléfono<input type="tel" placeholder="0991 000 000" /></label>
-            <label>Dirección<input type="text" placeholder="Calle y número" /></label>
-            <label>Email<input type="email" placeholder="correo@ejemplo.com" /></label>
-            <label>Tipo de Servicio<input type="text" placeholder="Catering, Evento…" /></label>
-            <label>Menú<input type="text" placeholder="Menú seleccionado" /></label>
-            <label>Número de invitados<input type="number" min="1" step="1" placeholder="0" /></label>
-            <label>Fecha<input type="date" /></label>
-            <label>Hora<input type="time" /></label>
+            <label>Nombre<input id="d_nombre" type="text" placeholder="Nombre del cliente" /></label>
+            <label>Teléfono<input id="d_telefono" type="tel" placeholder="0991 000 000" /></label>
+            <label>Dirección<input id="d_direccion" type="text" placeholder="Calle y número" /></label>
+            <label>Email<input id="d_email" type="email" placeholder="correo@ejemplo.com" /></label>
+            <label>Tipo de Servicio<input id="d_tipo" type="text" placeholder="Catering, Evento…" /></label>
+            <label>Menú<input id="d_menu" type="text" placeholder="Menú seleccionado" /></label>
+            <label>Número de invitados<input id="d_invitados" type="number" min="1" step="1" placeholder="0" /></label>
+            <label>Fecha<input id="d_fecha" type="date" /></label>
+            <label>Hora<input id="d_hora" type="time" /></label>
           </div>
           <div class="acciones">
-            <button class="btn brown" type="button">Cancelar</button>
-            <button class="btn warn"  type="button">En curso</button>
-            <button class="btn green" type="button">Finalizado</button>
+            <button class="btn brown" id="btnCancelar"  type="button">Cancelar</button>
+            <button class="btn warn"  id="btnEnCurso"   type="button">En curso</button>
+            <button class="btn"       id="btnEditar"    type="button">Editar</button>
+            <button class="btn green" id="btnFinalizar" type="button">Finalizado</button>
           </div>
         </form>
       </section>
@@ -120,20 +64,20 @@
       <!-- AGENDAR CATERING -->
       <section class="card form-card">
         <h3 class="card__title">Agendar Catering</h3>
-        <form class="form">
+        <form class="form" id="formAgendar">
           <div class="form-grid">
-            <label>Nombre<input type="text" placeholder="Nombre del cliente" /></label>
-            <label>Teléfono<input type="tel" placeholder="0991 000 000" /></label>
-            <label>Dirección<input type="text" placeholder="Calle y número" /></label>
-            <label>Email<input type="email" placeholder="correo@ejemplo.com" /></label>
-            <label>Tipo de Servicio<input type="text" placeholder="Catering, Evento…" /></label>
-            <label>Menú<input type="text" placeholder="Preferencia" /></label>
-            <label>Número de invitados<input type="number" min="1" step="1" placeholder="0" /></label>
-            <label>Fecha<input type="date" /></label>
-            <label>Hora<input type="time" /></label>
+            <label>Nombre<input id="a_nombre" type="text" placeholder="Nombre del cliente" /></label>
+            <label>Teléfono<input id="a_telefono" type="tel" placeholder="0991 000 000" /></label>
+            <label>Dirección<input id="a_direccion" type="text" placeholder="Calle y número" /></label>
+            <label>Email<input id="a_email" type="email" placeholder="correo@ejemplo.com" /></label>
+            <label>Tipo de Servicio<input id="a_tipo" type="text" placeholder="Catering, Evento…" /></label>
+            <label>Menú<input id="a_menu" type="text" placeholder="Preferencia" /></label>
+            <label>Número de invitados<input id="a_invitados" type="number" min="1" step="1" placeholder="0" /></label>
+            <label>Fecha<input id="a_fecha" type="date" /></label>
+            <label>Hora<input id="a_hora" type="time" /></label>
           </div>
           <div class="acciones">
-            <button class="btn brown" type="reset">Cancelar</button>
+            <button class="btn brown" id="btnAgendarCancelar" type="button">Cancelar</button>
             <button class="btn primary" type="submit">Agendar</button>
           </div>
         </form>
@@ -141,8 +85,7 @@
     </main>
   </div>
 
-
-  
+  <!-- Módulo -->
   <script type="module" src="JS/catering.js"></script>
 </body>
 </html>

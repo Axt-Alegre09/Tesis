@@ -7,13 +7,13 @@ const ymd  = d => d.toISOString().slice(0,10);
 const fMY  = new Intl.DateTimeFormat("es-PY", { month: "long", year: "numeric" });
 const fromYMD = s => new Date(`${s}T00:00:00`);
 const isoWeek = (d) => { const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())); const n=t.getUTCDay()||7; t.setUTCDate(t.getUTCDate()+4-n); const y0=new Date(Date.UTC(t.getUTCFullYear(),0,1)); return Math.ceil((((t-y0)/86400000)+1)/7); };
-const isWeekend = d => [0,6].includes(d.getDay()); // dom=0, sáb=6
+const isWeekend = d => [0,6].includes(d.getDay());
 const limiteDia = d => isWeekend(d) ? 3 : 2;
 
 /* ========= Estado ========= */
-let pivot = new Date(); pivot.setDate(1); // mes mostrado
-let cache = [];             // reservas del mes (filtradas por fecha)
-let selectedId = null;      // id BIGINT seleccionado
+let pivot = new Date(); pivot.setDate(1);
+let cache = [];
+let selectedId = null;
 let editMode   = false;
 
 /* ========= Nodos ========= */
@@ -80,7 +80,7 @@ async function loadMes(baseDate){
     .gte("fecha", ymd(start))
     .lt("fecha",  ymd(end))
     .order("fecha", { ascending: true })
-    .order("hora",  { ascending: true }); // HH:MM texto
+    .order("hora",  { ascending: true });
   if (error) {
     console.error("[catering] loadMes error", error);
     cache = [];
@@ -95,21 +95,18 @@ function renderCalendar(){
   monthTitle.textContent = titulo;
   fechaHeader.textContent = titulo;
 
-  // Encabezados (Sem,Dom..Sáb)
   const heads = [
     h("div","wcol head","Sem"),
     ...["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"].map(t => h("div","head",t))
   ];
   calTable.replaceChildren(...heads);
 
-  // calcular 6 semanas
   const first   = new Date(pivot);
-  const dow     = first.getDay(); // 0 dom
-  const start   = new Date(first); start.setDate(1 - ((dow + 6) % 7)); // lunes de la semana de 1°
+  const dow     = first.getDay();
+  const start   = new Date(first); start.setDate(1 - ((dow + 6) % 7));
   const days42  = [...Array(42)].map((_,i)=>{ const d=new Date(start); d.setDate(start.getDate()+i); return d; });
 
   for (let w=0; w<6; w++){
-    // Columna semana ISO
     calTable.appendChild(h("div","wcol", String(isoWeek(days42[w*7]))));
 
     for (let i=0;i<7;i++){
@@ -128,7 +125,6 @@ function renderCalendar(){
         day.appendChild(chip);
       });
 
-      // Si está lleno, opacidad
       if (inMonth){
         const usados = delDia.filter(r => r.estado !== "cancelado").length;
         if (usados >= limiteDia(d)) day.style.opacity = .70;
@@ -257,7 +253,6 @@ A.form?.addEventListener("submit", async (e) => {
     return alert("Faltan campos obligatorios.");
   }
 
-  // Chequeo de cupo (lado cliente; el RPC igual valida)
   const fechaSel = A.fecha.value;
   const dJS      = fromYMD(fechaSel);
   const lim      = limiteDia(dJS);
@@ -302,8 +297,8 @@ async function reload(){ await loadMes(pivot); renderCalendar(); }
 
 (async function init(){
   try {
-    await requireAuth();    // asegura sesión activa
-  } catch { return; }       // si redirige a login, corta flujo
+    await requireAuth(); // exige sesión
+  } catch { return; }
 
   await reload();
   disableDetalle(true);
