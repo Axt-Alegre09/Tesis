@@ -1,5 +1,5 @@
 /* JS/chatbot.brain.js
-   NLU liviano para catálogo + carrito + respuestas de producto.
+   NLU liviano para catálogo + carrito + respuestas de producto + reservas catering (multi-turno).
    (sin OpenAI, todo frontend)
 */
 (() => {
@@ -64,7 +64,7 @@
   };
 
   // =============== KB (precios / incluye) breve ===============
-   const KB = {
+  const KB = {
     // -- BOCADITOS
     "bocaditos combo 1": { precio: 55000,  incluye: "2 empanadas (a elegir), 2 sándwiches y 4 chipas" },
     "bocaditos combo 2": { precio: 50000,  incluye: "3 empanadas, 3 sandwichitos, 2 payagua/pajagua, 2 chipa guasú, 4 chipas y 4 mbejú" },
@@ -241,7 +241,7 @@
     return { count: inCat.length, names: names.slice(0,10), flavors: Array.from(flavors) };
   }
 
-  // =============== Parser de intención ===============
+  // =============== Parser de intención (carrito + info) ===============
   function extractFlavor(fragment){
     const multi = /(jamon y queso|dulce de leche|papa frita|milanesa|chipaguazu|pan del campo|sopa paraguaya)/;
     const m = (fragment||"").match(multi);
@@ -290,6 +290,171 @@
     if (kb) return kb.key;
     return null;
   }
+
+  // =============== --- CATERING: helpers + flujo --- ===============
+  const CATERING_FIELDS = [
+    { key:"razonsocial", prompt:"¿A nombre de quién es el servicio? (empresa o nombre)", required:true },
+    { key:"telefono",    prompt:"¿Cuál es el teléfono de contacto?", required:true },
+    { key:"email",       prompt:"Correo de contacto (opcional, podés decir 'no tengo')", required:false },
+    { key:"tipoevento",  prompt:"¿Qué tipo de servicio/evento? (p.ej. Catering, Evento)", required:true },
+    { key:"tipocomida",  prompt:"¿Qué menú/preferencia? (p.ej. bocaditos)", required:true },
+    { key:"lugar",       prompt:"¿Dónde es (dirección o ciudad)?", required:true },
+    { key:"invitados",   prompt:"¿Para cuántos invitados?", required:true },
+    { key:"fecha",       prompt:"¿Fecha del evento? (dd/mm/aaaa o aaaa-mm-dd)", required:true },
+    { key:"hora",        prompt:"¿Hora de inicio? (HH:MM)", required:true },
+  ];
+  const DRAFT_KEY = "CATERING_DRAFT";
+
+  function parseFecha(s) {
+    if (!s) return null;
+    const t = String(s).trim();
+    const m1 = t.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (m1) return `${m1[3]}-${String(m1[2]).padStart(2,"0")}-${String(m1[1]).padStart(2,"0")}`;
+    const m2 = t.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (m2) return t;
+    return null;
+  }
+  function parseHora(s) {
+    const m = String(s||"").trim().match(/^(\d{1,2}):(\d{2})$/);
+    if (!m) return null;
+    const hh = String(m[1]).padStart(2,"0"), mm = m[2];
+    if (Number(hh)>23 || Number(mm)>59) return null;
+    return `${hh}:${mm}`;
+  }
+
+  function tryFillDraftFromText(draft, text){
+    const msg = normalize(text);
+
+    // nombre / empresa
+    const mNom = msg.match(/(a\s*nombre\s*de|empresa|razon|razón)\s+([a-z0-9 áéíóúñ\.-]+)/i);
+    if (mNom && !draft.razonsocial) draft.razonsocial = mNom[2].trim();
+
+    const tel = msg.match(/(\+?\d[\d\s\-]{6,}\d)/);
+    if (tel && !draft.telefono) draft.telefono = tel[1].replace(/\s+/g,"");
+
+    const em = msg.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i);
+    if (em && !draft.email) draft.email = em[0];
+
+    if (!draft.invitados){
+      const inv = msg.match(/(\d+)\s*(invitado|persona|personas|pers|pax)/);
+      if (inv) draft.invitados = Number(inv[1]);
+    }
+
+    if (!draft.fecha){
+      const f1 = msg.match(/(\d{1,2}\/\d{1,2}\/\d{4}|\d{4}-\d{2}-\d{2})/);
+      if (f1) draft.fecha = parseFecha(f1[1]);
+    }
+
+    if (!draft.hora){
+      const h1 = msg.match(/(\d{1,2}:\d{2})/);
+      if (h1) draft.hora = parseHora(h1[1]);
+    }
+
+    if (!draft.tipoevento){
+      if (msg.includes("evento")) draft.tipoevento = "evento";
+      else if (msg.includes("catering")) draft.tipoevento = "catering";
+    }
+    if (!draft.tipocomida){
+      if (msg.includes("bocadito")) draft.tipocomida = "bocaditos";
+    }
+    if (!draft.lugar){
+      const mLug = msg.match(/\ben\s+([a-záéíóúñ0-9\.\- ]{4,})$/i);
+      if (mLug) draft.lugar = mLug[1].trim();
+    }
+  }
+
+  function getNextMissing(draft){
+    for (const f of CATERING_FIELDS){
+      if (f.required && (draft[f.key]==null || String(draft[f.key]).trim()==="")){
+        return f;
+      }
+    }
+    return null;
+  }
+
+  async function checkCupo(fecha){
+    try{
+      const d = new Date(`${fecha}T00:00:00`);
+      const weekend = [0,6].includes(d.getDay());
+      const lim = weekend ? 3 : 2;
+      const { data, error } = await window.supabase
+        .from("reservas_catering")
+        .select("id,estado")
+        .eq("fecha", fecha);
+      if (error) throw error;
+      const usados = (data||[]).filter(r=>r.estado!=="cancelado").length;
+      return { ok: usados < lim, usados, lim };
+    }catch(e){
+      console.warn("checkCupo:", e);
+      return { ok:false, usados:0, lim:0, error:e };
+    }
+  }
+
+  async function actCatering(userText){
+    // sesión requerida
+    try {
+      const { data } = await window.supabase.auth.getSession();
+      if (!data?.session) {
+        return { text: "Para agendar necesito que inicies sesión (botón “Cuenta” → Iniciar sesión)." };
+      }
+    } catch {}
+
+    // Recupero/actualizo borrador
+    let draft = {};
+    try{ draft = JSON.parse(localStorage.getItem(DRAFT_KEY)||"{}"); }catch{}
+    tryFillDraftFromText(draft, userText);
+
+    // Normalizaciones
+    if (draft.fecha && !parseFecha(draft.fecha)) draft.fecha = null;
+    if (draft.hora  && !parseHora(draft.hora))   draft.hora  = null;
+    if (draft.invitados && isNaN(Number(draft.invitados))) draft.invitados = null;
+
+    // Preguntar lo que falta
+    const missing = getNextMissing(draft);
+    if (missing){
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      return { text: missing.prompt };
+    }
+
+    // Validar cupo
+    const cupo = await checkCupo(draft.fecha);
+    if (!cupo.ok){
+      return { text:`⚠️ Cupo lleno para ${draft.fecha}. Capacidad: ${cupo.lim}. Probá con otra fecha.` };
+    }
+
+    // Ejecutar RPC
+    try{
+      const payload = {
+        p_razonsocial: draft.razonsocial,
+        p_ruc:         "",
+        p_tipoevento:  draft.tipoevento,
+        p_fecha:       draft.fecha,
+        p_hora:        draft.hora,
+        p_tipocomida:  draft.tipocomida,
+        p_lugar:       draft.lugar,
+        p_observaciones: "",
+        p_invitados:   Number(draft.invitados) || null,
+        p_telefono:    draft.telefono || "",
+        p_email:       draft.email || ""
+      };
+      const { data, error } = await window.supabase.rpc("catering_agendar", payload);
+      if (error) throw error;
+
+      localStorage.removeItem(DRAFT_KEY);
+
+      const resumen = `✅ Reserva creada:
+• Cliente: ${data.razonsocial}
+• Fecha: ${data.fecha}  Hora: ${data.hora}
+• Tipo: ${data.tipoevento}  • Menú: ${data.tipocomida}
+• Invitados: ${data.invitados ?? "-"}
+• Lugar: ${data.lugar}`;
+      return { text: resumen };
+    }catch(e){
+      console.error("RPC catering_agendar:", e);
+      return { text: "❌ No pude registrar la reserva ahora. Revisá los datos o intentá de nuevo." };
+    }
+  }
+  // =============== FIN helpers CATERING ===============
 
   function parseMessage(msgRaw=""){
     const msg = normalize(preclean(msgRaw));
@@ -340,10 +505,15 @@
       if (prodTxt) return { intent:"add", items:[{ cantidad:1, prodTxt }] };
     }
 
+    // --- NUEVO: intención de reservas catering ---
+    if (/\b(catering|reserva(r)?|agendar)\b/.test(msg)) {
+      return { intent:"catering_book", raw: msgRaw };
+    }
+
     return { intent:"none" };
   }
 
-  // =============== Acciones ===============
+  // =============== Acciones (carrito + info + catering) ===============
   async function actAdd(items){
     const done = [], missing = [];
     for (const it of items) {
@@ -428,11 +598,8 @@
 • “poné 5 empanadas”
 • “ver carrito”, “total”, “vaciar carrito”
 
-También respondo:
-• “¿qué incluye Bocaditos Combo 4?”
-• “precio de Bocadito en Pareja”
-• “sabores de empanadas”
-• “¿tienes milanesas?”` };
+También puedo agendar tu catering:
+• “quiero reservar catering para el 20/11 a las 10:00 en Villa Elisa para 30 personas”` };
   }
 
   async function actCategoryInfo({ cat, topic }){
@@ -494,7 +661,8 @@ También respondo:
         case "category_info":  return await actCategoryInfo(parsed);
         case "product_info":   return await actProductInfo(parsed);
         case "category_prices":return await actCategoryPrices(parsed);
-        default:               return null; // pasa al backend (reservas)
+        case "catering_book":  return await actCatering(parsed.raw);
+        default:               return null; // sin match -> backend
       }
     }catch(e){
       console.error("[ChatBrain] handleMessage error:", e);

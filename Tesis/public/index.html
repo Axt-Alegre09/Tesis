@@ -344,8 +344,11 @@
   <!-- Popup de recomendaciones -->
   <script type="module" src="JS/reco-popup.js"></script>
 
-  <!-- Chat -->
-  <script src="JS/chatbot.brain.js" defer></script>
-  <script src="JS/script-chatbot.js" defer></script>
+              <!-- Chat -->
+      <script src="JS/chatbot.brain.js" defer></script>
+      <!-- 👉 Módulo de reservas por chat DEBE ir antes -->
+      <script src="JS/chatbot.catering.js" defer></script>
+      <!-- UI del chat -->
+      <script src="JS/script-chatbot.js" defer></script>
 </body>
 </html>

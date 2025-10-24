@@ -251,3 +251,5 @@ export async function requireAuth() {
   return data.session.user; // por si querés usar el user
 }
 
+
+window.supabase = supabase;
