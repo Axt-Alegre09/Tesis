@@ -1,7 +1,7 @@
 // JS/catering.js
 // Panel Pedidos Catering — calendario 100% funcional con Supabase
 // Usa la sesión real (admin) importando el cliente que ya configuraste.
-import { supabase } from "./JS/ScriptLogin.js"; // ajusta ruta si es necesario
+import { supabase } from "../JS/ScriptLogin.js"; // ajusta ruta si es necesario
 
 /* ========= Utiles de fecha ========= */
 const ymd  = d => d.toISOString().slice(0,10);
