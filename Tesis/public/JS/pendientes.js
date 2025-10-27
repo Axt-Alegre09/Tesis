@@ -15,98 +15,105 @@ const fmtGs = (n) => new Intl.NumberFormat("es-PY").format(Number(n || 0)) + " G
 const hoyLargo = () =>
   new Date().toLocaleDateString("es-PY", { day:"2-digit", month:"long", year:"numeric" });
 
+$("#fecha").textContent = hoyLargo();
+$(".back")?.addEventListener("click", () => history.back());
+
 const ESTADOS_PEDIDO = ["pendiente", "pagado", "cancelado", "entregado"];
 const ESTADOS_PAGO   = ["pendiente", "pagado", "fallido", "reembolsado"];
-const LISTAR_COMO_PEND = ["pendiente"]; // lo que se muestra en esta vista
-
-// pinta badge con color por estado
-function badge(estado, palette) {
-  const color = palette[estado] || "#444";
-  return `<span class="badge" style="display:inline-block;padding:.15rem .5rem;border-radius:999px;background:${color}15;color:${color};border:1px solid ${color}40;font-size:.78rem;margin-left:.25rem;">${estado}</span>`;
-}
 const colorEstado = { pendiente:"#b38a00", pagado:"#1d6f42", cancelado:"#8b0000", entregado:"#2e7dd1" };
 const colorPago   = { pendiente:"#b38a00", pagado:"#1d6f42", fallido:"#8b0000", reembolsado:"#6b4caf" };
+const badge = (estado, palette) => {
+  if (!estado) return "";
+  const color = palette[estado] || "#444";
+  return `<span class="badge" style="display:inline-block;padding:.15rem .5rem;border-radius:999px;background:${color}15;color:${color};border:1px solid ${color}40;font-size:.78rem;margin-left:.25rem;">${estado}</span>`;
+};
 
-$(".back")?.addEventListener("click", () => history.back());
-$("#fecha").textContent = hoyLargo();
+/* ========= Data (lee de pedidos_snapshot) ========= */
 
-/* ========= Data ========= */
-// 1) Pedidos pendientes con detalle
-async function fetchPedidosPendientes() {
-  const { data, error } = await supa
-    .from("pedidos")
+/** Trae snapshots más recientes y, si tienen pedido_id, trae el estado desde 'pedidos' */
+async function fetchSnapshotsConEstados() {
+  // 1) Snapshots (esto tiene TODOS los datos del cliente y envío)
+  const { data: snaps, error } = await supa
+    .from("pedidos_snapshot")
     .select(`
-      id, creado_en, usuario_id,
-      metodo_pago, monto_total,
-      estado, estado_pago,
-      detalles_pedido:detalles_pedido!detalles_pedido_pedido_id_fkey (
-        cantidad, precio_unitario,
-        productos:productos!detalles_pedido_producto_id_fkey ( id, nombre )
-      )
-    `)
-    .in("estado", LISTAR_COMO_PEND)
-    .order("creado_en", { ascending: true });
-  if (error) throw error;
-  return data || [];
-}
-
-// 2) Perfiles por user_id
-async function fetchPerfiles(userIds) {
-  if (!userIds.length) return new Map();
-  const { data, error } = await supa
-    .from("clientes_perfil")
-    .select(`
-      user_id,
+      id, creado_en, pedido_id, usuario_id,
+      metodo_pago, total,
       ruc, razon, tel, mail, contacto,
       ciudad, barrio, depto, postal,
       calle1, calle2, nro,
-      created_at, updated_at
+      hora_desde, hora_hasta,
+      items
     `)
-    .in("user_id", userIds);
+    .order("creado_en", { ascending: true }); // oldest -> newest (ajusta si querés)
   if (error) throw error;
-  const map = new Map();
-  (data || []).forEach((r) => map.set(r.user_id, r));
-  return map;
-}
 
-async function updatePedido(id, payload) {
-  Object.keys(payload).forEach((k) => {
-    if (payload[k] === "" || payload[k] === undefined) delete payload[k];
+  // 2) Estados desde 'pedidos' (si existe pedido_id)
+  const ids = [...new Set((snaps || []).map(s => s.pedido_id).filter(Boolean))];
+  let mapEstado = new Map();
+  if (ids.length) {
+    const { data: pedidos, error: e2 } = await supa
+      .from("pedidos")
+      .select("id, estado, estado_pago, metodo_pago, monto_total")
+      .in("id", ids);
+    if (e2) throw e2;
+    mapEstado = new Map(pedidos.map(p => [p.id, p]));
+  }
+
+  // 3) Une estado/estado_pago
+  return (snaps || []).map(s => {
+    const ped = s.pedido_id ? mapEstado.get(s.pedido_id) : null;
+    return {
+      ...s,
+      estado: ped?.estado || "pendiente",
+      estado_pago: ped?.estado_pago || "pendiente",
+      metodo_pago_real: ped?.metodo_pago || s.metodo_pago,
+      total_real: (Number(ped?.monto_total || 0) || Number(s.total || 0) || 0)
+    };
   });
-  const { error } = await supa.from("pedidos").update(payload).eq("id", id);
-  if (error) throw error;
 }
 
-async function updatePerfil(user_id, payload) {
-  Object.keys(payload).forEach((k) => {
-    if (payload[k] === "" || payload[k] === undefined) delete payload[k];
+async function updatePedido(pedido_id, payload) {
+  if (!pedido_id) throw new Error("Este snapshot no tiene pedido_id para actualizar.");
+  const toSend = { ...payload };
+  Object.keys(toSend).forEach(k => {
+    if (toSend[k] === "" || typeof toSend[k] === "undefined") delete toSend[k];
   });
-  const { error } = await supa
-    .from("clientes_perfil")
-    .update(payload)
-    .eq("user_id", user_id);
+  const { error } = await supa.from("pedidos").update(toSend).eq("id", pedido_id);
   if (error) throw error;
 }
 
-async function fetchPedidoFull(id) {
-  const { data: p, error } = await supa
-    .from("pedidos")
+async function fetchSnapshotById(id) {
+  const { data: s, error } = await supa
+    .from("pedidos_snapshot")
     .select(`
-      id, creado_en, usuario_id,
-      metodo_pago, monto_total,
-      estado, estado_pago,
-      detalles_pedido:detalles_pedido!detalles_pedido_pedido_id_fkey (
-        cantidad, precio_unitario,
-        productos:productos!detalles_pedido_producto_id_fkey ( id, nombre )
-      )
+      id, creado_en, pedido_id, usuario_id,
+      metodo_pago, total,
+      ruc, razon, tel, mail, contacto,
+      ciudad, barrio, depto, postal,
+      calle1, calle2, nro,
+      hora_desde, hora_hasta,
+      items
     `)
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
 
-  const perfMap = await fetchPerfiles([p.usuario_id]);
-  p.perfil = perfMap.get(p.usuario_id) || {};
-  return p;
+  let estado = "pendiente", estado_pago = "pendiente", metodo_pago = s.metodo_pago, total = Number(s.total || 0);
+  if (s.pedido_id) {
+    const { data: p } = await supa
+      .from("pedidos")
+      .select("estado, estado_pago, metodo_pago, monto_total")
+      .eq("id", s.pedido_id)
+      .maybeSingle();
+    if (p) {
+      estado = p.estado || estado;
+      estado_pago = p.estado_pago || estado_pago;
+      metodo_pago = p.metodo_pago || metodo_pago;
+      total = Number(p.monto_total || total);
+    }
+  }
+
+  return { ...s, estado, estado_pago, metodo_pago_real: metodo_pago, total_real: total };
 }
 
 /* ========= UI ========= */
@@ -118,37 +125,33 @@ function render(list) {
     grid.innerHTML = `<section class="card"><p>No hay pedidos pendientes.</p></section>`;
     return;
   }
-  list.forEach((p) => grid.appendChild(cardPedido(p)));
+  list.forEach((p, idx) => grid.appendChild(cardPedido(p, idx)));
 }
 
-function cardPedido(p) {
-  const perf = p.perfil || {};
-  const dets = (p.detalles_pedido || []).map((d) => {
-    const qty  = Number(d?.cantidad ?? 0);
-    const unit = Number(d?.precio_unitario ?? 0);
-    return { titulo: d?.productos?.nombre ?? "(sin nombre)", cantidad: qty, precio: unit, subtotal: qty * unit };
-  });
-  const totalDet = dets.reduce((a, r) => a + r.subtotal, 0);
-  const total = p.monto_total ?? totalDet;
+function cardPedido(p, idx) {
+  const dets = Array.isArray(p.items) ? p.items : [];
+  const detTotal = dets.reduce((a, d) => a + Number(d.precio || 0) * Number(d.cantidad || 1), 0);
+  const total = Number(p.total_real || detTotal || 0);
 
   const sec = document.createElement("section");
   sec.className = "card";
-  sec.dataset.id = p.id;
+  sec.dataset.snapshot_id = p.id;
+  sec.dataset.pedido_id = p.pedido_id || "";
 
   sec.innerHTML = `
-    <h3>Pedido N°: ${p.id}
+    <h3>Pedido N°: ${idx}
       ${p.estado ? badge(p.estado, colorEstado) : ""}
       ${p.estado_pago ? badge(p.estado_pago, colorPago) : ""}
     </h3>
 
     <form class="info two-cols" data-mode="view">
       <div class="col">
-        <label>Ruc / Ci : <input name="ruc" value="${dz(perf.ruc)}" disabled></label>
-        <label>Nombre : <input name="razon" value="${dz(perf.razon)}" disabled></label>
-        <label>Teléfono : <input name="tel" value="${dz(perf.tel)}" disabled></label>
-        <label>Correo : <input name="mail" value="${dz(perf.mail)}" disabled></label>
-        <label>Contacto : <input name="contacto" value="${dz(perf.contacto)}" disabled></label>
-        <label>Dirección postal : <input name="postal" value="${dz(perf.postal)}" disabled></label>
+        <label>Ruc / Ci : <input value="${dz(p.ruc)}" disabled></label>
+        <label>Nombre : <input value="${dz(p.razon)}" disabled></label>
+        <label>Teléfono : <input value="${dz(p.tel)}" disabled></label>
+        <label>Correo : <input value="${dz(p.mail)}" disabled></label>
+        <label>Contacto : <input value="${dz(p.contacto)}" disabled></label>
+        <label>Dirección postal : <input value="${dz(p.postal)}" disabled></label>
 
         <div class="hr"></div>
         <div class="detalle">
@@ -156,8 +159,8 @@ function cardPedido(p) {
           <ul class="det-list">
             ${
               dets.length
-                ? dets.map(d => `<li>${d.titulo} — ${d.cantidad} × ${fmtGs(d.precio)} = <b>${fmtGs(d.subtotal)}</b></li>`).join("")
-                : "<li>(sin ítems)</li>"
+              ? dets.map(d => `<li>${dz(d.titulo)||"(item)"} — ${Number(d.cantidad||1)} × ${fmtGs(d.precio||0)} = <b>${fmtGs(Number(d.precio||0)*Number(d.cantidad||1))}</b></li>`).join("")
+              : "<li>(sin ítems)</li>"
             }
           </ul>
         </div>
@@ -165,33 +168,29 @@ function cardPedido(p) {
       </div>
 
       <div class="col">
-        <label>Ciudad : <input name="ciudad" value="${dz(perf.ciudad)}" disabled></label>
-        <label>Barrio : <input name="barrio" value="${dz(perf.barrio)}" disabled></label>
-        <label>Departamento : <input name="depto" value="${dz(perf.depto)}" disabled></label>
-        <label>Calle 1 : <input name="calle1" value="${dz(perf.calle1)}" disabled></label>
-        <label>Calle 2 : <input name="calle2" value="${dz(perf.calle2)}" disabled></label>
-        <label>N° Casa : <input name="nro" value="${dz(perf.nro)}" disabled></label>
+        <label>Ciudad : <input value="${dz(p.ciudad)}" disabled></label>
+        <label>Barrio : <input value="${dz(p.barrio)}" disabled></label>
+        <label>Departamento : <input value="${dz(p.depto)}" disabled></label>
+        <label>Calle 1 : <input value="${dz(p.calle1)}" disabled></label>
+        <label>Calle 2 : <input value="${dz(p.calle2)}" disabled></label>
+        <label>N° Casa : <input value="${dz(p.nro)}" disabled></label>
 
         <div class="hr"></div>
 
         <label>Método de Pago :
           <select name="metodo_pago" disabled>
-            <option value="">—</option>
-            ${["Transferencia", "Tarjeta", "Efectivo"]
-              .map(opt => `<option value="${opt}" ${p.metodo_pago===opt?"selected":""}>${opt}</option>`).join("")}
+            ${["Transferencia","Tarjeta","Efectivo"].map(opt => `<option value="${opt}" ${ (p.metodo_pago_real||p.metodo_pago)===opt ? "selected":"" }>${opt}</option>`).join("")}
           </select>
         </label>
 
         <label>Estado pago :
-          <select name="estado_pago" disabled>
-            <option value="">—</option>
+          <select name="estado_pago" ${p.pedido_id ? "" : "disabled"}>
             ${ESTADOS_PAGO.map(e => `<option value="${e}" ${p.estado_pago===e?"selected":""}>${e}</option>`).join("")}
           </select>
         </label>
 
         <label>Estado pedido :
-          <select name="estado" disabled>
-            <option value="">—</option>
+          <select name="estado" ${p.pedido_id ? "" : "disabled"}>
             ${ESTADOS_PEDIDO.map(e => `<option value="${e}" ${p.estado===e?"selected":""}>${e}</option>`).join("")}
           </select>
         </label>
@@ -199,9 +198,8 @@ function cardPedido(p) {
     </form>
 
     <div class="acciones">
-      <button class="btn brown btn-edit">Actualizar</button>
-      <button class="btn green btn-ok">Finalizar</button>
-      <!-- <button class="btn" data-cancel>Cancelar</button> -->
+      <button class="btn brown btn-edit" ${p.pedido_id ? "" : "disabled"}>Actualizar</button>
+      <button class="btn green btn-ok" ${p.pedido_id ? "" : "disabled"}>Finalizar</button>
     </div>
   `;
 
@@ -210,14 +208,18 @@ function cardPedido(p) {
   const btnOk  = $(".btn-ok", sec);
   let btnCancel = null;
 
-  btnEd.addEventListener("click", async (e) => {
+  // Actualizar: permite editar solo estado/estado_pago/metodo_pago (en pedidos)
+  btnEd?.addEventListener("click", async (e) => {
     e.preventDefault();
-    const mode = form.dataset.mode;
+    if (!p.pedido_id) return alert("Este snapshot no tiene pedido vinculado (pedido_id).");
 
+    const mode = form.dataset.mode;
     if (mode === "view") {
-      $$("input, select", form).forEach((el) => (el.disabled = false));
+      $$("select[name='metodo_pago'], select[name='estado_pago'], select[name='estado']", form)
+        .forEach(el => el.disabled = false);
       form.dataset.mode = "edit";
       btnEd.textContent = "Guardar";
+
       if (!btnCancel) {
         btnCancel = document.createElement("button");
         btnCancel.className = "btn";
@@ -229,23 +231,13 @@ function cardPedido(p) {
         });
       }
     } else {
-      const payload = serializeForm(form);
-
-      // separar payloads
-      const perfilPayload = pick(payload, [
-        "ruc","razon","tel","mail","contacto","postal",
-        "ciudad","barrio","depto","calle1","calle2","nro"
-      ]);
-      const pedidoPayload = pick(payload, ["metodo_pago","estado_pago","estado"]);
+      const metodo_pago = form.querySelector("select[name='metodo_pago']")?.value || undefined;
+      const estado_pago = form.querySelector("select[name='estado_pago']")?.value || undefined;
+      const estado      = form.querySelector("select[name='estado']")?.value || undefined;
 
       try {
         btnEd.disabled = true;
-        if (Object.keys(perfilPayload).length) {
-          await updatePerfil(p.usuario_id, perfilPayload);
-        }
-        if (Object.keys(pedidoPayload).length) {
-          await updatePedido(p.id, pedidoPayload);
-        }
+        await updatePedido(p.pedido_id, { metodo_pago, estado_pago, estado });
         await reloadCard(sec, p.id);
       } catch (err) {
         alert("No se pudo guardar: " + (err?.message || err));
@@ -256,14 +248,15 @@ function cardPedido(p) {
     }
   });
 
-  // Finaliza => estado 'entregado'
-  btnOk.addEventListener("click", async (e) => {
+  // Finalizar => estado 'entregado'
+  btnOk?.addEventListener("click", async (e) => {
     e.preventDefault();
+    if (!p.pedido_id) return alert("Este snapshot no tiene pedido vinculado (pedido_id).");
     if (!confirm("¿Dar por finalizado este pedido (estado: entregado)?")) return;
 
     try {
       btnOk.disabled = true;
-      await updatePedido(p.id, { estado: "entregado" });
+      await updatePedido(p.pedido_id, { estado: "entregado" });
       sec.remove();
       if (!grid.children.length) render([]);
     } catch (err) {
@@ -277,24 +270,11 @@ function cardPedido(p) {
   return sec;
 }
 
-function serializeForm(form) {
-  const out = {};
-  $$("input, select", form).forEach((el) => {
-    if (!el.name) return;
-    out[el.name] = el.value;
-  });
-  return out;
-}
-function pick(obj, keys) {
-  const out = {};
-  keys.forEach((k) => { if (k in obj) out[k] = obj[k]; });
-  return out;
-}
-
-async function reloadCard(oldNode, id) {
+async function reloadCard(oldNode, snapshotId) {
   try {
-    const fresh = await fetchPedidoFull(id);
-    const newNode = cardPedido(fresh);
+    const fresh = await fetchSnapshotById(snapshotId);
+    const idx = [...grid.children].indexOf(oldNode);
+    const newNode = cardPedido(fresh, Math.max(0, idx));
     oldNode.replaceWith(newNode);
   } catch (err) {
     alert("No se pudo recargar el pedido: " + (err?.message || err));
@@ -305,11 +285,8 @@ async function reloadCard(oldNode, id) {
 /* ========= Init ========= */
 (async () => {
   try {
-    const pedidos = await fetchPedidosPendientes();
-    const ids = [...new Set(pedidos.map(p => p.usuario_id).filter(Boolean))];
-    const perfMap = await fetchPerfiles(ids);
-    pedidos.forEach(p => { p.perfil = perfMap.get(p.usuario_id) || {}; });
-    render(pedidos);
+    const snaps = await fetchSnapshotsConEstados();
+    render(snaps);
   } catch (err) {
     alert("Error cargando pedidos: " + (err?.message || err));
     console.error(err);
