@@ -39,7 +39,7 @@ async function fetchPedidosPendientes() {
       id, creado_en, usuario_id,
       metodo_pago, monto_total,
       estado, estado_pago,
-      detalles_pedido (
+      detalles_pedido:detalles_pedido!detalles_pedido_pedido_id_fkey (
         cantidad, precio_unitario,
         productos ( id, nombre )
       )
@@ -95,7 +95,7 @@ async function fetchPedidoFull(id) {
       id, creado_en, usuario_id,
       metodo_pago, monto_total,
       estado, estado_pago,
-      detalles_pedido (
+      detalles_pedido:detalles_pedido!detalles_pedido_pedido_id_fkey (
         cantidad, precio_unitario,
         productos ( id, nombre )
       )
@@ -103,6 +103,7 @@ async function fetchPedidoFull(id) {
     .eq("id", id)
     .maybeSingle();
   if (error) throw error;
+
   const perfMap = await fetchPerfiles([p.usuario_id]);
   p.perfil = perfMap.get(p.usuario_id) || {};
   return p;
