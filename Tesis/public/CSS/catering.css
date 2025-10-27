@@ -214,3 +214,27 @@ input::placeholder{ color:#8a8a8a }
 @media (prefers-reduced-motion: reduce){
   * { scroll-behavior: auto !important; }
 }
+
+
+
+/* ===================== AJUSTE DE CONTENEDOR GLOBAL EN MÓVIL ===================== */
+@media (max-width: 760px){
+  body {
+    background: var(--gray-bg); /* fondo limpio */
+  }
+  .wrapper {
+    margin: 0;
+    padding: 12px;
+    min-height: 100vh;
+    border-radius: 0;           /* elimina bordes redondeados exagerados */
+    box-shadow: none;           /* quita sombra interna grande */
+  }
+  .topbar h1 {
+    font-size: 22px;            /* título más compacto */
+  }
+  .fecha {
+    margin-top: 4px;
+    font-size: 14px;
+  }
+}
+
