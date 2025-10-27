@@ -1,5 +1,4 @@
 :root{
-  /* misma paleta que “Pendientes” */
   --brown-900:#3c2e1a;
   --brown-700:#7a623c;
   --cream-50:#fbf8f3;
@@ -8,13 +7,13 @@
   --ok:#34a853;
   --warn:#d8a033;
 
-  --radius:22px;
+  --radius:26px;
   --shadow-deep:0 25px 40px rgba(0,0,0,.15);
   --shadow-card:0 8px 15px rgba(0,0,0,.10);
 
-  /* responsive calendar */
-  --cell-h:108px;             /* alto de filas del calendario (se ajusta en breakpoints) */
-  --gap:22px;                 /* gap de grillas */
+  --gap:22px;
+  --cell-h:108px;          /* alto fila calendario (desktop) */
+  --border-w:2px;          /* grosor de bordes (se reduce en móvil) */
 }
 
 /* ====== BASE / WRAPPER ====== */
@@ -22,7 +21,7 @@
 body{
   margin:0;
   font-family:Poppins,system-ui,Segoe UI,Roboto,Arial,sans-serif;
-  background:#a98a58;                    /* marco marrón */
+  background:#a98a58;
 }
 .wrapper{
   margin:18px;
@@ -30,42 +29,35 @@ body{
   border-radius:20px;
   box-shadow: inset 0 0 0 2px rgba(0,0,0,.08), var(--shadow-deep);
   padding:25px;
-  min-height:calc(100vh - 36px);         /* gris hasta abajo */
+  min-height:calc(100vh - 36px);
   display:flex; flex-direction:column;
 }
 
 /* ====== HEADER ====== */
-.topbar{
-  display:flex; align-items:center; justify-content:center;
-  position:relative;
-}
+.topbar{ display:flex; align-items:center; justify-content:center; position:relative; }
 .back{
   position:absolute; left:0;
   width:38px; height:38px; border-radius:999px;
-  border:2px solid var(--brown-900);
+  border:var(--border-w) solid var(--brown-900);
   background:var(--cream-100);
   cursor:pointer; font-size:20px;
 }
-h1{
-  margin:0; font-weight:800; font-size:36px; color:var(--brown-900);
-}
-.fecha{
-  text-align:center; margin:8px 0 20px; font-weight:700; color:#333;
-}
+h1{ margin:0; font-weight:800; font-size:36px; color:var(--brown-900); }
+.fecha{ text-align:center; margin:8px 0 20px; font-weight:700; color:#333; }
 
 /* ====== LAYOUT ====== */
 .layout-3{
   display:grid;
-  grid-template-columns: 1.2fr 0.9fr 0.9fr; /* calendario más ancho */
+  grid-template-columns: 1.2fr 0.9fr 0.9fr;
   gap:var(--gap);
   align-items:start;
 }
 
-/* ====== CARD BASE ====== */
+/* ====== CARD ====== */
 .card{
   background:#fff;
-  border-radius:26px;
-  border:2px solid var(--brown-900);
+  border-radius:var(--radius);
+  border:var(--border-w) solid var(--brown-900);
   box-shadow:var(--shadow-card);
   padding:14px;
 }
@@ -73,10 +65,9 @@ h1{
 /* ====== CALENDARIO ====== */
 .calendar{ padding:14px 16px }
 .calendar__header{
-  position:sticky; top:0; z-index:5;     /* queda fijo cuando se hace scroll en móvil */
   display:flex; align-items:center; justify-content:space-between;
   background:var(--cream-100);
-  border:2px solid var(--brown-900);
+  border:var(--border-w) solid var(--brown-900);
   border-radius:14px;
   padding:8px 12px; margin-bottom:12px;
 }
@@ -84,26 +75,24 @@ h1{
 .month-title{margin:0; font-weight:800; color:var(--brown-900)}
 .icon-btn{
   width:36px; height:36px; border-radius:999px;
-  border:2px solid var(--brown-900); background:#fff; cursor:pointer;
+  border:var(--border-w) solid var(--brown-900);
+  background:#fff; cursor:pointer;
 }
 .icon-btn:hover{background:var(--cream-50)}
 .flag{font-size:24px}
 
 .calendar__table{
   display:grid;
-  grid-template-columns: 64px repeat(7, 1fr);
+  grid-template-columns: 64px repeat(7, 1fr);  /* “Sem” + 7 días (desktop) */
   grid-auto-rows: var(--cell-h);
-  border:2px solid var(--brown-900);
+  border:var(--border-w) solid var(--brown-900);
   border-radius:14px; overflow:hidden;
   background:#fff;
-  /* en móvil angosto permitimos desplazar horizontal si no entra */
-  overflow-x:auto;
-  overscroll-behavior: contain;
 }
 .head,.wcol{
   background:#e7dece;
-  border-right:2px solid var(--brown-900);
-  border-bottom:2px solid var(--brown-900);
+  border-right:var(--border-w) solid var(--brown-900);
+  border-bottom:var(--border-w) solid var(--brown-900);
   display:grid; place-items:center;
   font-weight:700; color:var(--brown-900);
   white-space:nowrap;
@@ -111,22 +100,22 @@ h1{
 .wcol{font-variant-numeric:tabular-nums}
 .day{
   position:relative; padding:10px 8px 8px;
-  border-right:2px solid var(--brown-900);
-  border-bottom:2px solid var(--brown-900);
+  border-right:var(--border-w) solid var(--brown-900);
+  border-bottom:var(--border-w) solid var(--brown-900);
   background:#fff;
 }
 .muted{background:#fafafa}
 .weekend{background:#f1f1f1}
 .num{position:absolute; top:8px; left:10px; font-weight:700; color:#333}
 
-/* Chips */
+/* Chips (evento) */
 .chip{
-  display:block;                 /* apilan de forma natural */
-  width:max-content;
-  max-width:100%;
+  display:block;
+  width:max-content; max-width:100%;
   margin-top:8px; padding:5px 10px;
   border-radius:999px; font-size:12px; font-weight:600;
-  background:var(--brown-700); color:#fff; border:2px solid var(--brown-900);
+  background:var(--brown-700); color:#fff;
+  border:var(--border-w) solid var(--brown-900);
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
 
@@ -134,26 +123,22 @@ h1{
 .form-card{ padding:14px 16px 16px; display:flex; flex-direction:column; }
 .card__title{
   margin:4px 0 12px; text-align:center; font-weight:800; color:var(--brown-900);
-  background:var(--cream-100); border:2px solid var(--brown-900);
+  background:var(--cream-100); border:var(--border-w) solid var(--brown-900);
   padding:8px 12px; border-radius:14px;
 }
 .form{ display:flex; flex-direction:column; gap:10px; }
-.form-grid{
-  display:grid; grid-template-columns: 1fr 1fr; gap:12px;
-}
+.form-grid{ display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
 label{ display:flex; flex-direction:column; gap:6px; font-size:13px; font-weight:600; color:#3b3b3b }
 input{
-  height:40px; border-radius:12px; border:2px solid var(--brown-900);
+  height:40px; border-radius:12px; border:var(--border-w) solid var(--brown-900);
   background:var(--cream-100); padding:0 12px; outline:none; font-size:14px;
 }
 input::placeholder{ color:#8a8a8a }
 
-/* Botones (estilo “Pendientes”) */
-.acciones{
-  margin-top:8px; display:flex; justify-content:center; gap:12px; flex-wrap:wrap;
-}
+/* Botones */
+.acciones{ margin-top:8px; display:flex; justify-content:center; gap:12px; flex-wrap:wrap; }
 .btn{
-  border:2px solid var(--brown-900);
+  border:var(--border-w) solid var(--brown-900);
   border-radius:999px; padding:8px 16px; font-weight:700; font-size:13px; cursor:pointer;
 }
 .btn.brown{ background:var(--cream-100); color:var(--brown-900) }
@@ -164,8 +149,8 @@ input::placeholder{ color:#8a8a8a }
 
 /* ===================== BREAKPOINTS ===================== */
 
-/* — Tablets (≤ 1150px): dos columnas; calendario arriba a todo el ancho */
-@media (max-width: 1150px){
+/* Tablet (≤ 1150px) */
+@media (max-width:1150px){
   :root{ --gap:18px; --cell-h:96px; }
   .layout-3{ grid-template-columns: 1fr 1fr; }
   .calendar{ grid-column: 1 / -1; }
@@ -173,68 +158,48 @@ input::placeholder{ color:#8a8a8a }
   .month-title{ font-size:22px; }
 }
 
-/* — Tablets chicas / Phablets (≤ 900px): celdas un poco más compactas */
-@media (max-width: 900px){
-  :root{ --cell-h:88px; }
+/* Phablet (≤ 900px) */
+@media (max-width:900px){
+  :root{ --cell-h:90px; }
   .chip{ font-size:11px; padding:4px 8px; }
   .num{ font-size:13px; }
 }
 
-/* — Móviles (≤ 760px): una columna; formularios de ancho completo */
-@media (max-width: 760px){
-  :root{ --gap:16px; --cell-h:82px; }
+/* Móvil (≤ 760px): una columna, botones cómodos */
+@media (max-width:760px){
+  :root{ --gap:16px; --cell-h:86px; --border-w:1.5px; }
+  body{ background:var(--gray-bg); }
+  .wrapper{ margin:0; padding:12px; min-height:100vh; border-radius:0; box-shadow:none; }
+
   .layout-3{ grid-template-columns: 1fr; }
-  .form-grid{ grid-template-columns:1fr; }
+  .form-grid{ grid-template-columns: 1fr; }
   .acciones{ justify-content:stretch; }
-  .acciones .btn{ flex:1 1 auto; min-width:46%; } /* botones cómodos a 2 por fila si hay espacio */
-  .calendar__header{ position:sticky; top:10px; }  /* “sticky” con margen */
-  .back{ width:36px; height:36px; font-size:18px; }
-  h1{ font-size:28px; }
+  .acciones .btn{ flex:1 1 auto; min-width:46%; }
+  .topbar h1{ font-size:24px; }
+  .fecha{ font-size:14px; margin-top:4px; }
+  .back{ width:34px; height:34px; font-size:18px; }
 }
 
-/* — Móviles chicos (≤ 520px): aún más compacto y scroll horizontal si hace falta */
-@media (max-width: 520px){
-  :root{ --cell-h:72px; }
-  .calendar{ padding:10px 12px; }
-  .calendar__table{ grid-template-columns: 56px repeat(7, minmax(90px, 1fr)); }
+/* Móvil angosto (≤ 520px): se oculta “Sem” para ganar ancho */
+@media (max-width:520px){
+  :root{ --cell-h:78px; }
+  /* ocultar TODAS las celdas “Sem” (header y filas) */
+  .calendar__table > .wcol{ display:none; }
+  /* pasar a 7 columnas (solo días) */
+  .calendar__table{ grid-template-columns: repeat(7, 1fr); }
   .num{ top:6px; left:8px; font-size:12px; }
-  .chip{ font-size:10px; padding:3px 8px; }
-  .acciones .btn{ min-width:100%; }      /* botones se apilan */
+  .chip{ font-size:10.5px; padding:3px 8px; }
+  .acciones .btn{ min-width:100%; }
 }
 
-/* — Very small (≤ 380px): asegurar navegación usable */
-@media (max-width: 380px){
-  :root{ --cell-h:66px; }
-  .month-nav{ gap:8px; }
+/* Muy angosto (≤ 360px): compacta más */
+@media (max-width:360px){
+  :root{ --cell-h:70px; }
   .icon-btn{ width:32px; height:32px; }
-  .calendar__table{ grid-template-columns: 52px repeat(7, minmax(86px, 1fr)); }
+  .month-nav{ gap:8px; }
 }
 
-/* Accesibilidad: menos movimiento si el usuario lo prefiere */
+/* Accesibilidad */
 @media (prefers-reduced-motion: reduce){
-  * { scroll-behavior: auto !important; }
+  *{ scroll-behavior: auto !important; }
 }
-
-
-
-/* ===================== AJUSTE DE CONTENEDOR GLOBAL EN MÓVIL ===================== */
-@media (max-width: 760px){
-  body {
-    background: var(--gray-bg); /* fondo limpio */
-  }
-  .wrapper {
-    margin: 0;
-    padding: 12px;
-    min-height: 100vh;
-    border-radius: 0;           /* elimina bordes redondeados exagerados */
-    box-shadow: none;           /* quita sombra interna grande */
-  }
-  .topbar h1 {
-    font-size: 22px;            /* título más compacto */
-  }
-  .fecha {
-    margin-top: 4px;
-    font-size: 14px;
-  }
-}
-
