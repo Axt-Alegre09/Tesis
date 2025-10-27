@@ -1,12 +1,12 @@
 // JS/pasarelaPagos.js
-// Guarda SOLO el método de pago en "pedidos" (Transferencia/Efectivo/Tarjeta) con default Efectivo.
-// No valida ni guarda otros datos.
+// Guarda metodo_pago (String) y los detalles del pedido en public.detalles_pedido.
+// Sin validar nada más. Default Efectivo si no hay selección.
 
 import { supabase } from "./ScriptLogin.js";
 
 const QS = new URLSearchParams(location.search);
 
-// Mapea valores del <input value="..."> a etiqueta a guardar
+// Mapa: value del radio -> etiqueta a guardar
 const METODO_LABEL = {
   transferencia: "Transferencia",
   tarjeta: "Tarjeta",
@@ -31,7 +31,6 @@ function putMessage(msg, type = "info") {
   box.innerHTML = `<b>${title}</b>${msg}`;
 }
 
-// Solo alterna paneles por método (visual)
 function setupMetodoPagoUI() {
   const radios = document.querySelectorAll(".metodo-radio");
   const panels = document.querySelectorAll(".metodo-panel");
@@ -43,32 +42,57 @@ function setupMetodoPagoUI() {
   });
 }
 
-// Inserta un pedido mínimo con solo metodo_pago
-async function crearPedidoMinimal(metodoPago) {
+// Crea un pedido mínimo con metodo_pago (+ usuario_id si hay sesión)
+async function crearPedidoMinimal(metodoPago, montoTotal) {
   const { data: { user } = {} } = await supabase.auth.getUser();
-  const insertObj = { metodo_pago: metodoPago };
-  // Si hay sesión y querés relacionarlo, agregamos usuario_id sin validarlo
-  if (user?.id) insertObj.usuario_id = user.id;
+  const row = {
+    metodo_pago: metodoPago,
+    estado: "pendiente",
+    estado_pago: "pendiente",
+    monto_total: Number(montoTotal || 0) || 0
+  };
+  if (user?.id) row.usuario_id = user.id;
 
   const { data, error } = await supabase
     .from("pedidos")
-    .insert([insertObj])
-    .select("id, metodo_pago")
+    .insert([row])
+    .select("id, metodo_pago, monto_total")
     .single();
   if (error) throw error;
-  return data; // { id, metodo_pago }
+  return data; // { id, metodo_pago, monto_total }
 }
 
-// Actualiza solo el metodo_pago de un pedido existente
-async function actualizarMetodoPago(pedidoId, metodoPago) {
+async function actualizarMetodoPago(pedidoId, metodoPago, montoTotal) {
+  // monto_total es opcional; si existe la columna, lo actualizamos también
+  const patch = { metodo_pago: metodoPago };
+  if (typeof montoTotal !== "undefined") patch.monto_total = Number(montoTotal || 0) || 0;
+
   const { data, error } = await supabase
     .from("pedidos")
-    .update({ metodo_pago: metodoPago })
+    .update(patch)
     .eq("id", pedidoId)
-    .select("id, metodo_pago")
+    .select("id, metodo_pago, monto_total")
     .single();
   if (error) throw error;
-  return data; // { id, metodo_pago }
+  return data;
+}
+
+// Inserta todos los ítems en detalles_pedido para un pedido dado
+async function insertarDetalles(pedidoId, items) {
+  const rows = (items || [])
+    .filter(it => it && it.id) // esperamos id del producto
+    .map(it => ({
+      pedido_id: pedidoId,
+      producto_id: String(it.id),
+      cantidad: Number(it.cantidad || 1),
+      precio_unitario: Number(it.precio || 0)
+    }));
+
+  if (!rows.length) return { count: 0 };
+
+  const { error } = await supabase.from("detalles_pedido").insert(rows);
+  if (error) throw error;
+  return { count: rows.length };
 }
 
 async function init() {
@@ -80,34 +104,55 @@ async function init() {
   form?.addEventListener("submit", async (e) => {
     e.preventDefault();
 
-    // 1) Obtener el valor crudo del radio
+    // 1) Método de pago (default Efectivo)
     const raw = document.querySelector('input[name="metodo"]:checked')?.value || "efectivo";
-    // 2) Mapear a etiqueta final (Title Case)
-    const metodoPago = METODO_LABEL[raw] || "Efectivo"; // default “Efectivo”
+    const metodoPago = METODO_LABEL[raw] || "Efectivo";
 
-    // 3) Si existe ?pedido=… -> update; sino -> insert minimal
-    const pedidoId = QS.get("pedido")?.trim();
+    // 2) Snapshot del carrito (local o remoto)
+    let items = [];
+    let total = 0;
     try {
-      form.querySelector('button[type="submit"]')?.setAttribute("disabled", "true");
+      const snap = await window.CartAPI?.getSnapshot?.();
+      items = Array.isArray(snap?.items) ? snap.items : [];
+      total = Number(snap?.total || 0) || 0;
+    } catch (err) {
+      // Si no hay CartAPI, seguimos; podemos crear el pedido sin detalles
+      console.warn("[checkout] No se pudo leer el carrito:", err);
+    }
 
-      let saved;
-      if (pedidoId) {
-        saved = await actualizarMetodoPago(pedidoId, metodoPago);
+    const submitBtn = form.querySelector('button[type="submit"]');
+    submitBtn?.setAttribute("disabled", "true");
+
+    try {
+      // 3) ¿Actualizar o crear pedido?
+      const qsPedido = QS.get("pedido")?.trim();
+      let pedido;
+
+      if (qsPedido) {
+        pedido = await actualizarMetodoPago(qsPedido, metodoPago, total);
       } else {
-        saved = await crearPedidoMinimal(metodoPago);
+        pedido = await crearPedidoMinimal(metodoPago, total);
       }
 
-      // 4) Feedback y UI
-      putMessage(`Método de pago guardado: <b>${saved.metodo_pago}</b> (Pedido: ${saved.id})`, "ok");
+      // 4) Insertar detalles (si hay items)
+      if (items.length) {
+        await insertarDetalles(pedido.id, items);
+      }
+
+      // 5) Vaciar carrito (si existe API)
+      try { await window.CartAPI?.empty?.(); } catch {}
+
+      // 6) UI de éxito
+      putMessage(`Pedido confirmado (${pedido.id}). Método: <b>${pedido.metodo_pago}</b>.`, "ok");
       success?.classList.remove("disabled");
       form.classList.add("disabled");
+      try { window.CartAPI?.refreshBadge?.(); } catch {}
 
-      // 5) Opcional: volver al inicio suave
       setTimeout(() => { window.location.assign("index.html"); }, 1200);
     } catch (err) {
       console.error(err);
-      putMessage("No se pudo guardar el método de pago.");
-      form.querySelector('button[type="submit"]')?.removeAttribute("disabled");
+      putMessage("No se pudo confirmar el pedido. Reintentá.");
+      submitBtn?.removeAttribute("disabled");
     }
   });
 }
