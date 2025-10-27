@@ -11,6 +11,10 @@ const supa = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const $  = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const dz = (v) => (v ?? "").toString().trim();
+const nnum = (v, d=0) => {
+  const x = Number(v);
+  return Number.isFinite(x) ? x : d;
+};
 const fmtGs = (n) => new Intl.NumberFormat("es-PY").format(Number(n || 0)) + " Gs";
 const hoyLargo = () =>
   new Date().toLocaleDateString("es-PY", { day:"2-digit", month:"long", year:"numeric" });
@@ -28,8 +32,24 @@ const badge = (estado, palette) => {
   return `<span class="badge" style="display:inline-block;padding:.15rem .5rem;border-radius:999px;background:${color}15;color:${color};border:1px solid ${color}40;font-size:.78rem;margin-left:.25rem;">${estado}</span>`;
 };
 
-/* ========= Data (lee de la VISTA v_pedidos_pendientes) ========= */
-// La vista ya devuelve SOLO los pedidos con estado_pedido = 'pendiente'
+/* ========= Normalización de ítems ========= */
+function normalizeItems(items) {
+  // items puede venir como array, string JSON o null
+  let arr = [];
+  if (Array.isArray(items)) arr = items;
+  else if (typeof items === "string" && items.trim()) {
+    try { arr = JSON.parse(items); } catch { arr = []; }
+  }
+  // homogeneizamos campos esperados: titulo/nombre y precio/precio_unitario
+  return arr.map((d) => {
+    const titulo = dz(d.titulo || d.nombre || d?.productos?.nombre || "");
+    const cantidad = nnum(d.cantidad, 1);
+    const precio = nnum(d.precio ?? d.precio_unitario ?? d.unitario, 0);
+    return { titulo, cantidad, precio };
+  });
+}
+
+/* ========= Data (vista v_pedidos_pendientes) ========= */
 async function fetchPendientes() {
   const { data, error } = await supa
     .from("v_pedidos_pendientes")
@@ -54,8 +74,26 @@ async function fetchPendientes() {
   return data || [];
 }
 
+// Carga ítems en vivo cuando la vista no los trae
+async function fetchPedidoItems(pedido_id) {
+  if (!pedido_id) return [];
+  const { data, error } = await supa
+    .from("detalles_pedido")
+    .select(`
+      cantidad,
+      precio_unitario,
+      productos ( nombre )
+    `)
+    .eq("pedido_id", pedido_id);
+  if (error) throw error;
+  return (data || []).map((r) => ({
+    titulo: dz(r?.productos?.nombre || ""),
+    cantidad: nnum(r?.cantidad, 1),
+    precio: nnum(r?.precio_unitario, 0),
+  }));
+}
+
 async function updatePedido(pedido_id, payload) {
-  // Sólo se actualiza en la tabla real 'pedidos'
   const clean = { ...payload };
   Object.keys(clean).forEach((k) => {
     if (clean[k] === "" || typeof clean[k] === "undefined") delete clean[k];
@@ -102,9 +140,11 @@ function render(list) {
 }
 
 function cardPedido(p) {
-  const dets = Array.isArray(p.items) ? p.items : [];
-  const detTotal = dets.reduce((a, d) => a + Number(d.precio || 0) * Number(d.cantidad || 1), 0);
-  const total = Number(p.total ?? detTotal ?? 0);
+  // 1) Normalizamos items que vengan en la vista
+  let dets = normalizeItems(p.items);
+  // 2) Calculamos total con esos ítems
+  let detTotal = dets.reduce((a, d) => a + nnum(d.precio)*nnum(d.cantidad), 0);
+  let total = nnum(p.total, detTotal);
 
   const sec = document.createElement("section");
   sec.className = "card";
@@ -131,7 +171,9 @@ function cardPedido(p) {
           <ul class="det-list">
             ${
               dets.length
-                ? dets.map(d => `<li>${dz(d.titulo)||"(item)"} — ${Number(d.cantidad||1)} × ${fmtGs(d.precio||0)} = <b>${fmtGs(Number(d.precio||0)*Number(d.cantidad||1))}</b></li>`).join("")
+                ? dets.map(d =>
+                    `<li>${dz(d.titulo)||"(item)"} — ${nnum(d.cantidad)} × ${fmtGs(nnum(d.precio))} = <b>${fmtGs(nnum(d.precio)*nnum(d.cantidad))}</b></li>`
+                  ).join("")
                 : "<li>(sin ítems)</li>"
             }
           </ul>
@@ -176,12 +218,35 @@ function cardPedido(p) {
     </div>
   `;
 
+  // ==== Fallback: si no había items en la vista, los buscamos en vivo y rehidratamos ====
+  if ((!dets.length || total === 0) && p.pedido_id) {
+    // marcador visual rápido
+    const ul = $(".det-list", sec);
+    if (ul && !dets.length) {
+      ul.innerHTML = `<li>(cargando ítems…)</li>`;
+    }
+    fetchPedidoItems(p.pedido_id).then((rows) => {
+      if (!rows.length) {
+        if (ul) ul.innerHTML = "<li>(sin ítems)</li>";
+        return;
+      }
+      const nuevos = rows;
+      const newHtml = nuevos.map(d =>
+        `<li>${dz(d.titulo)||"(item)"} — ${nnum(d.cantidad)} × ${fmtGs(nnum(d.precio))} = <b>${fmtGs(nnum(d.precio)*nnum(d.cantidad))}</b></li>`
+      ).join("");
+      if (ul) ul.innerHTML = newHtml;
+      const nuevoTotal = nuevos.reduce((a, d) => a + nnum(d.precio)*nnum(d.cantidad), 0);
+      const totalSpan = $(".total", sec);
+      if (totalSpan) totalSpan.textContent = fmtGs(nuevoTotal);
+    }).catch(console.error);
+  }
+
+  // ==== Acciones ====
   const form   = $("form", sec);
   const btnEd  = $(".btn-edit", sec);
   const btnOk  = $(".btn-ok", sec);
   let btnCancel = null;
 
-  // Modo edición: sólo {metodo_pago, estado_pago, estado_pedido}
   btnEd?.addEventListener("click", async (e) => {
     e.preventDefault();
     if (!p.pedido_id) return alert("No se puede actualizar: falta 'pedido_id'.");
@@ -221,7 +286,6 @@ function cardPedido(p) {
     }
   });
 
-  // Finalizar => estado 'entregado'
   btnOk?.addEventListener("click", async (e) => {
     e.preventDefault();
     if (!p.pedido_id) return alert("No se puede finalizar: falta 'pedido_id'.");
@@ -230,7 +294,6 @@ function cardPedido(p) {
     try {
       btnOk.disabled = true;
       await updatePedido(p.pedido_id, { estado: "entregado" });
-      // Al estar finalizado ya no aparece en la vista, quitamos la tarjeta
       sec.remove();
       if (!grid.children.length) render([]);
     } catch (err) {
@@ -248,7 +311,6 @@ async function reloadCard(oldNode, pedido_id) {
   try {
     const fresh = await fetchFromViewByPedidoId(pedido_id);
     if (!fresh) {
-      // probablemente ya no está pendiente, remover
       oldNode.remove();
       if (!grid.children.length) render([]);
       return;
