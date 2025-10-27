@@ -1,12 +1,19 @@
 // JS/pasarelaPagos.js
-// Valida contexto + ejecuta RPC al pagar + toggles de método + logs claros
+// Guarda SOLO el método de pago en "pedidos" (Transferencia/Efectivo/Tarjeta) con default Efectivo.
+// No valida ni guarda otros datos.
 
 import { supabase } from "./ScriptLogin.js";
 
 const QS = new URLSearchParams(location.search);
-const fmtGs = (n) => new Intl.NumberFormat("es-PY").format(Number(n || 0)) + " Gs";
 
-function putMessage(msg, type = "error") {
+// Mapea valores del <input value="..."> a etiqueta a guardar
+const METODO_LABEL = {
+  transferencia: "Transferencia",
+  tarjeta: "Tarjeta",
+  efectivo: "Efectivo",
+};
+
+function putMessage(msg, type = "info") {
   let box = document.querySelector("[data-checkout-msg]");
   if (!box) {
     box = document.createElement("div");
@@ -20,158 +27,89 @@ function putMessage(msg, type = "error") {
     box.style.fontSize = "14px";
     document.body.prepend(box);
   }
-  const title = (type === "ok" ? "Listo" : "Atención") + ": ";
+  const title = type === "ok" ? "Listo: " : type === "warn" ? "Atención: " : "";
   box.innerHTML = `<b>${title}</b>${msg}`;
 }
 
-function hasValidPedido(qs = QS) {
-  const raw = qs.get("pedido");
-  if (raw == null) return false;
-  const v = String(raw).trim().toLowerCase();
-  return v !== "" && v !== "null" && v !== "undefined";
-}
-
-function snapshotVigente(snap) {
-  if (!snap || !snap.ts) return false;
-  return (Date.now() - Number(snap.ts)) <= 5 * 60 * 1000; // 5 min
-}
-
-function readSnapshot() {
-  let a = null, b = null;
-  try { a = JSON.parse(sessionStorage.getItem("checkout_snapshot")); } catch {}
-  try { b = JSON.parse(sessionStorage.getItem("checkout")); } catch {}
-  if (a && b) return (Number(a.ts || 0) >= Number(b.ts || 0)) ? a : b;
-  return a || b || null;
-}
-
-// ---------- Ejecutar el RPC (compra real) ----------
-async function confirmarCompra() {
-  console.log("[checkout] confirmando compra…");
-  const { data: sess } = await supabase.auth.getSession();
-  if (!sess?.session?.user?.id) {
-    console.warn("[checkout] No hay sesión, abortando RPC.");
-    throw new Error("Debes iniciar sesión para confirmar la compra.");
-  }
-  // Llamada al RPC: guarda pedido + detalle y vacía carrito
-  const { data, error } = await supabase.rpc("checkout_crear_pedido");
-  if (error) {
-    console.error("[checkout] RPC error:", error);
-    throw error;
-  }
-  console.log("[checkout] RPC ok:", data);
-  return data; // { pedido_id, items, total } o array con 1 fila
-}
-
-// === Toggle de paneles de método de pago ===
-function setupMetodoPagoUI(snapshotTotal = 0) {
+// Solo alterna paneles por método (visual)
+function setupMetodoPagoUI() {
   const radios = document.querySelectorAll(".metodo-radio");
   const panels = document.querySelectorAll(".metodo-panel");
-
-  function showPanel(metodo) {
-    panels.forEach((p) => {
-      p.classList.toggle("disabled", p.getAttribute("data-metodo") !== metodo);
-    });
-  }
-
+  const show = (m) =>
+    panels.forEach((p) => p.classList.toggle("disabled", p.dataset.metodo !== m));
   radios.forEach((r) => {
-    r.addEventListener("change", () => showPanel(r.value));
-    if (r.checked) showPanel(r.value);
+    r.addEventListener("change", () => show(r.value));
+    if (r.checked) show(r.value);
   });
-
-  // Completar el total en el panel de efectivo
-  const efTotal = document.getElementById("efectivo-total");
-  if (efTotal) {
-    efTotal.value = fmtGs(snapshotTotal);
-  }
 }
 
-// ---------- UI principal ----------
+// Inserta un pedido mínimo con solo metodo_pago
+async function crearPedidoMinimal(metodoPago) {
+  const { data: { user } = {} } = await supabase.auth.getUser();
+  const insertObj = { metodo_pago: metodoPago };
+  // Si hay sesión y querés relacionarlo, agregamos usuario_id sin validarlo
+  if (user?.id) insertObj.usuario_id = user.id;
+
+  const { data, error } = await supabase
+    .from("pedidos")
+    .insert([insertObj])
+    .select("id, metodo_pago")
+    .single();
+  if (error) throw error;
+  return data; // { id, metodo_pago }
+}
+
+// Actualiza solo el metodo_pago de un pedido existente
+async function actualizarMetodoPago(pedidoId, metodoPago) {
+  const { data, error } = await supabase
+    .from("pedidos")
+    .update({ metodo_pago: metodoPago })
+    .eq("id", pedidoId)
+    .select("id, metodo_pago")
+    .single();
+  if (error) throw error;
+  return data; // { id, metodo_pago }
+}
+
 async function init() {
-  const snapshot = readSnapshot();
+  setupMetodoPagoUI();
 
-  // Mostrar contexto de checkout
-  if (hasValidPedido(QS)) {
-    const pedidoId = QS.get("pedido");
-    if (!snapshotVigente(snapshot) || snapshot?.source !== "remote" || snapshot?.pedidoId !== pedidoId) {
-      putMessage("No se encontró el resumen del pedido o está vencido. Volvé al carrito y repetí la operación.");
-    } else {
-      putMessage(`Pedido listo para pagar.`, "ok");
-    }
-  } else if (QS.has("monto")) {
-    const montoUrl = Number(QS.get("monto") || 0);
-    const isSourceLocal = snapshot?.source === "local" || snapshot?.source === "legacy";
-    if (!snapshotVigente(snapshot) || !isSourceLocal) {
-      putMessage("No se encontró el resumen de compra. Volvé al carrito para iniciar el pago.");
-    } else {
-      const totalSnap = Number(snapshot.total || 0);
-      if (Math.abs(totalSnap - montoUrl) > 1) {
-        putMessage("Detectamos un desajuste en el total. Volvé al carrito y reintentá.");
-      } else {
-        putMessage(`Total a pagar: ${fmtGs(totalSnap)}. Completá el formulario y simulá el pago.`, "ok");
-      }
-    }
-  } else {
-    putMessage('Faltan datos del checkout. Accedé aquí usando “Comprar ahora” del carrito.');
-  }
-
-  // Configurar UI de métodos de pago con total del snapshot
-  const snapTotal = Number(snapshot?.total || 0);
-  setupMetodoPagoUI(snapTotal);
-
-  // Enganchar submit (Pagar)
   const form = document.getElementById("checkout-form");
+  const success = document.getElementById("checkout-success");
+
   form?.addEventListener("submit", async (e) => {
     e.preventDefault();
 
-    const { data: sess } = await supabase.auth.getSession();
-    console.log("[checkout] session.user:", sess?.session?.user);
+    // 1) Obtener el valor crudo del radio
+    const raw = document.querySelector('input[name="metodo"]:checked')?.value || "efectivo";
+    // 2) Mapear a etiqueta final (Title Case)
+    const metodoPago = METODO_LABEL[raw] || "Efectivo"; // default “Efectivo”
 
+    // 3) Si existe ?pedido=… -> update; sino -> insert minimal
+    const pedidoId = QS.get("pedido")?.trim();
     try {
-      // 1) Ejecutar el RPC
-      const res = await confirmarCompra(); // { pedido_id, items, total } o [ {…} ]
-      const payload = Array.isArray(res) ? res[0] : res;
-
-      // 2) Guardar snapshot remoto
-      const snap = {
-        source: "remote",
-        pedidoId: payload?.pedido_id,
-        ts: Date.now(),
-        items: payload?.items,
-        total: payload?.total
-      };
-      sessionStorage.setItem("checkout_snapshot", JSON.stringify(snap));
-
-      // 3) Feedback visual
-      document.getElementById("checkout-success")?.classList.remove("disabled");
-      putMessage(`✅ Pedido confirmado. N°: ${snap.pedidoId || "(s/d)"} — Total: ${fmtGs(snap.total || 0)}.`, "ok");
-
-      // 4) Evitar doble submit
       form.querySelector('button[type="submit"]')?.setAttribute("disabled", "true");
 
-      // 5) Marcar post-compra y redirigir a Home (para “inmediatas”)
-      sessionStorage.setItem("just_bought", "1");
-      setTimeout(() => {
-        window.location.assign("index.html");
-      }, 3000); // pequeño delay
+      let saved;
+      if (pedidoId) {
+        saved = await actualizarMetodoPago(pedidoId, metodoPago);
+      } else {
+        saved = await crearPedidoMinimal(metodoPago);
+      }
+
+      // 4) Feedback y UI
+      putMessage(`Método de pago guardado: <b>${saved.metodo_pago}</b> (Pedido: ${saved.id})`, "ok");
+      success?.classList.remove("disabled");
+      form.classList.add("disabled");
+
+      // 5) Opcional: volver al inicio suave
+      setTimeout(() => { window.location.assign("index.html"); }, 1200);
     } catch (err) {
-      console.error("[checkout] Error general:", err);
-      const msg = err?.message || err?.error_description || "No se pudo confirmar la compra.";
-      putMessage(msg);
+      console.error(err);
+      putMessage("No se pudo guardar el método de pago.");
+      form.querySelector('button[type="submit"]')?.removeAttribute("disabled");
     }
   });
 }
 
-// Inicializar
-(function boot() {
-  // Inicializa paneles según snapshot, antes del init principal
-  let snap = null;
-  try { snap = JSON.parse(sessionStorage.getItem("checkout_snapshot")); } catch {}
-  try {
-    const legacy = JSON.parse(sessionStorage.getItem("checkout"));
-    if (!snap || (legacy?.ts && legacy.ts > (snap?.ts || 0))) snap = legacy;
-  } catch {}
-  const total = Number(snap?.total || 0);
-  setupMetodoPagoUI(total);
-
-  init();
-})();
+init();
