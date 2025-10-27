@@ -1,13 +1,20 @@
 // JS/pasarelaPagos.js
-// Guarda metodo_pago (String) y los detalles del pedido.
-// No valida datos sensibles. Default: Efectivo.
+// - Mantiene tu flujo actual (crear/actualizar 'pedidos').
+// - ADICIONAL: inserta snapshot completo en 'public.pedidos_snapshot'.
+// - Sin validaciones estrictas; método de pago default 'Efectivo'.
 
 import { supabase } from "./ScriptLogin.js";
 
 const QS = new URLSearchParams(location.search);
 const fmtGs = (n) => new Intl.NumberFormat("es-PY").format(Number(n || 0)) + " Gs";
 
-// ================= UI helpers =================
+const METODO_LABEL = {
+  transferencia: "Transferencia",
+  tarjeta: "Tarjeta",
+  efectivo: "Efectivo",
+};
+
+// ---------------- UI helpers ----------------
 function putMessage(msg, type = "info") {
   let box = document.querySelector("[data-checkout-msg]");
   if (!box) {
@@ -30,28 +37,17 @@ function putMessage(msg, type = "info") {
 function setupMetodoPagoUI(snapshotTotal = 0) {
   const radios = document.querySelectorAll(".metodo-radio");
   const panels = document.querySelectorAll(".metodo-panel");
-
   const show = (m) =>
     panels.forEach((p) => p.classList.toggle("disabled", p.getAttribute("data-metodo") !== m));
-
   radios.forEach((r) => {
     r.addEventListener("change", () => show(r.value));
     if (r.checked) show(r.value);
   });
-
-  // Completar el total en el panel de efectivo
   const efTotal = document.getElementById("efectivo-total");
   if (efTotal) efTotal.value = fmtGs(snapshotTotal);
 }
 
-// ================= Métodos de pago =================
-const METODO_LABEL = {
-  transferencia: "Transferencia",
-  tarjeta: "Tarjeta",
-  efectivo: "Efectivo",
-};
-
-// ================== Helpers items ==================
+// -------------- Lectura de carrito/items --------------
 async function getItemsFromCartAPI() {
   try {
     const snap = await window.CartAPI?.getSnapshot?.();
@@ -61,6 +57,7 @@ async function getItemsFromCartAPI() {
       cantidad: Number(it.cantidad || 1),
       precio: Number(it.precio || 0),
       titulo: it.titulo || null,
+      imagen: it.imagen || null,
     }));
   } catch {
     return [];
@@ -72,26 +69,23 @@ async function getItemsFromDB() {
     const { data: { user } = {} } = await supabase.auth.getUser();
     if (!user?.id) return [];
 
-    // asegurar carrito (función RPC existente en tu proyecto)
-    const { data: carritoId, error: e1 } = await supabase.rpc("asegurar_carrito");
-    if (e1 || !carritoId) return [];
+    const { data: carritoId } = await supabase.rpc("asegurar_carrito");
+    if (!carritoId) return [];
 
-    // items del carrito
-    const { data: items, error: e2 } = await supabase
+    const { data: items } = await supabase
       .from("carrito_items")
       .select("producto_id, cantidad")
       .eq("carrito_id", carritoId);
-    if (e2 || !items?.length) return [];
 
-    // precios y nombres de productos
+    if (!items?.length) return [];
+
     const ids = items.map((i) => i.producto_id);
-    const { data: prods, error: e3 } = await supabase
+    const { data: prods } = await supabase
       .from("v_productos_publicos")
-      .select("id, nombre, precio")
+      .select("id, nombre, precio, imagen")
       .in("id", ids);
-    if (e3) return [];
 
-    const map = new Map(prods.map((p) => [String(p.id), p]));
+    const map = new Map((prods || []).map((p) => [String(p.id), p]));
     return items.map((i) => {
       const p = map.get(String(i.producto_id)) || {};
       return {
@@ -99,6 +93,7 @@ async function getItemsFromDB() {
         cantidad: Number(i.cantidad || 1),
         precio: Number(p.precio || 0),
         titulo: p.nombre || null,
+        imagen: p.imagen || null,
       };
     });
   } catch {
@@ -113,22 +108,31 @@ function computeTotal(items) {
   );
 }
 
-async function insertarDetalles(pedidoId, items) {
-  if (!items?.length) return;
-  const rows = items.map((it) => ({
-    pedido_id: pedidoId,
-    producto_id: it.id,
-    cantidad: it.cantidad,
-    precio_unitario: it.precio,
-  }));
-  const { error } = await supabase.from("detalles_pedido").insert(rows);
-  if (error) throw error;
+// -------------- Lectura formulario (sin validar) --------------
+const v = (id) => document.getElementById(id)?.value?.trim() || "";
+
+function readProfileForm() {
+  return {
+    ruc: v("ruc"),
+    razon: v("razon"),
+    tel: v("tel"),
+    mail: v("mail"),
+    contacto: v("contacto"),
+    ciudad: v("ciudad"),
+    barrio: v("barrio"),
+    depto: v("depto"),
+    postal: v("postal"),
+    calle1: v("calle1"),
+    calle2: v("calle2"),
+    nro: v("nro"),
+    hora_desde: v("hora-desde") || null,
+    hora_hasta: v("hora-hasta") || null,
+  };
 }
 
-// ================== Pedidos (crear/actualizar) ==================
+// -------------- Pedidos (como tenés hoy) --------------
 async function crearPedidoMinimal(metodoPago, montoTotal) {
   const { data: { user } = {} } = await supabase.auth.getUser();
-
   const row = {
     metodo_pago: metodoPago,
     estado: "pendiente",
@@ -142,9 +146,8 @@ async function crearPedidoMinimal(metodoPago, montoTotal) {
     .insert([row])
     .select("id, metodo_pago, monto_total")
     .single();
-
   if (error) throw error;
-  return data; // { id, metodo_pago, monto_total }
+  return data;
 }
 
 async function actualizarMetodoPago(pedidoId, metodoPago, montoTotal) {
@@ -157,17 +160,50 @@ async function actualizarMetodoPago(pedidoId, metodoPago, montoTotal) {
     .eq("id", pedidoId)
     .select("id, metodo_pago, monto_total")
     .single();
-
   if (error) throw error;
   return data;
 }
 
-// ================== Init (UI + Submit) ==================
+async function insertarDetallesPedido(pedidoId, items) {
+  if (!items?.length) return;
+  const rows = items.map((it) => ({
+    pedido_id: pedidoId,
+    producto_id: it.id,
+    cantidad: it.cantidad,
+    precio_unitario: it.precio,
+  }));
+  const { error } = await supabase.from("detalles_pedido").insert(rows);
+  if (error) throw error;
+}
+
+// -------------- NUEVO: snapshot aparte --------------
+async function insertCheckoutSnapshot({ pedido, metodoPago, items, profile, total }) {
+  const { data: { user } = {} } = await supabase.auth.getUser();
+  const row = {
+    pedido_id: pedido?.id || null,
+    usuario_id: user?.id || null,
+    metodo_pago: metodoPago || "Efectivo",
+    total: Number(total || 0) || 0,
+    ruc: profile.ruc, razon: profile.razon, tel: profile.tel, mail: profile.mail, contacto: profile.contacto,
+    ciudad: profile.ciudad, barrio: profile.barrio, depto: profile.depto, postal: profile.postal,
+    calle1: profile.calle1, calle2: profile.calle2, nro: profile.nro,
+    hora_desde: profile.hora_desde || null,
+    hora_hasta: profile.hora_hasta || null,
+    items: items?.length ? items.map(it => ({
+      id: it.id, titulo: it.titulo, cantidad: it.cantidad, precio: it.precio, imagen: it.imagen || null
+    })) : [],
+    extra: {},  // por si luego querés guardar algo adicional
+  };
+  const { error } = await supabase.from("pedidos_snapshot").insert(row);
+  if (error) throw error;
+}
+
+// -------------- INIT --------------
 async function init() {
-  // contexto visual
+  // Mensaje inicial
   putMessage("Completá los datos y presioná Pagar.", "ok");
 
-  // setear totales para efectivo si hay snapshot de carrito
+  // Mostrar total en panel Efectivo (si hay snapshot de carrito)
   let snapshotTotal = 0;
   try {
     const snap = await window.CartAPI?.getSnapshot?.();
@@ -177,25 +213,26 @@ async function init() {
 
   const form = document.getElementById("checkout-form");
   const success = document.getElementById("checkout-success");
-  const btnFactura = document.getElementById("btn-descargar-factura");
 
   form?.addEventListener("submit", async (e) => {
     e.preventDefault();
-
     const submitBtn = form.querySelector('button[type="submit"]');
     submitBtn?.setAttribute("disabled", "true");
 
     try {
-      // 1) Método de pago (default Efectivo)
+      // 1) Método de pago (default Efectivo, sin validación)
       const raw = document.querySelector('input[name="metodo"]:checked')?.value || "efectivo";
       const metodoPago = METODO_LABEL[raw] || "Efectivo";
 
-      // 2) Ítems: primero CartAPI, si no hay, leer desde BD
+      // 2) Items: primero CartAPI; si no hay, desde BD
       let items = await getItemsFromCartAPI();
       if (!items.length) items = await getItemsFromDB();
-      let total = computeTotal(items); // puede ser 0 si realmente no hay ítems
+      let total = computeTotal(items);
 
-      // 3) Crear o actualizar pedido
+      // 3) Perfil/dirección desde el form (sin validar)
+      const profile = readProfileForm();
+
+      // 4) Crear o actualizar 'pedidos' (lo que ya usás)
       const qsPedido = QS.get("pedido")?.trim();
       let pedido;
       if (qsPedido) {
@@ -204,10 +241,9 @@ async function init() {
         pedido = await crearPedidoMinimal(metodoPago, total);
       }
 
-      // 4) Insertar detalles
+      // 5) Insertar detalles en 'detalles_pedido' (opcional pero recomendado)
       if (items.length) {
-        await insertarDetalles(pedido.id, items);
-        // Si quedó total en 0, actualizar con el calculado
+        await insertarDetallesPedido(pedido.id, items);
         if (!Number(pedido.monto_total)) {
           const nuevoTotal = computeTotal(items);
           if (nuevoTotal > 0) {
@@ -217,25 +253,19 @@ async function init() {
         }
       }
 
-      // 5) Vaciar carrito si existe API
-      try {
-        await window.CartAPI?.empty?.();
-      } catch {}
+      // 6) NUEVO: snapshot completo en tabla aparte
+      await insertCheckoutSnapshot({ pedido, metodoPago, items, profile, total });
 
-      // 6) Feedback visual + navegación
+      // 7) Vaciar carrito si existe API
+      try { await window.CartAPI?.empty?.(); } catch {}
+
+      // 8) Feedback
       putMessage(`✅ Pedido confirmado. N°: ${pedido.id} — Total: ${fmtGs(total)} — Método: ${pedido.metodo_pago}`, "ok");
       success?.classList.remove("disabled");
       form.classList.add("disabled");
       try { window.CartAPI?.refreshBadge?.(); } catch {}
 
-      // (opcional) botón de factura si lo usás
-      if (btnFactura) {
-        btnFactura.onclick = () => alert("Generación de factura simulada (puedes integrar jsPDF).");
-      }
-
-      setTimeout(() => {
-        window.location.assign("index.html");
-      }, 1200);
+      setTimeout(() => { window.location.assign("index.html"); }, 1200);
     } catch (err) {
       console.error("[checkout] Error:", err);
       const msg = err?.message || err?.error_description || "No se pudo confirmar la compra.";
@@ -245,5 +275,4 @@ async function init() {
   });
 }
 
-// Boot
 init();
