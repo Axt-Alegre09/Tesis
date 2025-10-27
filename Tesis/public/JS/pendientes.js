@@ -41,7 +41,7 @@ async function fetchPedidosPendientes() {
       estado, estado_pago,
       detalles_pedido:detalles_pedido!detalles_pedido_pedido_id_fkey (
         cantidad, precio_unitario,
-        productos ( id, nombre )
+        productos:productos!detalles_pedido_producto_id_fkey ( id, nombre )
       )
     `)
     .in("estado", LISTAR_COMO_PEND)
@@ -97,7 +97,7 @@ async function fetchPedidoFull(id) {
       estado, estado_pago,
       detalles_pedido:detalles_pedido!detalles_pedido_pedido_id_fkey (
         cantidad, precio_unitario,
-        productos ( id, nombre )
+        productos:productos!detalles_pedido_producto_id_fkey ( id, nombre )
       )
     `)
     .eq("id", id)
