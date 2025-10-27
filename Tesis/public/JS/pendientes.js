@@ -331,15 +331,32 @@ async function reloadCard(oldNode, snapshotId) {
 }
 
 /* ========= Init ========= */
+/* ========= Init (patch de diagnóstico) ========= */
 ;(async () => {
   try {
-    const snaps = await fetchSnapshotsConEstados()
-    // Solo los que están realmente pendientes en 'pedidos' (cuando exista), o pendientes por defecto
-    const pendientes = snaps.filter(s => (s.estado || "pendiente") === "pendiente")
-    render(pendientes)
+    const snaps = await fetchSnapshotsConEstados();
+
+    // Logs de diagnóstico:
+    console.log("snapshots totales:", snaps.length);
+    console.table(
+      snaps.map(s => ({
+        snapshot_id: s.id,
+        pedido_id: s.pedido_id,
+        estado: s.estado,
+        creado_en: s.creado_en
+      }))
+    );
+
+    // Regla: si tiene pedido_id -> mostrar solo si está 'pendiente'.
+    // Si NO tiene pedido_id -> mostrar (asumimos pendiente hasta vincular).
+    const pendientes = snaps.filter(s => (s.pedido_id ? s.estado === "pendiente" : true));
+
+    console.log("pendientes renderizados:", pendientes.length);
+    render(pendientes);
   } catch (err) {
-    alert("Error cargando pedidos: " + (err?.message || err))
-    console.error(err)
+    alert("Error cargando pedidos: " + (err?.message || err));
+    console.error(err);
   }
-})()
+})();
+
 
