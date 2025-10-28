@@ -1,121 +1,47 @@
-
-// === JS/pendientes.js ===
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+// JS/pendientes.js
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 /* ========= Supabase ========= */
-const SUPABASE_URL = "https://jyygevitfnbwrvxrjexp.supabase.co"
+const SUPABASE_URL = "https://jyygevitfnbwrvxrjexp.supabase.co";
 const SUPABASE_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5eWdldml0Zm5id3J2eHJqZXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2OTQ2OTYsImV4cCI6MjA3MTI3MDY5Nn0.St0IiSZSeELESshctneazCJHXCDBi9wrZ28UkiEDXYo"
-const supa = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5eWdldml0Zm5id3J2eHJqZXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2OTQ2OTYsImV4cCI6MjA3MTI3MDY5Nn0.St0IiSZSeELESshctneazCJHXCDBi9wrZ28UkiEDXYo";
+const supa = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 /* ========= Helpers ========= */
-const $  = (s, r = document) => r.querySelector(s)
-const $$ = (s, r = document) => [...r.querySelectorAll(s)]
-const dz = (v) => (v ?? "").toString().trim()
-const fmtGs = (n) => new Intl.NumberFormat("es-PY").format(Number(n || 0)) + " Gs"
-const hoyLargo = () => new Date().toLocaleDateString("es-PY", { day:"2-digit", month:"long", year:"numeric" })
+const $  = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const dz = (v) => (v ?? "").toString().trim();
+const fmtGs = (n) => new Intl.NumberFormat("es-PY").format(Number(n || 0)) + " Gs";
+const hoyLargo = () =>
+  new Date().toLocaleDateString("es-PY", { day: "2-digit", month: "long", year: "numeric" });
 
-$("#fecha").textContent = hoyLargo()
-$(".back")?.addEventListener("click", () => history.back())
+$("#fecha")?.textContent = hoyLargo();
+$(".back")?.addEventListener("click", () => history.back());
 
-const ESTADOS_PEDIDO = ["pendiente", "pagado", "cancelado", "entregado"]
-const ESTADOS_PAGO   = ["pendiente", "pagado", "fallido", "reembolsado"]
-const colorEstado = { pendiente:"#b38a00", pagado:"#1d6f42", cancelado:"#8b0000", entregado:"#2e7dd1" }
-const colorPago   = { pendiente:"#b38a00", pagado:"#1d6f42", fallido:"#8b0000", reembolsado:"#6b4caf" }
+const ESTADOS_PEDIDO = ["pendiente", "pagado", "cancelado", "entregado"];
+const ESTADOS_PAGO   = ["pendiente", "pagado", "fallido", "reembolsado"];
+const colorEstado = { pendiente:"#b38a00", pagado:"#1d6f42", cancelado:"#8b0000", entregado:"#2e7dd1" };
+const colorPago   = { pendiente:"#b38a00", pagado:"#1d6f42", fallido:"#8b0000", reembolsado:"#6b4caf" };
 const badge = (estado, palette) => {
-  if (!estado) return ""
-  const color = palette[estado] || "#444"
-  return `<span class="badge" style="display:inline-block;padding:.15rem .5rem;border-radius:999px;background:${color}15;color:${color};border:1px solid ${color}40;font-size:.78rem;margin-left:.25rem;">${estado}</span>`
+  if (!estado) return "";
+  const color = palette[estado] || "#444";
+  return `<span class="badge" style="display:inline-block;padding:.15rem .5rem;border-radius:999px;background:${color}15;color:${color};border:1px solid ${color}40;font-size:.78rem;margin-left:.25rem;">${estado}</span>`;
+};
+
+/* ========= Data ========= */
+/** Vista consolidada (ya filtra pendientes o snapshots sin pedido) */
+async function fetchPendientes() {
+  const { data, error } = await supa
+    .from("v_pedidos_pendientes")
+    .select("*")
+    .order("pedido_nro", { ascending: true });
+  if (error) throw error;
+  return data || [];
 }
 
-/* ========= Data: leemos de pedidos_snapshot y traemos estado real desde pedidos ========= */
-async function fetchSnapshotsConEstados() {
-  const { data: snaps, error } = await supa
-    .from("pedidos_snapshot")
-    .select(`
-      id, creado_en, pedido_id, usuario_id,
-      metodo_pago, total,
-      ruc, razon, tel, mail, contacto,
-      ciudad, barrio, depto, postal,
-      calle1, calle2, nro,
-      hora_desde, hora_hasta,
-      items
-    `)
-    .order("creado_en", { ascending: true })
-  if (error) throw error
-
-  const ids = [...new Set((snaps || []).map(s => s.pedido_id).filter(Boolean))]
-  let mapEstado = new Map()
-  if (ids.length) {
-    const { data: pedidos, error: e2 } = await supa
-      .from("pedidos")
-      .select("id, estado, estado_pago, metodo_pago, monto_total")
-      .in("id", ids)
-    if (e2) throw e2
-    mapEstado = new Map(pedidos.map(p => [p.id, p]))
-  }
-
-  return (snaps || []).map(s => {
-    const ped = s.pedido_id ? mapEstado.get(s.pedido_id) : null
-    return {
-      ...s,
-      estado: ped?.estado || "pendiente",
-      estado_pago: ped?.estado_pago || "pendiente",
-      metodo_pago_real: ped?.metodo_pago || s.metodo_pago,
-      total_real: (Number(ped?.monto_total || 0) || Number(s.total || 0) || 0)
-    }
-  })
-}
-
-async function updatePedido(pedido_id, payload) {
-  if (!pedido_id) throw new Error("Este snapshot no tiene pedido_id para actualizar.")
-  const toSend = { ...payload }
-  Object.keys(toSend).forEach(k => {
-    if (toSend[k] === "" || typeof toSend[k] === "undefined") delete toSend[k]
-  })
-  const { error } = await supa.from("pedidos").update(toSend).eq("id", pedido_id)
-  if (error) throw error
-}
-
-async function fetchSnapshotById(id) {
-  const { data: s, error } = await supa
-    .from("pedidos_snapshot")
-    .select(`
-      id, creado_en, pedido_id, usuario_id,
-      metodo_pago, total,
-      ruc, razon, tel, mail, contacto,
-      ciudad, barrio, depto, postal,
-      calle1, calle2, nro,
-      hora_desde, hora_hasta,
-      items
-    `)
-    .eq("id", id)
-    .maybeSingle()
-  if (error) throw error
-
-  let estado = "pendiente", estado_pago = "pendiente", metodo_pago = s.metodo_pago, total = Number(s.total || 0)
-  if (s.pedido_id) {
-    const { data: p } = await supa
-      .from("pedidos")
-      .select("estado, estado_pago, metodo_pago, monto_total")
-      .eq("id", s.pedido_id)
-      .maybeSingle()
-    if (p) {
-      estado = p.estado || estado
-      estado_pago = p.estado_pago || estado_pago
-      metodo_pago = p.metodo_pago || metodo_pago
-      total = Number(p.monto_total || total)
-    }
-  }
-  return { ...s, estado, estado_pago, metodo_pago_real: metodo_pago, total_real: total }
-}
-
-/* ========= NUEVO: Traer ítems de un pedido usando relación explícita =========
-   ¡IMPORTANTE! Usamos el constraint name para desambiguar:
-   - detalle -> productos:  productos!detalles_pedido_producto_id_fkey
-*/
+/** Ítems del pedido usando relación explícita para evitar ambigüedad */
 async function fetchItemsByPedido(pedido_id) {
-  if (!pedido_id) return []
+  if (!pedido_id) return [];
   const { data, error } = await supa
     .from("detalles_pedido")
     .select(`
@@ -124,38 +50,47 @@ async function fetchItemsByPedido(pedido_id) {
       productos:productos!detalles_pedido_producto_id_fkey ( id, nombre )
     `)
     .eq("pedido_id", pedido_id)
-    .order("id", { ascending: true })
+    .order("id", { ascending: true });
+
   if (error) {
-    console.error("Error items:", error)
-    return []
+    console.error("Error items:", error);
+    return [];
   }
+
   return (data || []).map(d => ({
     titulo: d?.productos?.nombre || "(item)",
     cantidad: Number(d?.cantidad || 1),
     precio: Number(d?.precio_unitario || 0)
-  }))
+  }));
+}
+
+async function updatePedido(pedido_id, payload) {
+  if (!pedido_id) throw new Error("Este snapshot no tiene pedido_id para actualizar.");
+  const toSend = { ...payload };
+  Object.keys(toSend).forEach(k => {
+    if (toSend[k] === "" || typeof toSend[k] === "undefined") delete toSend[k];
+  });
+  const { error } = await supa.from("pedidos").update(toSend).eq("id", pedido_id);
+  if (error) throw error;
 }
 
 /* ========= UI ========= */
-const grid = $("#grid")
+const grid = $("#grid");
 
 function render(list) {
-  grid.innerHTML = ""
+  grid.innerHTML = "";
   if (!list.length) {
-    grid.innerHTML = `<section class="card"><p>No hay pedidos pendientes.</p></section>`
-    return
+    grid.innerHTML = `<section class="card"><p>No hay pedidos pendientes.</p></section>`;
+    return;
   }
-  list.forEach((p, idx) => grid.appendChild(cardPedido(p, idx)))
+  list.forEach((p, idx) => grid.appendChild(cardPedido(p, idx)));
 }
 
 function cardPedido(p, idx) {
-  // Snapshot puede traer “items” embebidos (tu pasarela), pero preferimos los reales de la venta:
-  const snapshotItems = Array.isArray(p.items) ? p.items : []
-
-  const sec = document.createElement("section")
-  sec.className = "card"
-  sec.dataset.snapshot_id = p.id
-  sec.dataset.pedido_id = p.pedido_id || ""
+  const sec = document.createElement("section");
+  sec.className = "card";
+  sec.dataset.snapshot_id = p.snapshot_id;
+  sec.dataset.pedido_id = p.pedido_id || "";
 
   sec.innerHTML = `
     <h3>Pedido N°: ${idx}
@@ -175,7 +110,9 @@ function cardPedido(p, idx) {
         <div class="hr"></div>
         <div class="detalle">
           <b>Detalle de Pedido :</b>
-          <ul class="det-list"><li>(cargando ítems…)</li></ul>
+          <div class="items-wrap">
+            <div class="items-loading">(cargando ítems…)</div>
+          </div>
         </div>
         <p style="margin-top:8px;"><b>Total :</b> <span class="total">${fmtGs(Number(p.total_real || 0))}</span></p>
       </div>
@@ -192,7 +129,7 @@ function cardPedido(p, idx) {
 
         <label>Método de Pago :
           <select name="metodo_pago" ${p.pedido_id ? "" : "disabled"}>
-            ${["Transferencia","Tarjeta","Efectivo"].map(opt => `<option value="${opt}" ${(p.metodo_pago_real||p.metodo_pago)===opt ? "selected":""}>${opt}</option>`).join("")}
+            ${["Transferencia","Tarjeta","Efectivo"].map(opt => `<option value="${opt}" ${(p.metodo_pago)===opt ? "selected":""}>${opt}</option>`).join("")}
           </select>
         </label>
 
@@ -214,149 +151,147 @@ function cardPedido(p, idx) {
       <button class="btn brown btn-edit" ${p.pedido_id ? "" : "disabled"}>Actualizar</button>
       <button class="btn green btn-ok" ${p.pedido_id ? "" : "disabled"}>Finalizar</button>
     </div>
-  `
+  `;
 
-  const form   = $("form", sec)
-  const btnEd  = $(".btn-edit", sec)
-  const btnOk  = $(".btn-ok", sec)
-  const detUL  = $(".det-list", sec)
-  const totalSpan = $(".total", sec)
-  let btnCancel = null
+  const form      = $("form", sec);
+  const btnEd     = $(".btn-edit", sec);
+  const btnOk     = $(".btn-ok", sec);
+  const itemsWrap = $(".items-wrap", sec);
+  const totalSpan = $(".total", sec);
+  let btnCancel = null;
 
-  // ====== Cargar ÍTEMS ======
+  // ====== Cargar ÍTEMS (tabla 4 columnas) ======
   ;(async () => {
-    // Preferimos leer de la venta real si existe pedido_id; si no, usamos snapshotItems
-    let items = []
-    if (p.pedido_id) {
-      items = await fetchItemsByPedido(p.pedido_id)
-    }
-    if (!items.length && snapshotItems.length) {
-      // fallback a los items del snapshot (si tu pasarela los guardó)
-      items = snapshotItems.map(x => ({
-        titulo: dz(x.titulo) || "(item)",
-        cantidad: Number(x.cantidad || 1),
-        precio: Number(x.precio || 0)
-      }))
-    }
+    let items = [];
+    if (p.pedido_id) items = await fetchItemsByPedido(p.pedido_id);
 
     if (!items.length) {
-      detUL.innerHTML = "<li>(sin ítems)</li>"
-      // total: si no viene de BD ni snapshot, dejamos el total ya pintado (p.total_real)
-      return
+      itemsWrap.innerHTML = `<div class="items-empty">(sin ítems)</div>`;
+      return;
     }
 
-    const lis = items.map(d =>
-      `<li>${dz(d.titulo)} — ${d.cantidad} × ${fmtGs(d.precio)} = <b>${fmtGs(d.cantidad * d.precio)}</b></li>`
-    ).join("")
-    detUL.innerHTML = lis
+    const rows = items.map(d => `
+      <tr>
+        <td>${dz(d.titulo)}</td>
+        <td style="text-align:center;">${d.cantidad}</td>
+        <td style="text-align:right;">${fmtGs(d.precio)}</td>
+        <td style="text-align:right;"><b>${fmtGs(d.cantidad * d.precio)}</b></td>
+      </tr>
+    `).join("");
 
-    // Recalcular total si el de BD era 0:
-    const calcTotal = items.reduce((a, r) => a + r.cantidad * r.precio, 0)
-    const finalTotal = Number(p.total_real || 0) || calcTotal
-    totalSpan.textContent = fmtGs(finalTotal)
-  })().catch(console.error)
+    itemsWrap.innerHTML = `
+      <table class="items">
+        <thead>
+          <tr>
+            <th>Producto</th>
+            <th style="width:70px;text-align:center;">Cant.</th>
+            <th style="width:150px;text-align:right;">Precio xU</th>
+            <th style="width:160px;text-align:right;">Subtotal</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+
+    // Si el total de la vista fuese 0, recalculamos desde los ítems
+    const calcTotal = items.reduce((a, r) => a + r.cantidad * r.precio, 0);
+    const finalTotal = Number(p.total_real || 0) || calcTotal;
+    totalSpan.textContent = fmtGs(finalTotal);
+  })().catch(console.error);
 
   // ====== Editar / Guardar ======
   btnEd?.addEventListener("click", async (e) => {
-    e.preventDefault()
-    if (!p.pedido_id) return alert("Este snapshot no tiene pedido vinculado (pedido_id).")
+    e.preventDefault();
+    if (!p.pedido_id) return alert("Este snapshot no tiene pedido vinculado (pedido_id).");
 
-    const mode = form.dataset.mode
+    const mode = form.dataset.mode;
     if (mode === "view") {
       $$("select[name='metodo_pago'], select[name='estado_pago'], select[name='estado']", form)
-        .forEach(el => el.disabled = false)
-      form.dataset.mode = "edit"
-      btnEd.textContent = "Guardar"
+        .forEach(el => el.disabled = false);
+      form.dataset.mode = "edit";
+      btnEd.textContent = "Guardar";
 
       if (!btnCancel) {
-        btnCancel = document.createElement("button")
-        btnCancel.className = "btn"
-        btnCancel.textContent = "Cancelar"
-        $(".acciones", sec).insertBefore(btnCancel, btnOk)
+        btnCancel = document.createElement("button");
+        btnCancel.className = "btn";
+        btnCancel.textContent = "Cancelar";
+        $(".acciones", sec).insertBefore(btnCancel, btnOk);
         btnCancel.addEventListener("click", async (ev) => {
-          ev.preventDefault()
-          await reloadCard(sec, p.id)
-        })
+          ev.preventDefault();
+          await reloadCard(sec, p.snapshot_id);
+        });
       }
     } else {
-      const metodo_pago = form.querySelector("select[name='metodo_pago']")?.value || undefined
-      const estado_pago = form.querySelector("select[name='estado_pago']")?.value || undefined
-      const estado      = form.querySelector("select[name='estado']")?.value || undefined
+      const metodo_pago = form.querySelector("select[name='metodo_pago']")?.value || undefined;
+      const estado_pago = form.querySelector("select[name='estado_pago']")?.value || undefined;
+      const estado      = form.querySelector("select[name='estado']")?.value || undefined;
 
       try {
-        btnEd.disabled = true
-        await updatePedido(p.pedido_id, { metodo_pago, estado_pago, estado })
-        await reloadCard(sec, p.id)
+        btnEd.disabled = true;
+        await updatePedido(p.pedido_id, { metodo_pago, estado_pago, estado });
+        await reloadCard(sec, p.snapshot_id);
       } catch (err) {
-        alert("No se pudo guardar: " + (err?.message || err))
-        console.error(err)
+        alert("No se pudo guardar: " + (err?.message || err));
+        console.error(err);
       } finally {
-        btnEd.disabled = false
+        btnEd.disabled = false;
       }
     }
-  })
+  });
 
   // ====== Finalizar ======
   btnOk?.addEventListener("click", async (e) => {
-    e.preventDefault()
-    if (!p.pedido_id) return alert("Este snapshot no tiene pedido vinculado (pedido_id).")
-    if (!confirm("¿Dar por finalizado este pedido (estado: entregado)?")) return
+    e.preventDefault();
+    if (!p.pedido_id) return alert("Este snapshot no tiene pedido vinculado (pedido_id).");
+    if (!confirm("¿Dar por finalizado este pedido (estado: entregado)?")) return;
 
     try {
-      btnOk.disabled = true
-      await updatePedido(p.pedido_id, { estado: "entregado" })
-      sec.remove()
-      if (!grid.children.length) render([])
+      btnOk.disabled = true;
+      await updatePedido(p.pedido_id, { estado: "entregado" });
+      sec.remove();
+      if (!grid.children.length) render([]);
     } catch (err) {
-      alert("No se pudo finalizar: " + (err?.message || err))
-      console.error(err)
+      alert("No se pudo finalizar: " + (err?.message || err));
+      console.error(err);
     } finally {
-      btnOk.disabled = false
+      btnOk.disabled = false;
     }
-  })
+  });
 
-  return sec
+  return sec;
 }
 
 async function reloadCard(oldNode, snapshotId) {
   try {
-    const fresh = await fetchSnapshotById(snapshotId)
-    const idx = [...grid.children].indexOf(oldNode)
-    const newNode = cardPedido(fresh, Math.max(0, idx))
-    oldNode.replaceWith(newNode)
+    // Leemos nuevamente desde la vista (by snapshot_id)
+    const { data, error } = await supa
+      .from("v_pedidos_pendientes")
+      .select("*")
+      .eq("snapshot_id", snapshotId)
+      .maybeSingle();
+
+    if (error) throw error;
+    const idx = [...grid.children].indexOf(oldNode);
+    if (!data) {
+      oldNode.remove();
+      if (!grid.children.length) render([]);
+      return;
+    }
+    const newNode = cardPedido(data, Math.max(0, idx));
+    oldNode.replaceWith(newNode);
   } catch (err) {
-    alert("No se pudo recargar el pedido: " + (err?.message || err))
-    console.error(err)
+    alert("No se pudo recargar el pedido: " + (err?.message || err));
+    console.error(err);
   }
 }
 
 /* ========= Init ========= */
-/* ========= Init (patch de diagnóstico) ========= */
-;(async () => {
+(async () => {
   try {
-    const snaps = await fetchSnapshotsConEstados();
-
-    // Logs de diagnóstico:
-    console.log("snapshots totales:", snaps.length);
-    console.table(
-      snaps.map(s => ({
-        snapshot_id: s.id,
-        pedido_id: s.pedido_id,
-        estado: s.estado,
-        creado_en: s.creado_en
-      }))
-    );
-
-    // Regla: si tiene pedido_id -> mostrar solo si está 'pendiente'.
-    // Si NO tiene pedido_id -> mostrar (asumimos pendiente hasta vincular).
-    const pendientes = snaps.filter(s => (s.pedido_id ? s.estado === "pendiente" : true));
-
-    console.log("pendientes renderizados:", pendientes.length);
-    render(pendientes);
+    const rows = await fetchPendientes();
+    render(rows);
   } catch (err) {
     alert("Error cargando pedidos: " + (err?.message || err));
     console.error(err);
   }
 })();
-
-
