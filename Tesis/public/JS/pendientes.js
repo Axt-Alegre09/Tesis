@@ -22,8 +22,8 @@ const hoyLargo = () =>
 }
 $(".back")?.addEventListener("click", () => history.back());
 
-const ESTADOS_PEDIDO = ["pendiente", "pagado", "cancelado", "entregado"];
-const ESTADOS_PAGO   = ["pendiente", "pagado", "fallido", "reembolsado"];
+const ESTADOS_PEDIDO = ["pendiente", "finalizado", "cancelado"];
+const ESTADOS_PAGO   = ["pendiente", "pagado"];
 const colorEstado = { pendiente:"#b38a00", pagado:"#1d6f42", cancelado:"#8b0000", entregado:"#2e7dd1" };
 const colorPago   = { pendiente:"#b38a00", pagado:"#1d6f42", fallido:"#8b0000", reembolsado:"#6b4caf" };
 const badge = (estado, palette) => {
