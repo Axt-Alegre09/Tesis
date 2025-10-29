@@ -323,3 +323,29 @@ async function reloadCard(oldNode, snapshotId) {
     console.error(err);
   }
 })();
+
+// ==== Masonry con Grid: calcula spans por altura ====
+function aplicarMasonry() {
+  const grid = document.getElementById('grid');
+  if (!grid) return;
+
+  const style = getComputedStyle(grid);
+  const row = parseInt(style.getPropertyValue('grid-auto-rows')); // 8
+  const gap = parseInt(style.getPropertyValue('gap')) || 0;
+
+  grid.querySelectorAll('.card').forEach(card => {
+    card.style.gridRowEnd = 'span 1'; // reset antes de medir
+    const h = card.getBoundingClientRect().height;
+    const span = Math.ceil((h + gap) / (row + gap));
+    card.style.gridRowEnd = `span ${span}`;
+  });
+}
+
+// Recalcular después de render, al cargar imágenes y al redimensionar
+window.addEventListener('load', aplicarMasonry);
+window.addEventListener('resize', aplicarMasonry);
+
+// Si tu render es async, llama aplicarMasonry() justo después de insertar las cards.
+// Opcional: observa cambios dinámicos:
+new MutationObserver(aplicarMasonry).observe(document.getElementById('grid'), { childList: true, subtree: true });
+
