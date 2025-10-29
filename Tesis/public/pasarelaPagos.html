@@ -35,6 +35,14 @@
       <!-- ÉXITO -->
       <section id="checkout-success" class="checkout-success disabled">
         <h3>¡Pedido confirmado! 🎉</h3>
+
+        <!-- NUEVO: meta del pedido -->
+        <div id="success-meta" style="display:flex;gap:.5rem;flex-wrap:wrap;margin:.25rem 0 1rem;">
+          <span id="pill-pedido"  class="pill"></span>
+          <span id="pill-total"   class="pill"></span>
+          <span id="pill-metodo"  class="pill"></span>
+        </div>
+
         <div class="acciones-checkout" style="gap:.5rem; flex-wrap: wrap;">
           <button id="btn-descargar-factura" class="carrito-acciones-comprar" type="button">Descargar factura (PDF)</button>
           <a class="carrito-acciones-comprar" href="index.html">Volver al inicio</a>
@@ -190,11 +198,8 @@
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
 
-  <!-- Carrito (necesario para snapshot/limpieza) -->
+  <!-- Carrito (snapshot/limpieza) -->
   <script type="module" src="JS/cart-api.js"></script>
-
-  <!-- Lógica de la pasarela (importa ./ScriptLogin.js internamente) -->
-  <script type="module" src="JS/pasarelaPagos.js"></script>
 
   <!-- Autocompletar desde clientes_perfil -->
   <script type="module">
@@ -217,18 +222,24 @@
 
       FIELD_IDS.forEach(id => {
         const el = $(id);
-        if (el && isEmpty(el.value) && typeof data[id] !== "undefined" && data[id] !== null) {
+        if (el && isEmpty(el.value) && data[id] != null) {
           el.value = String(data[id]);
         }
       });
     }
     preloadProfileIntoForm();
   </script>
+
   <!-- Requiere sesión para poder pagar -->
   <script type="module">
     import { requireAuth } from "./JS/ScriptLogin.js";
     await requireAuth();
   </script>
+
+  <!-- Tu lógica legacy (validaciones UI / factura opcional) -->
   <script src="JS/checkout.js"></script>
+
+  <!-- NUEVO: flujo DB (captura submit y llama al RPC) -->
+  <script type="module" src="JS/pasarelaPagos.js"></script>
 </body>
 </html>
