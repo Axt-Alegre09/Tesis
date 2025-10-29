@@ -20,12 +20,15 @@ const hoyLargo = () =>
   const el = $("#fecha");
   if (el) el.textContent = hoyLargo();
 }
-$(".back")?.addEventListener("click", () => history.back());
+const backBtn = $(".back");
+if (backBtn) backBtn.addEventListener("click", () => history.back());
 
+/* ========= Estados ========= */
+// >>> Como pediste <<<
 const ESTADOS_PEDIDO = ["pendiente", "finalizado", "cancelado"];
 const ESTADOS_PAGO   = ["pendiente", "pagado"];
-const colorEstado = { pendiente:"#b38a00", pagado:"#1d6f42", cancelado:"#8b0000", entregado:"#2e7dd1" };
-const colorPago   = { pendiente:"#b38a00", pagado:"#1d6f42", fallido:"#8b0000", reembolsado:"#6b4caf" };
+const colorEstado = { pendiente:"#b38a00", finalizado:"#1d6f42", cancelado:"#8b0000" };
+const colorPago   = { pendiente:"#b38a00", pagado:"#1d6f42" };
 const badge = (estado, palette) => {
   if (!estado) return "";
   const color = palette[estado] || "#444";
@@ -37,7 +40,8 @@ async function fetchPendientes() {
   const { data, error } = await supa
     .from("v_pedidos_pendientes")
     .select("*")
-    .order("pedido_nro", { ascending: true });
+    .eq("estado", "pendiente")                       // solo pendientes
+    .order("creado_en", { ascending: false });       // más nuevo primero
   if (error) throw error;
   return data || [];
 }
@@ -90,11 +94,13 @@ function render(list) {
 function cardPedido(p, idx) {
   const sec = document.createElement("section");
   sec.className = "card";
-  sec.dataset.snapshot_id = p.snapshot_id;
+  sec.dataset.snapshot_id = p.snapshot_id ?? "";
   sec.dataset.pedido_id = p.pedido_id || "";
 
+  const nro = typeof p.pedido_nro === "number" ? p.pedido_nro : idx;
+
   sec.innerHTML = `
-    <h3>Pedido N°: ${idx}
+    <h3>Pedido N°: ${nro}
       ${p.estado ? badge(p.estado, colorEstado) : ""}
       ${p.estado_pago ? badge(p.estado_pago, colorPago) : ""}
     </h3>
@@ -164,10 +170,8 @@ function cardPedido(p, idx) {
   // ====== ÍTEMS (con fallback a snapshot) ======
   (async () => {
     let items = [];
-    // 1) Reales (si hay pedido_id y RLS permite)
     if (p.pedido_id) items = await fetchItemsByPedido(p.pedido_id);
 
-    // 2) Fallback a snapshot.items si quedó vacío
     if (!items.length && Array.isArray(p.items) && p.items.length) {
       items = p.items.map(x => ({
         titulo: dz(x.titulo) || "(item)",
@@ -202,7 +206,6 @@ function cardPedido(p, idx) {
         </table>`;
     }
 
-    // Total: p.total_real si está (>0), si no, suma de ítems
     const calc = (items || []).reduce((a, r) => a + r.cantidad * r.precio, 0);
     const finalTotal = Number(p.total_real || 0) || calc;
     totalSpan.textContent = fmtGs(finalTotal);
@@ -227,7 +230,7 @@ function cardPedido(p, idx) {
         $(".acciones", sec).insertBefore(btnCancel, btnOk);
         btnCancel.addEventListener("click", async (ev) => {
           ev.preventDefault();
-          await reloadCard(sec, p.snapshot_id);
+          await reloadCard(sec, sec.dataset.snapshot_id || null);
         });
       }
     } else {
@@ -238,7 +241,7 @@ function cardPedido(p, idx) {
       try {
         btnEd.disabled = true;
         await updatePedido(p.pedido_id, { metodo_pago, estado_pago, estado });
-        await reloadCard(sec, p.snapshot_id);
+        await reloadCard(sec, sec.dataset.snapshot_id || null);
       } catch (err) {
         alert("No se pudo guardar: " + (err?.message || err));
         console.error(err);
@@ -252,11 +255,12 @@ function cardPedido(p, idx) {
   btnOk?.addEventListener("click", async (e) => {
     e.preventDefault();
     if (!p.pedido_id) return alert("Este snapshot no tiene pedido vinculado (pedido_id).");
-    if (!confirm("¿Dar por finalizado este pedido (estado: entregado)?")) return;
+    if (!confirm("¿Dar por finalizado este pedido (estado: finalizado)?")) return;
 
     try {
       btnOk.disabled = true;
-      await updatePedido(p.pedido_id, { estado: "entregado" });
+      await updatePedido(p.pedido_id, { estado: "finalizado" });
+      // quitamos la tarjeta; si no queda ninguna, mostramos vacío
       sec.remove();
       if (!grid.children.length) render([]);
     } catch (err) {
@@ -272,24 +276,40 @@ function cardPedido(p, idx) {
 
 async function reloadCard(oldNode, snapshotId) {
   try {
-    const { data, error } = await supa
-      .from("v_pedidos_pendientes")
-      .select("*")
-      .eq("snapshot_id", snapshotId)
-      .maybeSingle();
+    const pedidoId = oldNode?.dataset?.pedido_id || null;
+
+    // Si no hay llaves, sacar la tarjeta
+    if (!snapshotId && !pedidoId) {
+      oldNode.remove();
+      if (!grid.children.length) render([]);
+      return;
+    }
+
+    // Construir query sin eq(null)
+    let q = supa.from("v_pedidos_pendientes").select("*").limit(1);
+    if (snapshotId && pedidoId) {
+      q = q.or(`snapshot_id.eq.${snapshotId},pedido_id.eq.${pedidoId}`);
+    } else if (snapshotId) {
+      q = q.eq("snapshot_id", snapshotId);
+    } else {
+      q = q.eq("pedido_id", pedidoId);
+    }
+
+    const { data, error } = await q.single();
     if (error) throw error;
 
-    const idx = [...grid.children].indexOf(oldNode);
     if (!data) {
       oldNode.remove();
       if (!grid.children.length) render([]);
       return;
     }
+
+    const idx = [...grid.children].indexOf(oldNode);
     const newNode = cardPedido(data, Math.max(0, idx));
     oldNode.replaceWith(newNode);
   } catch (err) {
+    console.error("reloadCard error:", err);
     alert("No se pudo recargar el pedido: " + (err?.message || err));
-    console.error(err);
   }
 }
 
