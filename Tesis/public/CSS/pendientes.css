@@ -4,31 +4,29 @@
   --cream-100: #f2eadf;
   --gray-bg: #e9edf1;
   --ok: #34a853;
-  --radius: 24px;
-  --shadow: 0 10px 30px rgba(0,0,0,.15);
+  --radius: 20px;
+  --shadow-soft: 0 4px 15px rgba(0,0,0,.08);
 }
 
-/* ====== BASE ====== */
+/* ===== BASE ===== */
 * { box-sizing: border-box; }
 body {
   margin: 0;
   font-family: "Poppins", sans-serif;
-  background: #a98a58; /* marco marrón */
+  background: #a98a58;
 }
 .wrapper {
   margin: 18px;
   background: var(--gray-bg);
-  border-radius: 20px;
-  box-shadow: inset 0 0 0 2px rgba(0,0,0,.08),
-              0 25px 40px rgba(0,0,0,.15); /* sombra más baja y suave */
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-soft);
   padding: 25px;
-  min-height: calc(100vh - 36px); /* extiende el fondo gris hasta abajo */
+  min-height: calc(100vh - 36px);
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
 }
 
-/* ====== HEADER ====== */
+/* ===== HEADER ===== */
 .topbar {
   display: flex;
   align-items: center;
@@ -39,110 +37,131 @@ body {
   position: absolute;
   left: 0;
   background: var(--cream-100);
-  border: 2px solid var(--brown-900);
+  border: none;
+  box-shadow: var(--shadow-soft);
   border-radius: 50%;
-  width: 38px;
-  height: 38px;
+  width: 42px;
+  height: 42px;
   font-size: 20px;
   cursor: pointer;
 }
 h1 {
   color: var(--brown-900);
   font-weight: 800;
-  font-size: 36px;
+  font-size: 34px;
   margin: 0;
 }
 
-/* ====== FECHA ====== */
+/* ===== FECHA ===== */
 .fecha {
   text-align: center;
-  font-weight: 700;
-  font-size: 18px;
-  margin: 8px 0 25px;
-  color: #333;
+  font-weight: 600;
+  font-size: 17px;
+  margin: 14px 0 22px;
+  color: var(--brown-900);
+  opacity: 0.8;
 }
 
-/* ====== GRID ====== */
+/* ===== GRID ===== */
 .grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 22px;
+  gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
   justify-items: center;
 }
-@media (max-width: 1300px) { .grid { grid-template-columns: repeat(4, 1fr); } }
-@media (max-width: 1050px) { .grid { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 850px)  { .grid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 580px)  { .grid { grid-template-columns: 1fr; } }
 
-/* ====== TARJETAS ====== */
+/* ===== CARD ===== */
 .card {
   width: 100%;
   background: #fff;
-  border: 2px solid var(--brown-900);
-  border-radius: 26px;
-  box-shadow: 0 8px 15px rgba(0,0,0,.1);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  box-shadow: var(--shadow-soft);
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  padding: 15px 20px 18px;
-  min-height: 530px;          /* antes: height: 530px; -> ahora flexible */
   transition: transform .2s ease;
 }
 .card:hover { transform: translateY(-3px); }
-.card.highlight { border: 2px solid #7b61ff; }
 .card h3 {
   text-align: center;
+  font-size: 19px;
+  font-weight: 700;
+  margin: 0 0 18px;
   color: var(--brown-900);
-  font-weight: 800;
-  font-size: 20px;
-  margin-top: 10px;
-  margin-bottom: 15px;
 }
 
-/* ====== INFO (una sola columna) ====== */
-.info {
+/* ===== FICHA ORDENADA ===== */
+.info.two-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 28px;
+}
+.info label {
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
-  align-items: flex-start;
-  gap: 6px;
-  flex: 1;
-  padding: 0 10px;
-}
-
-/* Cada texto ocupa toda la fila */
-.info p {
-  width: 100%;
   font-size: 14px;
   font-weight: 600;
-  margin: 3px 0;
   color: var(--brown-900);
-  line-height: 1.5;
+}
+.info input,
+.info select {
+  margin-top: 3px;
+  padding: 6px 10px;
+  border: none;
+  background: var(--cream-100);
+  border-radius: 12px;
+  font-size: 13px;
+  outline: none;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.05);
 }
 
-/* Separación visual entre grupos */
-.info p:nth-child(5),   /* después de Detalle de Pedido */
-.info p:nth-child(12),  /* después de Hora hasta */
-.info p:nth-child(16) { /* después de Total */
-  margin-bottom: 8px;
-  border-bottom: 1px solid #ddd;
-  padding-bottom: 4px;
+/* ===== DETALLE TABLA ===== */
+.detalle table.items {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 6px;
+}
+.detalle table.items th,
+.detalle table.items td {
+  padding: 8px 10px;
+  font-size: 13px;
+  text-align: left;
+  color: #333;
+}
+.detalle table.items thead {
+  background: var(--cream-100);
+  font-weight: 700;
+}
+.detalle table.items tbody tr {
+  background: #fff;
+  box-shadow: inset 0 -1px 0 rgba(0,0,0,.05);
 }
 
-/* ====== BOTONES ====== */
+/* TOTAL pegado y hermoso */
+.total {
+  font-weight: 700;
+  font-size: 15px;
+  margin-top: 12px;
+  color: var(--brown-900);
+  text-align: right;
+}
+
+/* ===== BOTONES ===== */
 .acciones {
   display: flex;
   justify-content: center;
   gap: 12px;
-  margin-top: 10px;
+  margin-top: 20px;
 }
 .btn {
-  border: 2px solid var(--brown-900);
-  border-radius: 999px;
-  padding: 7px 16px;
+  border: none;
+  padding: 10px 20px;
   font-weight: 700;
   font-size: 13px;
+  border-radius: 999px;
   cursor: pointer;
+  box-shadow: var(--shadow-soft);
+  transition: opacity .2s;
 }
 .btn.brown {
   background: var(--cream-100);
@@ -152,4 +171,4 @@ h1 {
   background: var(--ok);
   color: #fff;
 }
-.btn:hover { opacity: 0.9; }
+.btn:hover { opacity: 0.85; }
