@@ -1,241 +1,194 @@
-export const runtime = 'edge';
+(() => {
+  const CHAT_ENDPOINT = "/api/ask";
 
-/**
- * POST /api/ask
- * Body: { messages: [{role, content}], products?: [] }
- * Returns: { reply: string, rich?: { products?: [], promos?: [] } }
- */
+  const $ = s => document.querySelector(s);
+  const chatInput       = $(".chat-input textarea");
+  const sendChatBtn     = $(".chat-input i");
+  const chatbox         = $(".chatbox");
+  const chatbotToggler  = $(".chatbot-toggler");
+  if (!chatInput || !sendChatBtn || !chatbox) return;
 
-function json(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
+  // Chips rápidos
+  const quickbar = document.createElement("div");
+  quickbar.className = "quickbar";
+  quickbar.innerHTML = `
+    <button class="quick-chip" data-cmd="promos">Promos de hoy</button>
+    <button class="quick-chip" data-cmd="ver total">Ver total</button>
+    <button class="quick-chip" data-cmd="vaciar carrito">Vaciar carrito</button>
+    <button class="quick-chip" data-cmd="catering">Catering</button>
+  `;
+  chatbox.after(quickbar);
+  quickbar.addEventListener("click", (e) => {
+    const btn = e.target.closest(".quick-chip");
+    if (!btn) return;
+    chatInput.value = btn.dataset.cmd;
+    sendChatBtn.click();
   });
-}
 
-// ===== Entorno (desde Vercel env vars) =====
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE;
+  const inputIniHeight = chatInput.scrollHeight || 0;
+  const escapeHTML = (s="") => s.replace(/&/g,"&amp;").replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");
 
-const TB_PRODUCTOS = 'productos';
-const COLS_PRODUCTOS = 'id,nombre,descripcion,precio,imagen,activo,categoria_id';
-const TB_INFO = 'negocio_info';
-const TZ = 'America/Asuncion';
-
-// ---- util promos ----
-function isPromoWindowNow(d = new Date()) {
-  try {
-    const local = new Date(d.toLocaleString('en-US', { timeZone: TZ }));
-    const day = local.getDay(); // 5 = viernes
-    const hh = local.getHours();
-    const mm = local.getMinutes();
-    return day === 5 && (hh > 16 && (hh < 19 || (hh === 19 && mm === 0)));
-  } catch {
-    return false;
-  }
-}
-function getActivePromos() {
-  const promos = [];
-  if (isPromoWindowNow()) {
-    promos.push({
-      id: 'emp-2x1',
-      title: '2x1 en Empanadas',
-      detail: 'Válido hoy de 17:00 a 19:00 (hora de Asunción). 🥟✨',
-      cta: { text: 'Ver empanadas', payload: 'ver empanadas' },
-    });
-  }
-  return promos;
-}
-
-// ---- Supabase helpers ----
-async function supaSelect(table, columns, opts = {}) {
-  const { q } = opts;
-  try {
-    const url = new URL(`${SUPABASE_URL}/rest/v1/${table}`);
-    url.searchParams.set('select', columns);
-    if (q && q.trim()) {
-      url.searchParams.set('or', `nombre.ilike.*${q}*,descripcion.ilike.*${q}*`);
+  function bubble(className, { text=null, html=null }) {
+    const li = document.createElement("li");
+    li.classList.add("chat", className);
+    if (className === "incoming") {
+      const img = document.createElement("img");
+      img.className = "paniImg"; img.alt = "";
+      img.src = "https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinosico.ico";
+      li.appendChild(img);
     }
-    if (table === TB_PRODUCTOS) url.searchParams.set('activo', 'eq.true');
-
-    const res = await fetch(url.toString(), {
-      headers: {
-        apikey: SUPABASE_SERVICE_ROLE,
-        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE}`,
-      },
-      cache: 'no-store',
-    });
-    if (!res.ok) throw new Error(await res.text());
-    return await res.json();
-  } catch (e) {
-    console.error('[ask] supaSelect error:', e);
-    return [];
+    const p = document.createElement("p");
+    if (html) { p.classList.add("msg-card"); p.innerHTML = html; }
+    else { p.textContent = String(text ?? ""); }
+    li.appendChild(p);
+    return li;
   }
-}
-
-// RPC: kb_search (RAG con embeddings)
-async function supaKbSearch(queryEmbedding, matchCount = 5) {
-  try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/kb_search`, {
-      method: 'POST',
-      headers: {
-        apikey: SUPABASE_SERVICE_ROLE,
-        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE}`,
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ query_embedding: queryEmbedding, match_count: matchCount }),
-    });
-    if (!res.ok) throw new Error(await res.text());
-    return await res.json();
-  } catch (e) {
-    console.warn('[ask] supaKbSearch error:', e);
-    return [];
+  function appendIncomingText(text){ chatbox.append(bubble("incoming",{text})); chatbox.scrollTop=chatbox.scrollHeight; }
+  function appendIncomingHTML(html){ chatbox.append(bubble("incoming",{html})); chatbox.scrollTop=chatbox.scrollHeight; }
+  function appendOutgoing(text){ chatbox.append(bubble("outgoing",{text})); chatbox.scrollTop=chatbox.scrollHeight; }
+  function setSending(on){
+    sendChatBtn.classList.toggle("disabled",!!on);
+    if(on) sendChatBtn.setAttribute("aria-disabled","true"); else sendChatBtn.removeAttribute("aria-disabled");
   }
-}
 
-// ---- OpenAI helpers ----
-async function openaiChat(messages, temperature = 0.4, model = 'gpt-4o-mini') {
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({ model, messages, temperature }),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  const j = await res.json();
-  return j?.choices?.[0]?.message?.content?.trim() || null;
-}
-
-async function openaiEmbedding(input, model = 'text-embedding-3-small') {
-  const res = await fetch('https://api.openai.com/v1/embeddings', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({ model, input }),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  const j = await res.json();
-  return j?.data?.[0]?.embedding || null;
-}
-
-// ---- heurística productos ----
-function pickSuggestedProducts(all, userText, max = 5) {
-  if (!Array.isArray(all) || !all.length) return [];
-  const t = String(userText || '').toLowerCase();
-  const score = (p) => {
-    const n = String(p?.nombre || '').toLowerCase();
-    const d = String(p?.descripcion || '').toLowerCase();
-    let s = 0;
-    for (const w of t.split(/\s+/)) {
-      if (!w) continue;
-      if (n.includes(w)) s += 2;
-      if (d.includes(w)) s += 1;
-    }
-    if (/(empan|bocadit|combo|alfajor|torta|pan|milanesa)/.test(t)) s += 1;
-    if (p?.activo === true) s += 0.5;
-    return s;
-  };
-  return [...all]
-    .map((p) => ({ ...p, __s: score(p) }))
-    .sort((a, b) => b.__s - a.__s)
-    .slice(0, max)
-    .map(({ __s, ...p }) => p);
-}
-
-export async function POST(request) {
-  try {
-    if (!OPENAI_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE) {
-      return json({ reply: 'Configurar variables de entorno del servidor.', rich: null }, 500);
-    }
-
-    const { messages = [], products: frontProducts = [] } = await request.json().catch(() => ({}));
-    const lastUser =
-      messages.slice().reverse().find((m) => m.role === 'user')?.content?.slice(0, 2000) || '';
-
-    const dbProducts =
-      (frontProducts && frontProducts.length
-        ? frontProducts
-        : await supaSelect(TB_PRODUCTOS, COLS_PRODUCTOS)) || [];
-
-    const negocioInfoRows = await supaSelect(TB_INFO, '*');
-    const negocioInfo = negocioInfoRows?.[0] || {};
-
-    const promos = getActivePromos();
-    const suggested = pickSuggestedProducts(dbProducts, lastUser, 5);
-
-    // RAG fallback
-    let kbContext = '';
+  async function askBackend(messages) {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), 18000); // 18s
     try {
-      const needKb =
-        suggested.length < 1 ||
-        /horario|direccion|dirección|telefono|teléfono|whats|whatsapp|ubicacion|ubicación|quien|quién|historia|info|informacion|información|servicio|catering/i.test(
-          lastUser
-        );
-      if (needKb && lastUser) {
-        const emb = await openaiEmbedding(lastUser);
-        if (emb) {
-          const matches = await supaKbSearch(emb, 5);
-          if (Array.isArray(matches) && matches.length) {
-            kbContext = matches.map((m) => m?.content).filter(Boolean).join('\n');
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('[ask] RAG warning:', e);
-    }
-
-    const systemPrompt = `
-Eres “Paniquiños Bot”, el asistente de una confitería en Paraguay.
-Tono: mozo amable, cálido, profesional.
-Reglas:
-- Responde SIEMPRE en español.
-- Usa SOLO la información provista (productos, negocio, promos y KB). Si algo no está, decí que no tenés ese dato.
-- Para precios, usa el formato "99.999 Gs".
-- Si preguntan por horarios/dirección/teléfono, usa "negocioInfo".
-- Si hay promo activa relevante, menciónala una vez, sin insistir.
-- Sé conciso. Bullets máx 5 cuando ayuden.
-- No inventes disponibilidad, tamaños o sabores fuera de los datos.`;
-
-    const messagesForLLM = [
-      { role: 'system', content: systemPrompt.trim() },
-      { role: 'system', content: `negocioInfo:\n${JSON.stringify(negocioInfo, null, 2)}` },
-      { role: 'system', content: `productos (subset):\n${JSON.stringify(suggested, null, 2)}` },
-      { role: 'system', content: `promos activas:\n${JSON.stringify(promos, null, 2)}` },
-    ];
-    if (kbContext) {
-      messagesForLLM.push({
-        role: 'system',
-        content: `KB (contexto adicional verificado, no inventes fuera de esto):\n${kbContext}`,
+      const res = await fetch(CHAT_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type":"application/json" },
+        body: JSON.stringify({
+          messages,
+          products: (window.__PRODUCTS__||[]).slice(0,200)
+        }),
+        signal: controller.signal
       });
+      clearTimeout(id);
+      if (!res.ok) {
+        const t = await res.text().catch(()=> "");
+        throw new Error(`HTTP ${res.status}: ${t}`);
+      }
+      const data = await res.json();
+      return { ok:true, text: data?.reply || null, rich: data?.rich || null };
+    } catch (e) {
+      clearTimeout(id);
+      console.error("[chatbot] backend error:", e);
+      return { ok:false, text:"No pude responder ahora mismo. Probá de nuevo." };
     }
-    messagesForLLM.push({ role: 'user', content: lastUser || 'Hola' });
-
-    const reply =
-      (await openaiChat(messagesForLLM, 0.4, 'gpt-4o-mini')) ||
-      'Ahora mismo no tengo ese dato. ¿Querés preguntarme de otra forma?';
-
-    const rich = {};
-    if (promos.length) rich.promos = promos;
-    if (suggested.length) {
-      rich.products = suggested.map((p) => ({
-        id: p.id,
-        nombre: p.nombre,
-        precio: Number(p.precio || 0),
-        imagen: p.imagen || null,
-      }));
-    }
-
-    return json({ reply, rich }, 200);
-  } catch (e) {
-    console.error('[/api/ask] ERROR:', e);
-    return json(
-      { reply: 'Perdón, algo falló al preparar la respuesta. Probá de nuevo en unos segundos.', rich: null },
-      500
-    );
   }
-}
+
+  function renderPromos(promos=[]) {
+    if (!promos.length) return;
+    const html = `
+      <h4>Promos activas</h4>
+      <ul class="msg-list">
+        ${promos.map(p => `<li><b>${escapeHTML(p.title)}</b> — ${escapeHTML(p.detail)}</li>`).join("")}
+      </ul>
+      <div class="msg-actions">
+        ${promos.map(p => `<button class="btn-primary" data-payload="${escapeHTML(p.cta?.payload||"")}">${escapeHTML(p.cta?.text||"Ver")}</button>`).join("")}
+      </div>
+    `;
+    appendIncomingHTML(html);
+  }
+  function renderProducts(products=[]) {
+    if (!products.length) return;
+    const fmt = n => new Intl.NumberFormat("es-PY").format(n) + " Gs";
+    const html = `
+      <h4>Te puede gustar</h4>
+      <ul class="msg-list">
+        ${products.slice(0,5).map(p => `
+          <li>
+            <b>${escapeHTML(p.nombre)}</b> — ${fmt(p.precio)}
+            <div class="msg-actions">
+              <button class="btn-ghost" data-add="${escapeHTML(p.id)}">Agregar</button>
+            </div>
+          </li>`).join("")}
+      </ul>
+    `;
+    appendIncomingHTML(html);
+  }
+
+  document.addEventListener("click", async (e) => {
+    const add = e.target.closest("[data-add]");
+    if (add && window.CartAPI?.addById) {
+      try { await window.CartAPI.addById(add.dataset.add, 1);
+        appendIncomingText("✅ Agregué ese producto al carrito.");
+      } catch { appendIncomingText("No pude agregarlo ahora 🙈"); }
+    }
+    const payload = e.target.closest("[data-payload]")?.dataset.payload;
+    if (payload) { chatInput.value = payload; sendChatBtn.click(); }
+  });
+
+  const MESSAGES = [];
+
+  async function handleChat() {
+    const userMessage = (chatInput.value||"").trim();
+    if (!userMessage) return;
+
+    chatInput.value = "";
+    if (inputIniHeight) chatInput.style.height = `${inputIniHeight}px`;
+    appendOutgoing(userMessage);
+
+    // 1) NLU local (carrito/categorías)
+    try {
+      const local = await (window.ChatBrain?.handleMessage?.(userMessage));
+      if (local && (local.text || local.html || local.products || local.promos)) {
+        if (local.text) appendIncomingText(local.text);
+        const promos = (window.ChatBrain?.getActivePromos?.() || []);
+        if (local.promos?.length || promos.length) renderPromos(local.promos?.length ? local.promos : promos);
+        if (local.products?.length) renderProducts(local.products);
+        if (local && local.text) return;
+      }
+    } catch (e){ console.warn("[chatbot] ChatBrain:", e); }
+
+    // 2) Catering (si existe módulo)
+    try {
+      const ChatCatering = window.ChatCatering?.handle ? window.ChatCatering : null;
+      if (ChatCatering) {
+        const res = await window.ChatCatering.handle(userMessage);
+        if (res && res.text) { appendIncomingText(res.text); return; }
+      }
+    } catch (e){ console.warn("[chatbot] ChatCatering:", e); }
+
+    // 3) Backend natural
+    MESSAGES.push({ role:"user", content:userMessage });
+    if (MESSAGES.length > 20) MESSAGES.splice(0, MESSAGES.length - 20);
+
+    setSending(true);
+    const loading = bubble("incoming", { text:"Escribiendo..." });
+    chatbox.appendChild(loading); chatbox.scrollTop = chatbox.scrollHeight;
+
+    let ok=false, text=null, rich=null;
+    try {
+      ({ ok, text, rich } = await askBackend(MESSAGES));
+    } finally {
+      loading.remove(); // nunca queda colgado
+    }
+
+    if (rich?.promos?.length) renderPromos(rich.promos);
+    if (rich?.products?.length) renderProducts(rich.products);
+    appendIncomingText(text || (ok ? "No tengo respuesta ahora." : "Oops, ocurrió un error."));
+    setSending(false);
+  }
+
+  chatInput.addEventListener("input", () => {
+    chatInput.style.height = `${inputIniHeight}px`;
+    chatInput.style.height = `${Math.min(chatInput.scrollHeight, 120)}px`;
+    chatbox.scrollTop = chatbox.scrollHeight;
+  });
+  chatInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey && window.innerWidth > 800) {
+      e.preventDefault(); handleChat();
+    }
+  });
+  sendChatBtn.addEventListener("click", handleChat);
+
+  chatbotToggler?.addEventListener("click", () => {
+    document.body.classList.toggle("show-chatbot");
+  });
+  document.querySelector(".chatbot .close-btn")?.addEventListener("click", () => {
+    document.body.classList.remove("show-chatbot");
+  });
+})();
