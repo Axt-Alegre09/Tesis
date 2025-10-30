@@ -1,11 +1,12 @@
 // JS/script-chatbot.js
-// Chat flotante: envía mensajes, usa lógica local (ChatBrain) y reservas (ChatCatering),
-// y si nada responde cae al backend opcional (CHAT_ENDPOINT).
+// Chat flotante: usa lógica local (ChatBrain) y reservas (ChatCatering).
+// Si nada responde, consulta al backend semántico (/api/ask).
 (() => {
-  // ---- Config opcional de backend (déjalo vacío si no usas servidor) ----
-  const CHAT_ENDPOINT = "/api/chat"; // o "" para no usar backend
+  // ---- Endpoint del backend semántico ----
+  // Si usas Vercel: /api/ask debe existir (ask.js).
+  const CHAT_ENDPOINT = "/api/ask";
 
-  // ---- Nodos (con defensas por si no existen) ----
+  // ---- Nodos ----
   const $ = (sel) => document.querySelector(sel);
   const chatInput       = $(".chat-input textarea");
   const sendChatBtn     = $(".chat-input i");
@@ -15,7 +16,7 @@
 
   if (!chatInput || !sendChatBtn || !chatbox) {
     console.warn("[chatbot] Falta markup del chat. Revisa el HTML.");
-    return; // salimos silenciosamente
+    return;
   }
 
   // ---- Utiles ----
@@ -74,27 +75,66 @@
     });
   }
 
-  // ---- Backend opcional ----
-  async function askBackend(messages) {
+  // ---- Backend semántico (/api/ask) ----
+  async function askBackend(question) {
     if (!CHAT_ENDPOINT) return { ok: false, text: null };
     try {
-      const res = await fetch(CHAT_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages })
-      });
+      // /api/ask soportado como GET ?question=
+      const url = `${CHAT_ENDPOINT}?question=${encodeURIComponent(question)}`;
+      const res = await fetch(url, { method: "GET" });
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
       const data = await res.json();
-      return { ok: true, text: data?.reply || null };
+      return { ok: true, text: parseAskResponse(data) };
     } catch (e) {
       console.error("[chatbot] backend error:", e);
       return { ok: false, text: "Oops, ocurrió un error. Intenta de nuevo." };
     }
   }
 
-  // ---- Manejo principal ----
-  const MESSAGES = [];
+  // Interpreta la respuesta del /api/ask:
+  // - Si viene {reply: "..."} lo usa directo
+  // - Si viene array de matches [{content, similarity, meta...}], arma un texto útil
+  function parseAskResponse(data) {
+    // Caso 1: objeto con reply
+    if (data && typeof data === "object" && !Array.isArray(data) && data.reply) {
+      return String(data.reply);
+    }
 
+    // Caso 2: array de matches (kb_search)
+    if (Array.isArray(data) && data.length) {
+      const top = data[0];
+      const txt = String(top.content ?? "").trim();
+
+      // Intento extraer "Horarios: { ... }" si existe
+      const m = txt.match(/Horarios:\s*({[\s\S]*?})/i);
+      if (m) {
+        try {
+          const horarios = JSON.parse(m[1]);
+          const map = {
+            lun: "Lun", mar: "Mar", mie: "Mié", jue: "Jue",
+            vie: "Vie", sab: "Sáb", dom: "Dom"
+          };
+          const lineas = Object.keys(map)
+            .filter(k => k in horarios)
+            .map(k => `${map[k]}: ${horarios[k]}`);
+          if (lineas.length) {
+            return "🕒 Horarios:\n" + lineas.join("\n");
+          }
+        } catch {}
+      }
+
+      // Si no hay horarios, devolvemos el contenido recortado
+      if (txt) return txt.slice(0, 220) + (txt.length > 220 ? "…" : "");
+
+      // Si no hay content, mostramos algo genérico
+      return "Tengo información relacionada pero no pude formatearla. Probá preguntarme de otra forma (ej: “¿Abren los domingos?”).";
+    }
+
+    // Default
+    return "No encontré información relacionada 😕";
+  }
+
+  // ---- Manejo principal ----
   async function handleChat() {
     const userMessage = (chatInput.value || "").trim();
     if (!userMessage) return;
@@ -115,7 +155,6 @@
       }
     } catch (e) {
       console.warn("[chatbot] ChatBrain error:", e);
-      // seguimos…
     }
 
     // 2) Intento reservas catering (espera breve por si el script aún carga)
@@ -130,19 +169,15 @@
       }
     } catch (e) {
       console.warn("[chatbot] ChatCatering error:", e);
-      // seguimos…
     }
 
-    // 3) Backend (si está configurado)
-    MESSAGES.push({ role: "user", content: userMessage });
-    if (MESSAGES.length > 20) MESSAGES.splice(0, MESSAGES.length - 20);
-
+    // 3) Backend semántico
     setSending(true);
     const loadingLi = createChatLi("Cargando...", "incoming");
     chatbox.appendChild(loadingLi);
     chatbox.scrollTop = chatbox.scrollHeight;
 
-    const { ok, text } = await askBackend(MESSAGES);
+    const { ok, text } = await askBackend(userMessage);
     loadingLi.querySelector("p").textContent =
       text || (ok ? "No tengo respuesta ahora." : "Oops, ocurrió un error. Intenta de nuevo.");
 
