@@ -1,6 +1,5 @@
-/* JS/chatbot.brain.js
-   NLU liviano (solo carrito/categorías/promos). Sin textos fijos.
-   Todo lo demás se delega al backend /api/ask para respuestas naturales.
+/* public/JS/chatbot.brain.js
+   NLU liviano (carrito/categorías/promos). Lo demás pasa al backend /api/ask.
 */
 (() => {
   // ===== Utiles =====
@@ -26,7 +25,7 @@
   const pluralize = (s,n=2)=> (n===1? s: s.endsWith("a")? s+"s": s.endsWith("or")? s+"es": s+"s");
   const list = (arr=[]) => arr.length<=1 ? (arr[0]||"") : arr.slice(0,-1).join(", ") + " y " + arr.slice(-1);
 
-  // ===== Dominio (sin KB fijo) =====
+  // ===== Dominio =====
   const SYN = {
     empanada:["empanada","empanadas","empi","empas"],
     alfajor:["alfajor","alfajores"],
@@ -45,17 +44,17 @@
 
   const CAT_SYNONYMS = {
     empanadas: SYN.empanada,
-    confiteria: ["confiteria","confitería","postres","dulces","reposteria","repostería","tortas","flanes","pastaflora","pasta flora","alfajores", ...SYN.croissant, ...SYN.dulces],
+    confiteria: ["confiteria","confitería","postres","dulces","reposteria","repostería","tortas","torta","flanes","pastaflora","pasta flora","alfajores", ...SYN.croissant, ...SYN.dulces],
     bocaditos: SYN.bocadito,
     alfajores: SYN.alfajor,
     panificados: [...SYN.pan],
     milanesas: SYN.milanesa
   };
 
-  // ===== Índice dinámico de productos (desde window.__PRODUCTS__) =====
+  // ===== Índice dinámico desde window.__PRODUCTS__
   function getProductIndex(){
     if (window.__PRODUCT_INDEX__?.byToken) return window.__PRODUCT_INDEX__;
-    const productos = window.__PRODUCTS__ || []; // <-- lo llena tu main.js desde Supabase
+    const productos = window.__PRODUCTS__ || [];
     const byToken = new Map();
     const all = productos.map(p => ({
       id: String(p.id ?? p.productoId ?? p.uuid ?? p.ID ?? p.Id ?? p.slug ?? p.nombre),
@@ -85,7 +84,7 @@
   }
   const candidatesFor = (token) => getProductIndex().byToken.get(token) || [];
 
-  // ===== Helpers de parsing =====
+  // ===== Helpers parsing =====
   function detectCategory(msgNorm){
     for (const [cat, syns] of Object.entries(CAT_SYNONYMS)) {
       if (syns.some(s => msgNorm.includes(s))) return cat;
@@ -103,11 +102,11 @@
 
   function guessProductText(msgRaw){
     const msg = normalize(msgRaw);
-    // pista: primer token que exista en el índice
     const idx = getProductIndex();
     for (const t of msg.split(" ")) if (idx.byToken?.has(t)) return t;
     if (/\bmilanesa(s)?\b/.test(msg)) return "milanesa";
     if (/\bempanad(a|as)\b/.test(msg)) return "empanada";
+    if (/\btorta(s)?\b/.test(msg)) return "torta";
     if (FLAVORS.some(f => msg.includes(normalize(f)))) return "empanada";
     return null;
   }
@@ -195,9 +194,11 @@
     }
 
     const cat = detectCategory(msg);
+    // 👇 ampliamos gatillos para “tienen”/“tenés”
     if (cat) {
       if (/sabor|sabores|variedad/.test(msg)) return { intent:"category_info", cat, topic:"sabores" };
-      if (/que tienen|que hay|lista|catalogo|catálogo|mostrar|tienes|tenes|que productos/.test(msg)) return { intent:"category_info", cat, topic:"lista" };
+      if (/que tienen|tienen|tienes|tenes|tenés|que hay|lista|catalogo|catálogo|mostrar|que productos/.test(msg))
+        return { intent:"category_info", cat, topic:"lista" };
     }
 
     if (/(quita|saca|elimina|borra)\b/.test(msg)) {
@@ -214,7 +215,6 @@
       if (prodTxt) return { intent:"add", items:[{ cantidad:1, prodTxt }] };
     }
 
-    // Reserva catering – si aparece, lo maneja el submódulo
     if (/\b(catering|reserva(r)?|agendar)\b/.test(msg)) {
       return { intent:"catering_book", raw: msgRaw };
     }
@@ -222,7 +222,7 @@
     return { intent:"none" };
   }
 
-  // ===== Acciones (carrito + catálogo dinámico + promos) =====
+  // ===== Acciones (carrito + catálogo + promos) =====
   async function actAdd(items){
     const done = [], missing = [];
     for (const it of items) {
@@ -241,123 +241,100 @@
     if (done.length) {
       const parts = done.map(d => `${d.cantidad} ${pluralize(d.producto||d.prodTxt)}${d.flavor? " de " + d.flavor : ""}`);
       const snap = window.CartAPI.getSnapshot?.(); const total = snap?.total ?? null;
-      text += `✅ Agregué ${list(parts)} al carrito.` + (total!=null? ` Total: ${fmtGs(total)}.`:"");
+      text += `¡Listo! Agregué ${list(parts)} al carrito.` + (total!=null? ` Total: ${fmtGs(total)}.`:"");
     }
     if (missing.length) {
-      text += (text? "\n":"") + "No pude identificar: " +
-        list(missing.map(m => `${m.cantidad} ${pluralize(m.prodTxt)}${m.flavor?` de ${m.flavor}`:""}`)) +
-        ". Decime el nombre como aparece en el catálogo.";
+      text += (text? "\n":"") + `No pude identificar: ${list(missing.map(m => `${m.cantidad} ${pluralize(m.prodTxt)}${m.flavor?` de ${m.flavor}`:""}`))}. Decime el nombre como aparece en el catálogo y te lo cargo.`;
     }
     return { text };
   }
 
   async function actRemove(items){
     const snap = window.CartAPI.getSnapshot?.();
-    if (!snap?.items?.length) return { text: "Tu carrito está vacío." };
+    if (!snap?.items?.length) return { text: "Tu carrito está vacío por ahora." };
 
     let removed = [];
     for (const it of (items?.length ? items : [{ cantidad:1, prodTxt: guessProductText("") }])) {
       const prod = findProduct(it.prodTxt, it.flavor); if (!prod) continue;
       const row = snap.items.find(r => normalize(r.titulo).includes(normalize(prod.nombre))); if (!row) continue;
-
       const newQty = Math.max(0, Number(row.cantidad||1) - (it.cantidad||1));
       if (newQty === 0) await window.CartAPI.remove({ id: row.id });
       else await window.CartAPI.setQty({ id: row.id }, newQty);
       removed.push(`${it.cantidad} ${pluralize(prod.nombre)}`);
     }
     const after = window.CartAPI.getSnapshot?.();
-    return { text: removed.length ? `🗑️ Saqué ${list(removed)}. Total: ${fmtGs(after?.total||0)}.` : "No encontré ese producto en tu carrito." };
+    return { text: removed.length ? `Saqué ${list(removed)}. Total actual: ${fmtGs(after?.total||0)}.` : "No encontré ese producto en tu carrito." };
   }
 
   async function actSetQty({ prodTxt, flavor, qty }){
-    if (!qty || qty<1) return { text:"Decime la cantidad (1 o más)." };
+    if (!qty || qty<1) return { text:"Decime la cantidad (1 o más) y lo ajusto." };
     const snap = window.CartAPI.getSnapshot?.(); if (!snap?.items?.length) return { text:"Tu carrito está vacío." };
-    const prod = findProduct(prodTxt, flavor); if (!prod) return { text:"No identifiqué el producto. Decímelo como en el catálogo." };
+    const prod = findProduct(prodTxt, flavor); if (!prod) return { text:"No identifiqué el producto. Decímelo como en el catálogo y lo ajusto." };
     const row = snap.items.find(r => normalize(r.titulo).includes(normalize(prod.nombre)));
     if (!row) return { text:"Ese producto no está en tu carrito." };
     await window.CartAPI.setQty({ id: row.id }, qty);
     const after = window.CartAPI.getSnapshot?.();
-    return { text:`Listo: dejé ${qty} ${pluralize(prod.nombre, qty)}. Total: ${fmtGs(after?.total||0)}.` };
+    return { text:`Hecho: dejé ${qty} ${pluralize(prod.nombre, qty)}. Total: ${fmtGs(after?.total||0)}.` };
   }
 
   async function actShowTotal(){
     const snap = window.CartAPI.getSnapshot?.();
-    if (!snap?.items?.length) return { text:"Tu carrito está vacío." };
-    return { text:`🧾 Total actual: ${fmtGs(snap.total)} (${snap.items.length} ítems).` };
+    if (!snap?.items?.length) return { text:"Tu carrito está vacío todavía. ¿Querés que te recomiende algo?" };
+    return { text:`🧾 Total: ${fmtGs(snap.total)} (${snap.items.length} ítems). ¿Ajustamos algo o ya te paso a pagar?` };
   }
   async function actShowCart(){
     const snap = window.CartAPI.getSnapshot?.();
-    if (!snap?.items?.length) return { text:"Tu carrito está vacío." };
+    if (!snap?.items?.length) return { text:"Tu carrito está vacío por ahora." };
     const lines = snap.items.slice(0,8).map(it => `• ${it.cantidad} × ${it.titulo}`);
     const extra = snap.items.length>8 ? `\n…y ${snap.items.length-8} más.` : "";
-    return { text:`En tu carrito:\n${lines.join("\n")}${extra}\nTotal: ${fmtGs(snap.total)}.` };
-  }
-  async function actEmpty(){
-    const snap = window.CartAPI.getSnapshot?.();
-    if (!snap?.items?.length) return { text:"Tu carrito ya está vacío." };
-    for (const it of (snap.items||[])) await window.CartAPI.remove({ id: it.id });
-    return { text:"Listo, vacié tu carrito." };
+    return { text:`Tenés en tu carrito:\n${lines.join("\n")}${extra}\nTotal: ${fmtGs(snap.total)}.\n¿Ajustamos algo o te paso una recomendación?` };
   }
 
   function actHelp(){
     return { text:
-`Puedo ayudarte con tu compra:
-• “agregá 3 empanadas de carne y 1 de jamón y queso”
-• “quitá 1 alfajor”
-• “poné 5 empanadas”
-• “ver carrito”, “total”, “vaciar carrito”
-
-Si querés info del local, horarios o dudas generales, preguntame directamente 😉` };
+`Dale, te doy una mano. Puedo:
+• Agregar al carrito (“agregá 3 empanadas de carne”)
+• Quitar o ajustar (“quitá 1 alfajor”, “poné 5 empanadas”)
+• Ver el total (“ver total”, “mostrar carrito”)
+• Ver precios por categoría (“precios de empanadas”)
+¿Querés algo salado o dulce? 😊` };
   }
 
-  // dentro de chatbot.brain.js, reemplaza actCategoryInfo por:
-    async function actCategoryInfo({ cat, topic }){
-      const inCat = getCategorySummary(cat);
-      if (!inCat.length) return { text:"Por ahora no tengo productos cargados en esa categoría." };
+  async function actCategoryInfo({ cat, topic }){
+    const inCat = getCategorySummary(cat);
+    if (!inCat.length) return { text:"Por ahora no tengo productos cargados en esa categoría. ¿Querés que te sugiera otra cosa?" };
 
-      if (topic === "sabores") {
-        const flavors = new Set();
-        for (const p of inCat) {
-          const n = normalize(p.nombre);
-          FLAVORS.forEach(f => { if (n.includes(normalize(f))) flavors.add(f); });
-        }
-        if (flavors.size) {
-          return { text:`Mirá, en ${cat} solemos tener: ${Array.from(flavors).slice(0,8).join(", ")}. ¿Querés que te recomiende algo?` };
-        }
-        return { text:`Tenemos varias opciones en ${cat}. ¿Querés que te muestre algunas?` };
+    if (topic === "sabores") {
+      const flavors = new Set();
+      for (const p of inCat) {
+        const n = normalize(p.nombre);
+        FLAVORS.forEach(f => { if (n.includes(normalize(f))) flavors.add(f); });
       }
-
-      const top = inCat.slice(0,6).map(p => `• ${p.nombre} — ${fmtGs(p.precio)}`).join("\n");
-      const extra = inCat.length > 6 ? `\n…y ${inCat.length - 6} más.` : "";
-      return { text:`Claro, en ${cat} tenemos:\n${top}${extra}\n¿Te agrego alguno al carrito o querés saber el total?` };
+      if (flavors.size) {
+        return { text:`En ${cat} solemos tener: ${Array.from(flavors).slice(0,8).join(", ")}. ¿Te recomiendo algo para empezar?` };
+      }
+      return { text:`Tenemos varias opciones en ${cat}. ¿Querés que te muestre algunas?` };
     }
 
+    const top = inCat.slice(0,6).map(p => `• ${p.nombre} — ${fmtGs(p.precio)}`).join("\n");
+    const extra = inCat.length > 6 ? `\n…y ${inCat.length - 6} más.` : "";
+    return { text:`Mirá, en ${cat} tenemos:\n${top}${extra}\n¿Te agrego alguno al carrito o querés otra recomendación?` };
+  }
 
   async function actProductInfo({ topic, prodTxt }){
-    // Si coincide con producto del índice → respuesta natural con datos reales
     const prod = findProduct(prodTxt);
     if (prod) {
-      if (topic === "precio") return { text:`${prod.nombre} está a ${fmtGs(prod.precio)}.` };
-      return { text:`De ${prod.nombre} tenemos opciones frescas. ¿Querés que lo agregue al carrito o te cuento el precio?` };
+      if (topic === "precio") return { text:`${prod.nombre} está a ${fmtGs(prod.precio)}. ¿Te agrego uno al carrito?` };
+      return { text:`De ${prod.nombre} tenemos fresquitos. ¿Querés el precio o te agrego uno al carrito?` };
     }
-    // Devuelvo null → que lo atienda el backend /api/ask (horarios, dirección, etc.)
-    return null;
+    return null; // que lo atienda el backend (horarios, dirección, etc.)
   }
 
-  async function actCategoryPrices({ cat }){
-    const inCat = getCategorySummary(cat);
-    if (!inCat.length) return { text:"No tengo precios cargados para esa categoría." };
-    const lines = inCat.map(p => `• ${p.nombre} — ${fmtGs(p.precio)}`).join("\n");
-    return { text:`Precios en ${cat}:\n${lines}` };
-  }
-
-  // ===== Ventana de promociones (viernes 17:00–19:00 America/Asuncion) =====
+  // ===== Ventana de promociones (viernes 17–19) para uso local si querés
   function isPromoWindowNow() {
     try {
       const now = new Date();
-      const day = now.getDay(); // 5 = viernes
-      const hh = now.getHours();
-      const mm = now.getMinutes();
+      const day = now.getDay(); const hh = now.getHours(); const mm = now.getMinutes();
       return (day === 5) && (hh > 16 && (hh < 19 || (hh === 19 && mm === 0)));
     } catch { return false; }
   }
@@ -388,17 +365,29 @@ Si querés info del local, horarios o dudas generales, preguntame directamente �
         case "empty_cart":     return await actEmpty();
         case "help":           return actHelp();
         case "category_info":  return await actCategoryInfo(parsed);
-        case "product_info":   return await actProductInfo(parsed) || null; // si null → backend
+        case "product_info":   return await actProductInfo(parsed) || null;
         case "category_prices":return await actCategoryPrices(parsed);
-        case "catering_book":  return { text:null }; // deja que lo maneje ChatCatering o backend
+        case "catering_book":  return { text:null };
         default:               return null;
       }
     }catch(e){
       console.error("[ChatBrain] handleMessage error:", e);
-      return { text:"Algo salió mal al interpretar tu pedido. Probá de nuevo 😅" };
+      return { text:"Se me complicó interpretar eso. ¿Lo repetís de otra forma? 😅" };
     }
   };
 
-  // Exponemos promos por si el backend quiere mostrarlas también
+  async function actEmpty(){
+    const snap = window.CartAPI.getSnapshot?.();
+    if (!snap?.items?.length) return { text:"Tu carrito ya está vacío." };
+    for (const it of (snap.items||[])) await window.CartAPI.remove({ id: it.id });
+    return { text:"Listo, vacié tu carrito." };
+  }
+  async function actCategoryPrices({ cat }){
+    const inCat = getCategorySummary(cat);
+    if (!inCat.length) return { text:"No tengo precios cargados para esa categoría." };
+    const lines = inCat.map(p => `• ${p.nombre} — ${fmtGs(p.precio)}`).join("\n");
+    return { text:`Precios en ${cat}:\n${lines}` };
+  }
+
   window.ChatBrain.getActivePromos = getActivePromos;
 })();
