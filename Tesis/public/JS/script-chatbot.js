@@ -1,5 +1,5 @@
 (() => {
-  const CHAT_ENDPOINT = "/api/ask";
+  const CHAT_ENDPOINT = "/api/ask"; // backend natural (OpenAI + kb Supabase)
 
   const $ = s => document.querySelector(s);
   const chatInput       = $(".chat-input textarea");
@@ -7,10 +7,9 @@
   const chatbox         = $(".chatbox");
   const chatbotCloseBtn = $(".close-btn");
   const chatbotToggler  = $(".chatbot-toggler");
-
   if (!chatInput || !sendChatBtn || !chatbox) return;
 
-  // —— Quick chips (se inyectan bajo el chatbox)
+  // Chips rápidos
   const quickbar = document.createElement("div");
   quickbar.className = "quickbar";
   quickbar.innerHTML = `
@@ -29,7 +28,6 @@
 
   const inputIniHeight = chatInput.scrollHeight || 0;
 
-  // —— Helpers de UI
   const escapeHTML = (s="") => s
     .replace(/&/g,"&amp;").replace(/</g,"&lt;")
     .replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");
@@ -44,30 +42,21 @@
       li.appendChild(img);
     }
     const p = document.createElement("p");
-    if (html) {
-      p.classList.add("msg-card");
-      p.innerHTML = html;
-    } else {
-      p.textContent = String(text ?? "");
-    }
+    if (html) { p.classList.add("msg-card"); p.innerHTML = html; }
+    else { p.textContent = String(text ?? ""); }
     li.appendChild(p);
     return li;
   }
   function appendIncomingText(text) {
-    chatbox.append(bubble("incoming", { text }));
-    chatbox.scrollTop = chatbox.scrollHeight;
+    chatbox.append(bubble("incoming", { text })); chatbox.scrollTop = chatbox.scrollHeight;
   }
   function appendIncomingHTML(html) {
-    chatbox.append(bubble("incoming", { html }));
-    chatbox.scrollTop = chatbox.scrollHeight;
+    chatbox.append(bubble("incoming", { html })); chatbox.scrollTop = chatbox.scrollHeight;
   }
   function appendOutgoing(text) {
-    chatbox.append(bubble("outgoing", { text }));
-    chatbox.scrollTop = chatbox.scrollHeight;
+    chatbox.append(bubble("outgoing", { text })); chatbox.scrollTop = chatbox.scrollHeight;
   }
-
   function setSending(on) {
-    if (!sendChatBtn) return;
     sendChatBtn.classList.toggle("disabled", !!on);
     if (on) sendChatBtn.setAttribute("aria-disabled","true");
     else    sendChatBtn.removeAttribute("aria-disabled");
@@ -79,7 +68,10 @@
       const res = await fetch(CHAT_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type":"application/json" },
-        body: JSON.stringify({ messages })
+        body: JSON.stringify({ messages,
+          // pasamos un snapshot opcional de productos para “grounding”
+          products: (window.__PRODUCTS__||[]).slice(0,200)
+        })
       });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
@@ -90,7 +82,7 @@
     }
   }
 
-  // —— Tarjetitas ricas (promos/productos)
+  // Render de promos/productos sugeridos
   function renderPromos(promos=[]) {
     if (!promos.length) return;
     const html = `
@@ -107,12 +99,13 @@
 
   function renderProducts(products=[]) {
     if (!products.length) return;
+    const fmt = n => new Intl.NumberFormat("es-PY").format(n) + " Gs";
     const html = `
       <h4>Te puede gustar</h4>
       <ul class="msg-list">
         ${products.slice(0,5).map(p => `
           <li>
-            <b>${escapeHTML(p.nombre)}</b> — ${new Intl.NumberFormat("es-PY").format(p.precio)} Gs
+            <b>${escapeHTML(p.nombre)}</b> — ${fmt(p.precio)}
             <div class="msg-actions">
               <button class="btn-ghost" data-add="${escapeHTML(p.id)}">Agregar</button>
             </div>
@@ -122,25 +115,17 @@
     appendIncomingHTML(html);
   }
 
-  // Acciones de los botones dentro de tarjetas:
   document.addEventListener("click", async (e) => {
     const add = e.target.closest("[data-add]");
     if (add && window.CartAPI?.addById) {
-      try {
-        await window.CartAPI.addById(add.dataset.add, 1);
+      try { await window.CartAPI.addById(add.dataset.add, 1);
         appendIncomingText("✅ Agregué ese producto al carrito.");
-      } catch {
-        appendIncomingText("No pude agregarlo ahora 🙈");
-      }
+      } catch { appendIncomingText("No pude agregarlo ahora 🙈"); }
     }
     const payload = e.target.closest("[data-payload]")?.dataset.payload;
-    if (payload) {
-      chatInput.value = payload;
-      sendChatBtn.click();
-    }
+    if (payload) { chatInput.value = payload; sendChatBtn.click(); }
   });
 
-  // —— Loop principal
   const MESSAGES = [];
 
   async function handleChat() {
@@ -151,18 +136,19 @@
     if (inputIniHeight) chatInput.style.height = `${inputIniHeight}px`;
     appendOutgoing(userMessage);
 
-    // 1) NLU local (tu ChatBrain)
+    // 1) NLU local (carrito/categorías). SIN datos fijos.
     try {
       const local = await (window.ChatBrain?.handleMessage?.(userMessage));
       if (local && (local.text || local.html || local.products || local.promos)) {
         if (local.text) appendIncomingText(local.text);
-        if (local.promos?.length) renderPromos(local.promos);
+        const promos = (window.ChatBrain?.getActivePromos?.() || []);
+        if (local.promos?.length || promos.length) renderPromos(local.promos?.length ? local.promos : promos);
         if (local.products?.length) renderProducts(local.products);
-        return;
+        if (local && local.text) return; // si ya respondió algo concreto, listo
       }
     } catch (e){ console.warn("[chatbot] ChatBrain:", e); }
 
-    // 2) Catering
+    // 2) Catering (si tu módulo lo detecta)
     try {
       const ChatCatering = window.ChatCatering?.handle ? window.ChatCatering : null;
       if (ChatCatering) {
@@ -171,29 +157,22 @@
       }
     } catch (e){ console.warn("[chatbot] ChatCatering:", e); }
 
-    // 3) Backend
+    // 3) Backend natural
     MESSAGES.push({ role:"user", content:userMessage });
     if (MESSAGES.length > 20) MESSAGES.splice(0, MESSAGES.length - 20);
 
     setSending(true);
-    const loading = bubble("incoming", { text:"…" });
-    loading.classList.add("loading");
-    loading.querySelector("p").textContent = "Escribiendo…";
-    chatbox.appendChild(loading);
-    chatbox.scrollTop = chatbox.scrollHeight;
+    const loading = bubble("incoming", { text:"Escribiendo..." });
+    chatbox.appendChild(loading); chatbox.scrollTop = chatbox.scrollHeight;
 
-    let ok=false, text=null, rich=null;
-    try {
-      const res = await askBackend(MESSAGES);
-      ok = res.ok; text = res.text; rich = res.rich;
-    } finally {
-      loading.remove();
-      setSending(false);
-    }
+    const { ok, text, rich } = await askBackend(MESSAGES);
+    loading.querySelector("p").textContent = "";
 
     if (rich?.promos?.length) renderPromos(rich.promos);
     if (rich?.products?.length) renderProducts(rich.products);
     appendIncomingText(text || (ok ? "No tengo respuesta ahora." : "Oops, ocurrió un error."));
+
+    setSending(false);
   }
 
   chatInput.addEventListener("input", () => {
