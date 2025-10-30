@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="CSS/styleschat.css" />
 
   <style>
-    /* ===== Overlay de cierre de sesión ===== */
+    /* Overlay de cierre de sesión */
     #logoutOverlay {
       position: fixed;
       inset: 0;
@@ -29,10 +29,12 @@
     /* ===== POPUP Recomendaciones ===== */
     #recoModalOverlay[hidden] { display: none; }
     #recoModalOverlay {
-      position: fixed; inset: 0;
+      position: fixed;
+      inset: 0;
       background: rgba(0,0,0,.45);
       backdrop-filter: blur(2px);
-      display: grid; place-items: center;
+      display: grid;
+      place-items: center;
       z-index: 10000;
     }
     #recoModal {
@@ -46,7 +48,9 @@
       grid-template-rows: auto 1fr auto;
     }
     .reco-header {
-      display: flex; align-items: center; justify-content: space-between;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       padding: 14px 18px;
       border-bottom: 1px solid rgba(0,0,0,.06);
       background: var(--clr-main-claro, #f6f2ea);
@@ -58,9 +62,14 @@
       color: var(--clr-main, #6f5c38);
     }
     .reco-close {
-      appearance: none; border: 0; background: transparent;
-      font-size: 1.6rem; line-height: 1; cursor: pointer;
-      color: #555; padding: 0 8px;
+      appearance: none;
+      border: 0;
+      background: transparent;
+      font-size: 1.6rem;
+      line-height: 1;
+      cursor: pointer;
+      color: #555;
+      padding: 0 8px;
     }
     .reco-close:hover { color: #000; }
 
@@ -80,11 +89,13 @@
     @media (max-width: 460px) {
       .reco-grid { grid-template-columns: 1fr; }
     }
-
     .reco-card {
-      display: grid; grid-template-rows: auto 1fr auto; gap: 8px;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 8px;
       border: 1px solid rgba(0,0,0,.08);
-      border-radius: 12px; padding: 10px;
+      border-radius: 12px;
+      padding: 10px;
       background: #fff;
       transition: transform .12s ease, box-shadow .12s ease;
     }
@@ -93,25 +104,30 @@
       box-shadow: 0 6px 20px rgba(0,0,0,.12);
     }
     .reco-imgwrap {
-      width: 100%; aspect-ratio: 1/1; overflow: hidden; border-radius: 10px;
+      width: 100%;
+      aspect-ratio: 1/1;
+      overflow: hidden;
+      border-radius: 10px;
       background: #fafafa;
-      display: grid; place-items: center;
+      display: grid;
+      place-items: center;
     }
-    .reco-imgwrap img {
-      width: 100%; height: 100%; object-fit: cover;
-    }
-    .reco-title {
-      font-size: .95rem; font-weight: 700; margin: 2px 0 0;
-    }
-    .reco-price {
-      font-size: .95rem; color: #222; font-weight: 600;
-    }
+    .reco-imgwrap img { width: 100%; height: 100%; object-fit: cover; }
+    .reco-title { font-size: .95rem; font-weight: 700; margin: 2px 0 0; }
+    .reco-price { font-size: .95rem; color: #222; font-weight: 600; }
     .reco-actions {
-      display: flex; gap: 8px; align-items: center; justify-content: space-between;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
     }
     .reco-btn {
-      appearance: none; border: 0; cursor: pointer;
-      padding: 8px 10px; border-radius: 10px; font-weight: 700;
+      appearance: none;
+      border: 0;
+      cursor: pointer;
+      padding: 8px 10px;
+      border-radius: 10px;
+      font-weight: 700;
     }
     .reco-btn.primary {
       background: var(--clr-main, #6f5c38);
@@ -122,10 +138,12 @@
       color: var(--clr-main, #6f5c38);
       border: 1px solid currentColor;
     }
-
     .reco-footer {
-      display: flex; align-items: center; justify-content: flex-end;
-      gap: 12px; padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 12px;
+      padding: 12px 16px;
       border-top: 1px solid rgba(0,0,0,.06);
       background: #fff;
     }
@@ -135,20 +153,25 @@
       color: var(--clr-main, #6f5c38);
     }
     .reco-secondary {
-      appearance: none; border: 0; cursor: pointer;
-      padding: 8px 12px; border-radius: 10px;
-      background: #eee; color: #333; font-weight: 700;
+      appearance: none;
+      border: 0;
+      cursor: pointer;
+      padding: 8px 12px;
+      border-radius: 10px;
+      background: #eee;
+      color: #333;
+      font-weight: 700;
     }
   </style>
 </head>
 
 <body>
   <div class="wrapper has-topbar">
-    <!-- ASIDE (off-canvas en móvil) -->
+    <!-- ASIDE -->
     <aside id="mobileAside" aria-label="Menú lateral">
       <header class="aside-header">
         <h1 class="logo">
-          <img class="logo-principal" src="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinos.png" alt="Paniquiños">
+          <img class="logo-principal" src="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinos.png" alt="Paniquiños" />
         </h1>
         <button class="mobile-close" id="menuClose" aria-label="Cerrar menú">
           <i class="bi bi-x-lg"></i>
@@ -158,16 +181,11 @@
       <nav aria-label="Categorías">
         <ul class="menu" id="menuList">
           <li><button id="todos" class="boton-menu boton-categoria active"><i class="bi bi-hand-index-fill"></i> Todos los productos</button></li>
-          <li><button id="bocaditos" class="boton-menu boton-categoria"><i class="bi bi-hand-index"></i> Bocaditos</button></li>
-          <li><button id="confiteria" class="boton-menu boton-categoria"><i class="bi bi-hand-index"></i> Confitería</button></li>
-          <li><button id="panificados" class="boton-menu boton-categoria"><i class="bi bi-hand-index"></i> Panificados</button></li>
-          <li><button id="rosticeria" class="boton-menu boton-categoria"><i class="bi bi-hand-index"></i> Rostisería</button></li>
-          <li>
-            <a class="boton-menu boton-carrito" href="carrito.html">
-              <i class="bi bi-cart-fill"></i>
-              Carrito <span id="numerito" class="numerito">0</span>
-            </a>
-          </li>
+          <li><button id="bocaditos" class="boton-menu boton-categoria"><i class="bi bi-cookie"></i> Bocaditos</button></li>
+          <li><button id="confiteria" class="boton-menu boton-categoria"><i class="bi bi-cupcake"></i> Confitería</button></li>
+          <li><button id="panificados" class="boton-menu boton-categoria"><i class="bi bi-bagel"></i> Panificados</button></li>
+          <li><button id="rosticeria" class="boton-menu boton-categoria"><i class="bi bi-egg-fried"></i> Rostisería</button></li>
+          <li><a class="boton-menu boton-carrito" href="carrito.html"><i class="bi bi-cart-fill"></i> Carrito <span id="numerito" class="numerito">0</span></a></li>
         </ul>
       </nav>
 
@@ -177,36 +195,21 @@
     <!-- TOPBAR -->
     <div class="site-topbar within">
       <div class="topbar-inner">
-        <button class="mobile-toggle" id="menuToggle" aria-label="Abrir menú" aria-controls="mobileAside" aria-expanded="false">
-          <i class="bi bi-list"></i>
-        </button>
-
+        <button class="mobile-toggle" id="menuToggle" aria-label="Abrir menú"><i class="bi bi-list"></i></button>
         <form class="searchbar" id="searchForm" role="search">
           <i class="bi bi-search"></i>
-          <input type="search" id="searchInput" placeholder="Buscar productos…" aria-label="Buscar productos" autocomplete="off" />
+          <input type="search" id="searchInput" placeholder="Buscar productos…" autocomplete="off" />
           <button class="searchbar-btn" type="submit">Buscar</button>
         </form>
-      
         <div class="user-menu">
-          <button class="user-chip" id="userMenuBtn" aria-haspopup="true" aria-expanded="false" aria-controls="userDropdown" type="button">
-            <i class="bi bi-person"></i>
-            <span class="user-name">Cuenta</span>
-            <i class="bi bi-chevron-down chevron"></i>
-          </button>
-
-          <!-- Menú de cuenta -->
-          <div class="user-dropdown" id="userDropdown" role="menu">
-            <button class="dropdown-item" id="updateProfileBtn" type="button">
-              <i class="bi bi-gear"></i> Actualizar datos
-            </button>
-            <button class="dropdown-item" id="logoutBtn" type="button">
-              <i class="bi bi-box-arrow-right"></i> Cerrar sesión
-            </button>
+          <button class="user-chip" id="userMenuBtn"><i class="bi bi-person"></i><span class="user-name">Cuenta</span><i class="bi bi-chevron-down chevron"></i></button>
+          <div class="user-dropdown" id="userDropdown">
+            <button id="updateProfileBtn" class="dropdown-item"><i class="bi bi-gear"></i> Actualizar datos</button>
+            <button id="logoutBtn" class="dropdown-item"><i class="bi bi-box-arrow-right"></i> Cerrar sesión</button>
           </div>
         </div>
       </div>
     </div>
-    <!-- FIN TOPBAR -->
 
     <main>
       <h2 id="titulo-principal" class="titulo-principal">Todos los productos</h2>
@@ -214,26 +217,17 @@
     </main>
   </div>
 
-  <!-- Backdrop global -->
-  <div id="backdrop" class="backdrop" aria-hidden="true"></div>
-
-  <!-- Overlay de cierre de sesión -->
-  <div id="logoutOverlay" hidden>
-    <div class="spinner-border me-2" role="status"></div> Cerrando sesión…
-  </div>
+  <!-- Overlay de logout -->
+  <div id="logoutOverlay" hidden><div class="spinner-border me-2" role="status"></div> Cerrando sesión…</div>
 
   <!-- ===== POPUP Recomendaciones ===== -->
   <div id="recoModalOverlay" hidden>
-    <div id="recoModal" role="dialog" aria-modal="true" aria-labelledby="recoModalTitle">
+    <div id="recoModal">
       <header class="reco-header">
         <h2 id="recoModalTitle">Recomendado para vos</h2>
         <button id="recoCloseBtn" class="reco-close" aria-label="Cerrar">×</button>
       </header>
-
-      <div id="recoList" class="reco-grid" aria-live="polite">
-        <!-- Cards dinámicas -->
-      </div>
-
+      <div id="recoList" class="reco-grid"></div>
       <footer class="reco-footer">
         <a href="#contenedor-productos" class="reco-link">Ver todos los productos</a>
         <button id="recoCloseSecondary" class="reco-secondary">No, gracias</button>
@@ -241,114 +235,20 @@
     </div>
   </div>
 
-  <!-- Wire del menú -->
-  <script type="module">
-    import { logout, autoWireAuthMenu } from "./JS/ScriptLogin.js";
-    autoWireAuthMenu(); // pinto el chip y preparo “Actualizar datos / Cerrar sesión”
-    document.getElementById("logoutBtn")?.addEventListener("click", async (e) => {
-      const overlay = document.getElementById("logoutOverlay");
-      overlay.hidden = false;
-      try { await logout(e); } finally { overlay.hidden = true; }
-    });
-    document.getElementById('searchForm')?.addEventListener('submit', (e) => e.preventDefault());
-  </script>
-
-  <!-- Dropdown usuario -->
-  <script>
-    (() => {
-      const userBtn = document.getElementById('userMenuBtn');
-      const dropdown = document.getElementById('userDropdown');
-      function closeMenu(e) {
-        if (!dropdown.contains(e.target) && !userBtn.contains(e.target)) {
-          dropdown.classList.remove('open');
-          userBtn.setAttribute('aria-expanded', 'false');
-          document.removeEventListener('click', closeMenu);
-        }
-      }
-      userBtn?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        dropdown.classList.toggle('open');
-        userBtn.setAttribute('aria-expanded', dropdown.classList.contains('open') ? 'true' : 'false');
-        if (dropdown.classList.contains('open')) {
-          setTimeout(() => document.addEventListener('click', closeMenu), 0);
-        }
-      });
-    })();
-  </script>
-
-  <!-- Off-canvas móvil -->
-  <script>
-    (function () {
-      const body = document.body;
-      const toggle = document.getElementById('menuToggle');
-      const closeBtn = document.getElementById('menuClose');
-      const backdrop = document.getElementById('backdrop');
-      const menuList = document.getElementById('menuList');
-
-      // Abro y cierro el aside en móvil
-      const openAside = () => {
-        body.classList.add('aside-open');
-        toggle?.setAttribute('aria-expanded', 'true');
-        backdrop?.setAttribute('aria-hidden', 'false');
-      };
-      const closeAside = () => {
-        body.classList.remove('aside-open');
-        toggle?.setAttribute('aria-expanded', 'false');
-        backdrop?.setAttribute('aria-hidden', 'true');
-      };
-
-      toggle?.addEventListener('click', openAside);
-      closeBtn?.addEventListener('click', closeAside);
-      backdrop?.addEventListener('click', closeAside);
-
-      // Cierro el aside si el usuario toca alguna opción
-      menuList?.querySelectorAll('a,button').forEach(el => {
-        el.addEventListener('click', closeAside);
-      });
-
-      // Escape también cierra
-      document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') closeAside();
-      });
-    })();
-  </script>
-
-  <!-- Chat flotante -->
-  <button class="chatbot-toggler" aria-label="Abrir chat">
-    <i class="bi bi-chat-left-fill"></i>
-    <i class="bi bi-x-lg"></i>
-  </button>
-  <div class="chatbot" role="dialog" aria-modal="true" aria-label="Paniquiños Bot">
-    <header>
-      <h2>
-        <img class="paniImg" src="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinosico.ico" alt="" />
-        Paniquiños Bot
-      </h2>
-      <i class="close-btn bi bi-x-lg" role="button" aria-label="Cerrar"></i>
-    </header>
-    <ul class="chatbox" id="chatbox">
-      <li class="chat incoming">
-        <img class="paniImg" src="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinosico.ico" alt="" />
-        <p>¡Hola! 👋🏼 ¿En qué puedo ayudarte hoy?</p>
-      </li>
-    </ul>
-    <div class="chat-input">
-      <textarea id="chatInput" placeholder="Escribe tu mensaje…" required></textarea>
-      <i class="bi bi-send-fill" id="sendChatBtn" role="button" aria-label="Enviar"></i>
-    </div>
+  <!-- CHATBOT FLOTANTE -->
+  <button class="chatbot-toggler" aria-label="Abrir chat"><i class="bi bi-chat-left-text"></i><i class="bi bi-x-lg"></i></button>
+  <div class="chat-container" id="chat-container">
+    <div class="chatbox" id="chat-body"></div>
+    <form id="chat-form">
+      <input id="chat-input" type="text" placeholder="Escribí tu mensaje..." autocomplete="off" />
+      <button type="submit"><i class="bi bi-send-fill"></i></button>
+    </form>
   </div>
 
-  <!-- Catálogo -->
+  <!-- Scripts -->
   <script type="module" src="JS/main.js"></script>
-
-  <!-- Popup de recomendaciones -->
   <script type="module" src="JS/reco-popup.js"></script>
-
-              <!-- Chat -->
-      <script src="JS/chatbot.brain.js" defer></script>
-      <!-- 👉 Módulo de reservas por chat DEBE ir antes -->
-      <script type="module" src="JS/chatbot.catering.js"></script>
-      <!-- UI del chat -->
-      <script src="JS/script-chatbot.js" defer></script>
+  <script src="JS/chatbot.brain.js"></script>
+  <script src="JS/script-chatbot.js"></script>
 </body>
 </html>

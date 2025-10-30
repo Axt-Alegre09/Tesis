@@ -1,145 +1,119 @@
-/* public/JS/chatbot.brain.js
-   Módulo de entendimiento local para el chatbot Paniquiños */
-(() => {
-  const normalize = (s = "") =>
-    s
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^\w\s]/g, "")
-      .trim();
+// /public/JS/chatbot.brain.js
 
-  const NUM_PAL = {
-    uno: 1,
-    una: 1,
-    un: 1,
-    dos: 2,
-    tres: 3,
-    cuatro: 4,
-    cinco: 5,
-    seis: 6,
-    siete: 7,
-    ocho: 8,
-    nueve: 9,
-    diez: 10,
-  };
+// === CHATBRAIN LOCAL ===
+// Este módulo maneja respuestas básicas sin depender de OpenAI.
+// Sirve como primer filtro antes de enviar al backend /api/ask.
 
-  const toNumber = (w) => (/^\d+$/.test(w) ? parseInt(w) : NUM_PAL[w] || 1);
-  const fmtGs = (n) =>
-    new Intl.NumberFormat("es-PY").format(Number(n) || 0) + " Gs";
-  const list = (arr = []) =>
-    arr.length <= 1
-      ? arr[0] || ""
-      : arr.slice(0, -1).join(", ") + " y " + arr[arr.length - 1];
+window.ChatBrain = {
+  async handleMessage(text) {
+    if (!text) return null;
+    const msg = text.toLowerCase().trim();
 
-  const pluralize = (s, n = 2) =>
-    n === 1 ? s : s.endsWith("a") ? s + "s" : s + "es";
-
-  /* ===== Índice de productos ===== */
-  function getProductIndex() {
-    const productos = window.__PRODUCTS__ || [];
-    const byToken = new Map();
-    for (const p of productos) {
-      const base = normalize(p.nombre);
-      const tokens = base.split(" ").filter(Boolean);
-      for (const t of tokens) {
-        if (!byToken.has(t)) byToken.set(t, []);
-        byToken.get(t).push(p);
-      }
+    // =======================
+    // 1️⃣ SALUDOS
+    // =======================
+    if (["hola", "buenas", "hey", "qué tal", "como estas"].some(w => msg.includes(w))) {
+      return {
+        text: "¡Hola! 😊 Soy *Paniquiños Bot*. ¿Querés saber sobre algún producto o precio?",
+      };
     }
-    return { all: productos, byToken };
-  }
 
-  const findProduct = (text) => {
-    const t = normalize(text);
-    const { byToken, all } = getProductIndex();
-    if (byToken.has(t)) return byToken.get(t)[0];
-    return all.find((p) => normalize(p.nombre).includes(t));
-  };
-
-  const extractItems = (msg) => {
-    const parts = msg.match(
-      /(\d+|uno|una|un|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\s+([a-záéíóúñ\s]+)/gi
-    );
-    if (!parts) return [];
-    return parts.map((p) => {
-      const [_, num, prod] = p.split(/\s+(.+)/);
-      return { cantidad: toNumber(num), prodTxt: prod };
-    });
-  };
-
-  /* ===== Acciones del carrito ===== */
-  async function actAdd(items) {
-    const done = [];
-    for (const it of items) {
-      const prod = findProduct(it.prodTxt);
-      if (!prod) continue;
-      await window.CartAPI.addProduct(
-        {
-          id: prod.id,
-          titulo: prod.nombre,
-          precio: prod.precio,
-          imagen: prod.imagen,
-        },
-        it.cantidad
-      );
-      done.push(`${it.cantidad} ${pluralize(prod.nombre, it.cantidad)}`);
+    // =======================
+    // 2️⃣ AGRADECIMIENTOS
+    // =======================
+    if (msg.includes("gracias") || msg.includes("graci")) {
+      return {
+        text: "¡De nada! 🧁 Siempre es un placer ayudarte 💛",
+      };
     }
-    return {
-      text:
-        done.length > 0
-          ? `¡Listo! Agregué ${list(done)} al carrito 🛒`
-          : "No encontré esos productos. Probá con el nombre exacto del catálogo.",
-    };
-  }
 
-  async function actRemove(items) {
-    const snap = window.CartAPI.getSnapshot?.();
-    if (!snap?.items?.length) return { text: "Tu carrito está vacío." };
-    const removed = [];
-    for (const it of items) {
-      const prod = findProduct(it.prodTxt);
-      const row = snap.items.find((r) =>
-        normalize(r.titulo).includes(normalize(prod?.nombre))
-      );
-      if (row) {
-        await window.CartAPI.remove({ id: row.id });
-        removed.push(prod.nombre);
-      }
+    // =======================
+    // 3️⃣ HORARIOS Y UBICACIÓN
+    // =======================
+    if (
+      msg.includes("abierto") ||
+      msg.includes("hora") ||
+      msg.includes("cierran") ||
+      msg.includes("abren") ||
+      msg.includes("abierto hoy")
+    ) {
+      return {
+        text: "Estamos abiertos 🕓 *de lunes a sábado de 08:00 a 19:00 hs* en *Villa Elisa, Paraguay*. ¡Te esperamos con algo rico! 🍪",
+      };
     }
-    return {
-      text:
-        removed.length > 0
-          ? `Eliminé ${list(removed)} del carrito.`
-          : "No encontré ese producto en tu carrito.",
-    };
-  }
 
-  async function actShowCart() {
-    const snap = window.CartAPI.getSnapshot?.();
-    if (!snap?.items?.length) return { text: "Tu carrito está vacío 😅" };
-    const lines = snap.items.map(
-      (it) => `• ${it.cantidad} × ${it.titulo} — ${fmtGs(it.precio)}`
-    );
-    return {
-      text: `Tenés en tu carrito:\n${lines.join(
-        "\n"
-      )}\nTotal: ${fmtGs(snap.total)}.`,
-    };
-  }
+    if (msg.includes("donde") && msg.includes("ubic")) {
+      return {
+        text: "📍 Estamos en *Villa Elisa, Paraguay*. Podés visitarnos en nuestro local o hacer tu pedido online. 💛",
+      };
+    }
 
-  /* ===== Dispatcher ===== */
-  window.ChatBrain = {
-    async handleMessage(msg) {
-      const m = normalize(msg);
-      if (/vaciar|limpiar carrito/.test(m))
-        return await actRemove(window.CartAPI.getSnapshot()?.items || []);
-      if (/mostrar|ver carrito/.test(m)) return await actShowCart();
-      if (/agrega|agregame|pone|pon|sum(a|ar)|quiero/.test(m))
-        return await actAdd(extractItems(m));
-      if (/quita|saca|elimina|borra/.test(m))
-        return await actRemove(extractItems(m));
-      return null; // que lo maneje el backend
-    },
-  };
-})();
+    // =======================
+    // 4️⃣ PRODUCTOS COMUNES
+    // =======================
+    const productos = [
+      { nombre: "torta", precio: 45000, tipo: "dulce" },
+      { nombre: "alfajor", precio: 25000, tipo: "dulce" },
+      { nombre: "empanada de carne", precio: 19000, tipo: "salado" },
+      { nombre: "empanada de huevo", precio: 17000, tipo: "salado" },
+      { nombre: "empanada jamón y queso", precio: 17000, tipo: "salado" },
+      { nombre: "combo empanada + coca", precio: 24000, tipo: "salado" },
+      { nombre: "sandwich de milanesa", precio: 25000, tipo: "salado" },
+      { nombre: "bocadito", precio: 10000, tipo: "dulce" },
+      { nombre: "pan casero", precio: 12000, tipo: "salado" },
+    ];
+
+    const encontrado = productos.find((p) => msg.includes(p.nombre));
+    if (encontrado) {
+      return {
+        text: `Sí 😊 tenemos *${encontrado.nombre}* por *${encontrado.precio.toLocaleString()} Gs*. ¿Querés que te recomiende algo parecido o agregarlo al carrito? 🍰`,
+      };
+    }
+
+    // =======================
+    // 5️⃣ INTENCIONES
+    // =======================
+    if (msg.includes("salado") || msg.includes("empanada")) {
+      return {
+        text: `Para algo salado, te recomiendo:
+- 🥟 *Empanada de Carne* — 19.000 Gs
+- 🧀 *Empanada Jamón y Queso* — 17.000 Gs
+- 🥪 *Sandwich de Milanesa* — 25.000 Gs
+- 🥤 *Combo Empanada + Coca* — 24.000 Gs
+
+¡Cualquiera es deliciosa! 😋`,
+      };
+    }
+
+    if (msg.includes("dulce") || msg.includes("postre") || msg.includes("pastel")) {
+      return {
+        text: `Si querés algo dulce 🍰 te recomiendo:
+- 🎂 *Torta* — 45.000 Gs
+- 🍪 *Alfajores* — 25.000 Gs
+- 🧁 *Bocaditos surtidos* — 10.000 Gs
+
+¡Son perfectos para compartir! 💕`,
+      };
+    }
+
+    if (msg.includes("especial") || msg.includes("recomendas") || msg.includes("popular")) {
+      return {
+        text: "Nuestra especialidad 🍽️ es el *Combo Empanada + Coca*, ¡ideal para algo salado rápido! También la *Torta de la Casa* es un clásico dulce. 😋",
+      };
+    }
+
+    // =======================
+    // 6️⃣ CARRITO (simulación)
+    // =======================
+    if (msg.includes("carrito") || msg.includes("comprar") || msg.includes("agreg")) {
+      return {
+        text: "Puedo ayudarte a elegir productos 🧺, pero la compra se realiza desde el carrito principal del sitio web. ¡Te guío si querés! 😉",
+      };
+    }
+
+    // =======================
+    // 7️⃣ RESPUESTA POR DEFECTO
+    // =======================
+    return null; // Deja que /api/ask maneje el resto
+  },
+};

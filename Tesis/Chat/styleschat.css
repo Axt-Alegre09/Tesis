@@ -148,3 +148,20 @@ body{ margin:0; }
   }
   .chatbox{ height: calc(100% - 52px - 60px); }
 }
+
+.msg.bot p {
+  background: #f6f2ea;
+  color: #3c2e1a;
+  border-radius: 18px 18px 18px 4px;
+  padding: 10px 14px;
+  display: inline-block;
+}
+
+.msg.user p {
+  background: #6f5c38;
+  color: #fff;
+  border-radius: 18px 18px 4px 18px;
+  padding: 10px 14px;
+  display: inline-block;
+  align-self: flex-end;
+}

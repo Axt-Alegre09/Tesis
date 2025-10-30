@@ -1,135 +1,90 @@
-// api/ask.js — Backend inteligente con contexto real
+// /api/ask.js
+import OpenAI from "openai";
+import { createClient } from "@supabase/supabase-js";
+
+// ========= CONFIG =========
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE
+);
+
 export default async function handler(req, res) {
-  const json = (data, status = 200) => res.status(status).json(data);
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Método no permitido" });
+  }
 
   try {
-    if (req.method !== "POST" && req.method !== "GET")
-      return json({ reply: "Método no permitido." }, 405);
+    const { messages } = req.body;
+    const question = messages?.[0]?.content?.toLowerCase().trim();
 
-    const { SUPABASE_URL, SUPABASE_SERVICE_ROLE, OPENAI_API_KEY } = process.env;
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE || !OPENAI_API_KEY)
-      return json({ reply: "⚠️ Faltan variables de entorno necesarias." }, 200);
+    console.log("🟢 Nueva consulta recibida:", question);
 
-    /* ========= UTILIDADES ========= */
-    const fetchJSON = async (...a) => {
-      const r = await fetch(...a);
-      if (!r.ok) throw new Error(await r.text());
-      return r.json();
-    };
-
-    const clean = (s = "") =>
-      s.toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^\w\s]/g, "")
-        .trim();
-
-    const formatGs = (n) =>
-      new Intl.NumberFormat("es-PY").format(Number(n || 0)) + " Gs";
-
-    /* ========= INPUT ========= */
-    const q =
-      req.method === "GET"
-        ? req.query?.question || "hola"
-        : req.body?.messages?.slice(-1)?.[0]?.content || "hola";
-
-    /* ========= SUPABASE ========= */
-    const headers = {
-      apikey: SUPABASE_SERVICE_ROLE,
-      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE}`,
-    };
-
-    // Info del negocio
-    const [info] = await fetchJSON(`${SUPABASE_URL}/rest/v1/negocio_info?select=*`, {
-      headers,
+    // ======== 1️⃣ Embedding de la pregunta ========
+    console.log("📦 Generando embedding...");
+    const embeddingResponse = await openai.embeddings.create({
+      model: "text-embedding-3-small",
+      input: question,
     });
 
-    // Productos activos
-    const productos = await fetchJSON(
-      `${SUPABASE_URL}/rest/v1/productos?select=id,nombre,descripcion,precio,stock,activo,imagen&activo=eq.true`,
-      { headers }
-    );
+    const embedding = embeddingResponse.data[0].embedding;
+    console.log("✅ Embedding generado correctamente. Longitud:", embedding.length);
 
-    /* ========= RESPUESTAS DIRECTAS ========= */
-    const texto = clean(q);
+    // ======== 2️⃣ Buscar contexto RAG en Supabase ========
+    console.log("🔍 Buscando contexto en Supabase con kb_search...");
+    const { data: context, error } = await supabase.rpc("kb_search", {
+      query_embedding: embedding,
+      match_count: 5,
+    });
 
-    // Coincidencia directa de producto
-    const match = productos.find((p) =>
-      clean(p.nombre).includes(texto.replace("tienen ", ""))
-    );
-    if (match) {
-      const precio = formatGs(match.precio);
-      const reply = `Sí 😊 tenemos ${match.nombre} a ${precio}${
-        match.stock > 0
-          ? " — listo para disfrutar!"
-          : " (ahora sin stock, pero pronto vuelve)"
-      }`;
-      return json({ reply });
+    if (error) {
+      console.error("❌ Error kb_search:", error);
+    } else {
+      console.log(`✅ Contexto recuperado (${context?.length || 0} coincidencias).`);
     }
 
-    // Horarios
-    const horario =
-      info?.horario ||
-      "Lunes a Sábado de 07:00 a 19:00 (hora de Paraguay)";
-    const direccion = info?.direccion || "Villa Elisa, Paraguay";
-    if (/hora|abren|cierran|horario|abierto/i.test(texto)) {
-      return json({
-        reply: `Atendemos ${horario}. Nos encontramos en ${direccion}. 🕒`,
-      });
-    }
+    const contextText =
+      context?.map((r) => r.content).join("\n") ||
+      "No se encontró información contextual relevante.";
 
-    // Teléfono / contacto
-    if (/telefono|teléfono|whats|contacto/i.test(texto)) {
-      return json({
-        reply: `Podés escribirnos al ${
-          info?.telefono || "0991 234 567"
-        } 📞 o venir directamente a ${direccion}.`,
-      });
-    }
+    // ======== 3️⃣ Generar respuesta con OpenAI ========
+    console.log("💬 Solicitando respuesta a OpenAI...");
 
-    /* ========= OPENAI ========= */
-    const systemPrompt = `
-Sos “Paniquiños Bot”, el mozo digital de la confitería Paniquiños en Paraguay.
-Tono: amable, con voseo y naturalidad (nada robótico).
-Usá 0–2 emojis, solo cuando sumen. No inventes información.
+    const prompt = `
+Sos *Paniquiños Bot*, un asistente cálido y simpático de la confitería Paniquiños 🍰.
+Usá un tono amable, natural y paraguayo neutral.
+Nunca inventes productos que no existan en la base de datos.
+Si no sabés algo, admitilo con empatía. Podés sugerir consultar a un empleado.
+Respondé con frases breves, naturales y con emojis si queda bien.
+Si el usuario pide agregar productos al carrito, confirmá con el nombre real del producto y el precio.
 
-Tu conocimiento proviene de estos datos:
-Negocio: ${JSON.stringify(info || {}, null, 2)}
-Productos: ${JSON.stringify(productos.slice(0, 40), null, 2)}
+Contexto de productos:
+${contextText}
 
-Reglas:
-- Si el producto no existe, decí que no lo tenemos actualmente.
-- Si preguntan por recomendaciones, ofrecé 2 o 3 productos del catálogo con su precio.
-- Respondé con calidez y cercanía, como si fueras un mozo atendiendo en mostrador.
-- No uses lenguaje de bot ni frases genéricas tipo “estoy para ayudarte”.
+Usuario: ${question}
 `;
 
-    const r = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        temperature: 0.4,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: q },
-        ],
-      }),
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "system", content: prompt }],
+      temperature: 0.7,
     });
 
-    const j = await r.json();
     const reply =
-      j?.choices?.[0]?.message?.content?.trim() ||
-      "No tengo el dato exacto, pero te puedo sugerir algo rico 😋";
+      completion.choices?.[0]?.message?.content?.trim() ||
+      "Lo siento, no pude generar una respuesta en este momento.";
 
-    return json({ reply });
-  } catch (e) {
-    console.error("❌ /api/ask ERROR:", e);
-    return json({
-      reply: "Estoy con un pequeño problema para responder 🙈. Probá de nuevo.",
+    console.log("✅ Respuesta generada:", reply.slice(0, 100) + "...");
+
+    return res.status(200).json({ reply });
+  } catch (err) {
+    console.error("💥 Error interno en /api/ask:", err);
+    return res.status(500).json({
+      error: "Error interno del servidor",
+      detail: err.message,
     });
   }
 }
