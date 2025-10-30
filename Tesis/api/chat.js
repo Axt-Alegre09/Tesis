@@ -389,3 +389,9 @@ Eres "Paniquiños Bot", asistente de reservas de catering.
     return res.status(500).json({ error: "server-error" });
   }
 }
+
+
+const pregunta = "¿Qué horario tienen los sábados?";
+const res = await fetch(`/api/ask?question=${encodeURIComponent(pregunta)}`);
+const data = await res.json();
+console.log(data);
