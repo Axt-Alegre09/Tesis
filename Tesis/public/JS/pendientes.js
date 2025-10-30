@@ -323,4 +323,3 @@ async function reloadCard(oldNode, snapshotId) {
     console.error(err);
   }
 })();
-

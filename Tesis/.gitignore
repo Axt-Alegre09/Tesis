@@ -1,1 +1,22 @@
+.env# 🔒 Archivos de entorno
 .env
+.env.local
+.env.*.local
+
+# 🔒 Archivos con claves o ingesta
+Chat/tools/
+tools/
+Chat/ingest.js
+Chat/ingest.mjs
+
+# Node y dependencias
+node_modules/
+npm-debug.log
+package-lock.json
+
+# Build y temporales
+.vercel/
+dist/
+.cache/
+.DS_Store
+*.log

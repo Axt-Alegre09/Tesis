@@ -4,10 +4,13 @@
   "type": "module",
   "main": "ScriptLogin.js",
   "scripts": {
-    "build": "echo \"no build step\"",
-    "vercel-build": "npm run build",
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
+  "build": "echo \"no build step\"",
+  "vercel-build": "npm run build",
+  "ingest": "node Chat/tools/ingest.mjs",
+  "kb:ask": "node Chat/tools/query-kb.mjs \"¿Cuál es el horario hoy?\"",
+  "test": "echo \"Error: no test specified\" && exit 1"
+}
+,
   "dependencies": {
     "@supabase/supabase-js": "^2.55.0",
     "vercel": "^48.1.6"
