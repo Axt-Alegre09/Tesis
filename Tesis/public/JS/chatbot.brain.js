@@ -310,24 +310,28 @@
 Si querés info del local, horarios o dudas generales, preguntame directamente 😉` };
   }
 
-  async function actCategoryInfo({ cat, topic }){
-    const inCat = getCategorySummary(cat);
-    if (!inCat.length) return { text:"Aún no tengo productos en esa categoría." };
+  // dentro de chatbot.brain.js, reemplaza actCategoryInfo por:
+    async function actCategoryInfo({ cat, topic }){
+      const inCat = getCategorySummary(cat);
+      if (!inCat.length) return { text:"Por ahora no tengo productos cargados en esa categoría." };
 
-    if (topic === "sabores") {
-      const flavors = new Set();
-      for (const p of inCat) {
-        const n = normalize(p.nombre);
-        FLAVORS.forEach(f => { if (n.includes(normalize(f))) flavors.add(f); });
+      if (topic === "sabores") {
+        const flavors = new Set();
+        for (const p of inCat) {
+          const n = normalize(p.nombre);
+          FLAVORS.forEach(f => { if (n.includes(normalize(f))) flavors.add(f); });
+        }
+        if (flavors.size) {
+          return { text:`Mirá, en ${cat} solemos tener: ${Array.from(flavors).slice(0,8).join(", ")}. ¿Querés que te recomiende algo?` };
+        }
+        return { text:`Tenemos varias opciones en ${cat}. ¿Querés que te muestre algunas?` };
       }
-      if (flavors.size) return { text:`En ${cat} solemos tener estas variantes: ${Array.from(flavors).join(", ")}.` };
-      return { text:`Tenemos varias opciones en ${cat}. ¿Querés que te muestre algunos?` };
+
+      const top = inCat.slice(0,6).map(p => `• ${p.nombre} — ${fmtGs(p.precio)}`).join("\n");
+      const extra = inCat.length > 6 ? `\n…y ${inCat.length - 6} más.` : "";
+      return { text:`Claro, en ${cat} tenemos:\n${top}${extra}\n¿Te agrego alguno al carrito o querés saber el total?` };
     }
 
-    const listado = inCat.slice(0,10).map(p => `• ${p.nombre} — ${fmtGs(p.precio)}`).join("\n");
-    const extra = inCat.length > 10 ? `\n…y ${inCat.length - 10} más.` : "";
-    return { text:`En ${cat} tenemos:\n${listado}${extra}` };
-  }
 
   async function actProductInfo({ topic, prodTxt }){
     // Si coincide con producto del índice → respuesta natural con datos reales

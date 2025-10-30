@@ -1,7 +1,6 @@
 // api/ask/route.js
 export const runtime = 'edge';
 
-/* ---------- helpers base ---------- */
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -21,17 +20,15 @@ function ensureEnv() {
   if (miss.length) throw new Error(`Faltan variables: ${miss.join(', ')}`);
 }
 
-/* ---------- config dominio ---------- */
 const TB_PRODUCTOS = 'productos';
 const COLS_PRODUCTOS = 'id,nombre,descripcion,precio,imagen,activo,categoria_id';
 const TB_INFO = 'negocio_info';
 const TZ = 'America/Asuncion';
 
-/* ---------- promos ---------- */
 function isPromoWindowNow(d = new Date()) {
   try {
     const local = new Date(d.toLocaleString('en-US', { timeZone: TZ }));
-    const day = local.getDay(); // 5=v
+    const day = local.getDay();
     const hh = local.getHours();
     const mm = local.getMinutes();
     return day === 5 && (hh > 16 && (hh < 19 || (hh === 19 && mm === 0)));
@@ -50,7 +47,6 @@ function getActivePromos() {
   return promos;
 }
 
-/* ---------- Supabase REST + RPC ---------- */
 async function supaSelect(table, columns, opts = {}) {
   const { q } = opts;
   try {
@@ -75,6 +71,7 @@ async function supaSelect(table, columns, opts = {}) {
     return [];
   }
 }
+
 async function supaKbSearch(queryEmbedding, matchCount = 5) {
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/kb_search`, {
@@ -94,8 +91,7 @@ async function supaKbSearch(queryEmbedding, matchCount = 5) {
   }
 }
 
-/* ---------- OpenAI ---------- */
-async function openaiChat(messages, temperature = 0.4, model = 'gpt-4o-mini') {
+async function openaiChat(messages, temperature = 0.5, model = 'gpt-4o-mini') {
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -122,7 +118,6 @@ async function openaiEmbedding(input, model = 'text-embedding-3-small') {
   return j?.data?.[0]?.embedding || null;
 }
 
-/* ---------- heurística productos ---------- */
 function pickSuggestedProducts(all, userText, max = 5) {
   if (!Array.isArray(all) || !all.length) return [];
   const t = String(userText || '').toLowerCase();
@@ -146,31 +141,49 @@ function pickSuggestedProducts(all, userText, max = 5) {
     .map(({ __s, ...p }) => p);
 }
 
-/* ---------- core handler ---------- */
+function buildSystemPrompt(negocioInfo, promos, suggested) {
+  return `
+Eres “Paniquiños Bot”, el mozo digital de una confitería en Paraguay.
+Tono: cálido, breve, directo; ofrecé ayuda como en mostrador.
+Reglas:
+- Español siempre.
+- Solo usá lo provisto (negocioInfo, productos, promos, KB). Si no está, decí que no tenés ese dato.
+- Formateá precios como "99.999 Gs".
+- Si preguntan por horarios/dirección/teléfono, usá negocioInfo.
+- Si hay promo activa y es relevante, mencionála una vez (sin insistir).
+- Evitá párrafos largos; usá listas cortas (máx 5 ítems) cuando sirva.
+- No inventes sabores, tamaños ni disponibilidad fuera de los datos.
+Contexto negocioInfo:
+${JSON.stringify(negocioInfo || {}, null, 2)}
+Productos relevantes:
+${JSON.stringify(suggested || [], null, 2)}
+Promos activas:
+${JSON.stringify(promos || [], null, 2)}
+`.trim();
+}
+
 async function runAsk({ messages = [], frontProducts = [] }) {
   ensureEnv();
 
+  // último user y breve historial (máx 8 mensajes)
   const lastUser =
     messages.slice().reverse().find((m) => m.role === 'user')?.content?.slice(0, 2000) || '';
+  const recent = messages.slice(-8)
+    .map(m => ({ role: m.role, content: String(m.content || '').slice(0, 2000) }));
 
-  // 1) Datos Supabase
   const dbProducts =
     (frontProducts?.length ? frontProducts : await supaSelect(TB_PRODUCTOS, COLS_PRODUCTOS)) || [];
   const negocioInfoRows = await supaSelect(TB_INFO, '*');
   const negocioInfo = negocioInfoRows?.[0] || {};
-
-  // 2) Promos + 3) Sugeridos
   const promos = getActivePromos();
   const suggested = pickSuggestedProducts(dbProducts, lastUser, 5);
 
-  // 4) RAG si hace falta
+  // KB opcional
   let kbContext = '';
   try {
     const needKb =
       suggested.length < 1 ||
-      /horario|direccion|dirección|telefono|teléfono|whats|ubicacion|ubicación|quien|quién|historia|info|informacion|información|servicio|catering/i.test(
-        lastUser
-      );
+      /horario|direccion|dirección|telefono|teléfono|whats|ubicacion|ubicación|quien|quién|historia|info|informacion|información|servicio|catering/i.test(lastUser);
     if (needKb && lastUser) {
       const emb = await openaiEmbedding(lastUser);
       if (emb) {
@@ -184,49 +197,33 @@ async function runAsk({ messages = [], frontProducts = [] }) {
     console.warn('[ask] RAG warn:', e);
   }
 
-  // 5) Sistema estilo “mozo”
-  const systemPrompt = `
-Eres “Paniquiños Bot”, el asistente de una confitería en Paraguay.
-Hablas como un mozo amable: natural, cálido y profesional.
-Reglas:
-- Español siempre.
-- Usa SOLO productos, negocioInfo, promos y KB provistos.
-- Formatea precios como "99.999 Gs".
-- Si preguntan por horarios/dirección/teléfono, usa negocioInfo.
-- Menciona promo activa solo una vez si es relevante.
-- Sé conciso (bullets máx 5 cuando ayuden).
-- No inventes sabores/tamaños/disponibilidad.
-  `.trim();
+  const sys = buildSystemPrompt(negocioInfo, promos, suggested);
+  const msgs = [{ role: 'system', content: sys }];
+  if (kbContext) msgs.push({ role: 'system', content: `KB verificada:\n${kbContext}` });
+  msgs.push(...recent);
 
-  const msgs = [
-    { role: 'system', content: systemPrompt },
-    { role: 'system', content: `negocioInfo:\n${JSON.stringify(negocioInfo, null, 2)}` },
-    { role: 'system', content: `productos (subset):\n${JSON.stringify(suggested, null, 2)}` },
-    { role: 'system', content: `promos activas:\n${JSON.stringify(promos, null, 2)}` },
-  ];
-  if (kbContext) {
-    msgs.push({ role: 'system', content: `KB:\n${kbContext}` });
+  try {
+    const reply =
+      (await openaiChat(msgs, 0.5, 'gpt-4o-mini')) ||
+      'Ahora mismo no tengo ese dato. ¿Querés preguntarme de otra forma?';
+
+    const rich = {};
+    if (promos.length) rich.promos = promos;
+    if (suggested.length) {
+      rich.products = suggested.map((p) => ({
+        id: p.id, nombre: p.nombre, precio: Number(p.precio || 0), imagen: p.imagen || null,
+      }));
+    }
+    return { reply, rich };
+  } catch (e) {
+    // Fallback HUMANO en 200 para que el front no muestre error feo
+    console.error('[/api/ask] ERROR LLM:', e);
+    const fallback = `Estoy teniendo un problemita para responder con toda la info ahora mismo 🙈. \
+¿Querés que te recomiende algo del menú o te paso precios de una categoría?`;
+    return { reply: fallback, rich: { products: suggested.slice(0,3) } };
   }
-  msgs.push({ role: 'user', content: lastUser || 'Hola' });
-
-  const reply =
-    (await openaiChat(msgs, 0.4, 'gpt-4o-mini')) ||
-    'Ahora mismo no tengo ese dato. ¿Querés preguntarme de otra forma?';
-
-  const rich = {};
-  if (promos.length) rich.promos = promos;
-  if (suggested.length) {
-    rich.products = suggested.map((p) => ({
-      id: p.id,
-      nombre: p.nombre,
-      precio: Number(p.precio || 0),
-      imagen: p.imagen || null,
-    }));
-  }
-  return { reply, rich };
 }
 
-/* ---------- Export: POST + GET ---------- */
 export async function POST(req) {
   try {
     const { messages = [], products: frontProducts = [] } = await req.json().catch(() => ({}));
@@ -234,22 +231,17 @@ export async function POST(req) {
     return json(data, 200);
   } catch (e) {
     console.error('[/api/ask] ERROR:', e);
-    return json({
-      reply: 'Perdón, el asistente no está disponible por configuración incompleta o error interno.',
-      rich: null,
-    }, 500);
+    return json({ reply: 'Perdón, el asistente no está disponible.', rich: null }, 200);
   }
 }
 
-// GET opcional para compatibilidad con clientes viejos ?question=...
 export async function GET(req) {
   try {
-    const sp = new URL(req.url).searchParams;
-    const q = (sp.get('question') || 'Hola').slice(0, 2000);
+    const q = new URL(req.url).searchParams.get('question') || 'Hola';
     const data = await runAsk({ messages: [{ role: 'user', content: q }], frontProducts: [] });
     return json(data, 200);
   } catch (e) {
     console.error('[/api/ask][GET] ERROR:', e);
-    return json({ reply: 'No pude procesar tu consulta.', rich: null }, 500);
+    return json({ reply: 'No pude procesar tu consulta.', rich: null }, 200);
   }
 }
