@@ -1,100 +1,101 @@
-// /public/JS/script-chatbot.js
-// Nota: este archivo se carga con <script type="module"> en index.html.
-// Evitá importarlo dos veces para no ver el warning de múltiples GoTrueClient.
+// Se carga con type="module" en el index
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   const chatContainer = document.getElementById("chat-container");
   const chatBody = document.getElementById("chat-body");
   const chatForm = document.getElementById("chat-form");
   const chatInput = document.getElementById("chat-input");
   const toggler = document.querySelector(".chatbot-toggler");
 
-  // UI helpers
-  const appendMessage = (text, who = "bot") => {
-    const el = document.createElement("div");
-    el.className = `msg ${who}`;
-    el.innerHTML = `<p>${text}</p>`;
-    chatBody.appendChild(el);
-    chatBody.scrollTop = chatBody.scrollHeight;
-  };
-  const setLoading = (on) => {
-    if (on) {
-      const el = document.createElement("div");
-      el.id = "chat-loader";
-      el.className = "msg bot";
-      el.innerHTML = `<p><span class="dots">Escribiendo…</span></p>`;
-      chatBody.appendChild(el);
-      chatBody.scrollTop = chatBody.scrollHeight;
-    } else {
-      document.getElementById("chat-loader")?.remove();
-    }
-  };
+  // ========= Supabase (cliente único) =========
+  const SUPABASE_URL = "https://jyygevitfnbwrvxrjexp.supabase.co";
+  const SUPABASE_ANON_KEY =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5eWdldml0Zm5id3J2eHJqZXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2OTQ2OTYsImV4cCI6MjA3MTI3MDY5Nn0.St0IiSZSeELESshctneazCJHXCDBi9wrZ28UkiEDXYo";
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  // Apertura / cierre
+  // Pasamos el client a ChatBrain (evita múltiples instancias GoTrue)
+  window.ChatBrain?.init(supabase);
+
+  // ====== Abrir / cerrar chat ======
   toggler?.addEventListener("click", () => {
     chatContainer.classList.toggle("open");
     toggler.classList.toggle("active");
     if (chatContainer.classList.contains("open")) {
-      setTimeout(() => chatInput.focus(), 150);
+      setTimeout(() => chatInput?.focus(), 160);
     }
   });
 
-  // Mensaje de bienvenida (no llames a Supabase aquí para evitar el warning)
-  const saludo = (() => {
-    const h = new Date().getHours();
-    if (h < 12) return "☀️ ¡Buenos días!";
-    if (h < 19) return "🌞 ¡Buenas tardes!";
-    return "🌙 ¡Buenas noches!";
-  })();
-  appendMessage(`${saludo} Soy *Paniquiños Bot*. ¿Te ayudo a elegir algo del menú hoy?`);
+  // ====== Utils UI ======
+  function appendMessage(text, sender = "bot", delay = 0) {
+    const msg = document.createElement("div");
+    msg.className = `msg ${sender}`;
+    msg.innerHTML = `<p>${text}</p>`;
+    setTimeout(() => {
+      chatBody.appendChild(msg);
+      chatBody.scrollTo({ top: chatBody.scrollHeight, behavior: "smooth" });
+    }, delay);
+  }
 
-  // Envío
+  function showLoader() {
+    const loader = document.createElement("div");
+    loader.className = "msg bot loading";
+    loader.id = "loader";
+    loader.innerHTML = `<p>Escribiendo…</p>`;
+    chatBody.appendChild(loader);
+    chatBody.scrollTo({ top: chatBody.scrollHeight, behavior: "smooth" });
+  }
+  function hideLoader() { document.getElementById("loader")?.remove(); }
+
+  // ====== Saludo inicial corto ======
+  (function saludo() {
+    appendMessage("👋 ¡Bienvenido! Soy *Paniquiños Bot*. Preguntame por *tortas*, *empanadas*, *alfajores* o *combos*.", "bot", 50);
+  })();
+
+  // ====== Envío ======
   chatForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const text = chatInput.value.trim();
     if (!text) return;
+
     appendMessage(text, "user");
     chatInput.value = "";
-    setLoading(true);
+    showLoader();
 
     try {
-      // 1) intento “local” mínimo (saludo / gracias)
-      const lower = text.toLowerCase();
-      if (["hola", "buenas", "hey"].some((w) => lower.includes(w))) {
-        setLoading(false);
-        appendMessage("¡Hola! 😊 ¿Qué te gustaría saber: tortas, empanadas, alfajores o combos?");
-        return;
-      }
-      if (lower.includes("gracias")) {
-        setLoading(false);
-        appendMessage("¡De nada! 🧁");
+      // 1) Intento local con catálogo (ChatBrain)
+      const local = await window.ChatBrain.handleMessage(text);
+      if (local) {
+        hideLoader();
+        appendMessage(local.text, "bot", 150);
         return;
       }
 
-      // 2) backend con RAG + búsqueda de productos
+      // 2) Fallback a backend /api/ask (RAG/OpenAI)
       const res = await fetch("/api/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: [{ role: "user", content: text }] }),
       });
       const data = await res.json();
-      setLoading(false);
+      hideLoader();
 
       if (!res.ok) {
-        appendMessage("No pude responder ahora mismo 😅. ¿Podés repetir en pocas palabras?");
-        console.error("ask error:", data);
+        console.error("HTTP error /api/ask:", data);
+        appendMessage("No pude responder ahora mismo 😅 Probá de nuevo en un momento.", "bot");
         return;
       }
-      appendMessage(data.reply || "Hmm… no estoy seguro. ¿Podés reformular?");
+
+      appendMessage(data.reply || "No tengo respuesta ahora mismo 😅", "bot", 120);
     } catch (err) {
-      setLoading(false);
-      console.error("chat error:", err);
-      appendMessage("Hubo un problema de conexión 😓. Probá de nuevo.");
+      console.error("Chat error:", err);
+      hideLoader();
+      appendMessage("⚠️ Ocurrió un problema de conexión. Probá de nuevo.", "bot");
     }
   });
 
   // Enter para enviar
-  chatInput?.addEventListener("keydown", (e) => {
+  chatInput?.addEventListener("keypress", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       chatForm.requestSubmit();
