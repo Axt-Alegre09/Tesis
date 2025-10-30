@@ -303,3 +303,10 @@ async function reload(){ await loadMes(pivot); renderCalendar(); }
   await reload();
   disableDetalle(true);
 })();
+
+
+
+const pregunta = "¿Qué horario tienen los sábados?";
+const res = await fetch(`/api/ask?question=${encodeURIComponent(pregunta)}`);
+const data = await res.json();
+console.log(data);
