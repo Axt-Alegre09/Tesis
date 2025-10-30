@@ -2,89 +2,120 @@
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
 
-// ========= CONFIG =========
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-const supabase = createClient(
+// ENV (asegurate que coincidan en Vercel):
+// SUPABASE_URL
+// SUPABASE_SERVICE_ROLE
+// OPENAI_API_KEY
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const supa = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE
 );
 
+// Utilidad: busca productos por texto en 'nombre' (y solo activos)
+async function buscarProductosPorTexto(q, limit = 6) {
+  const term = q?.trim();
+  if (!term) return { data: [], error: null };
+
+  // heurística simple para consultas tipo “tienen empanadas?”, “torta”, “alfajor”
+  const like = `%${term.replace(/[^\p{L}\p{N}\s]/gu, " ").trim()}%`;
+
+  const { data, error } = await supa
+    .from("productos")
+    .select("id, nombre, precio, stock, activo")
+    .ilike("nombre", like)
+    .eq("activo", true)
+    .limit(limit);
+
+  return { data: data || [], error };
+}
+
 export default async function handler(req, res) {
-  if (req.method !== "POST") {
+  if (req.method !== "POST")
     return res.status(405).json({ error: "Método no permitido" });
-  }
 
   try {
-    const { messages } = req.body;
-    const question = messages?.[0]?.content?.toLowerCase().trim();
+    const body = await (typeof req.body === "string" ? JSON.parse(req.body) : req.body);
+    const userMsg = body?.messages?.[0]?.content?.toLowerCase()?.trim() || "";
 
-    console.log("🟢 Nueva consulta recibida:", question);
+    // 1) Intento directo a productos (fallback “inteligente”)
+    let productos = [];
+    {
+      const palabrasClave =
+        userMsg.length <= 60 // consultas cortas suelen ser “producto”
+          ? userMsg
+          : userMsg.split(/[?.!,]/)[0]; // primera oración
 
-    // ======== 1️⃣ Embedding de la pregunta ========
-    console.log("📦 Generando embedding...");
-    const embeddingResponse = await openai.embeddings.create({
-      model: "text-embedding-3-small",
-      input: question,
-    });
-
-    const embedding = embeddingResponse.data[0].embedding;
-    console.log("✅ Embedding generado correctamente. Longitud:", embedding.length);
-
-    // ======== 2️⃣ Buscar contexto RAG en Supabase ========
-    console.log("🔍 Buscando contexto en Supabase con kb_search...");
-    const { data: context, error } = await supabase.rpc("kb_search", {
-      query_embedding: embedding,
-      match_count: 5,
-    });
-
-    if (error) {
-      console.error("❌ Error kb_search:", error);
-    } else {
-      console.log(`✅ Contexto recuperado (${context?.length || 0} coincidencias).`);
+      const { data } = await buscarProductosPorTexto(palabrasClave);
+      productos = data || [];
     }
 
-    const contextText =
-      context?.map((r) => r.content).join("\n") ||
-      "No se encontró información contextual relevante.";
+    if (productos.length > 0) {
+      // formateamos una respuesta natural y útil para la tienda
+      const lista = productos
+        .map(
+          (p) =>
+            `• **${p.nombre}** — ${Number(p.precio).toLocaleString("es-PY")} Gs` +
+            (p.stock > 0 ? ` (stock: ${p.stock})` : ` (¡por encargo!)`)
+        )
+        .join("\n");
 
-    // ======== 3️⃣ Generar respuesta con OpenAI ========
-    console.log("💬 Solicitando respuesta a OpenAI...");
+      const reply =
+        `Te paso lo que encontré relacionado:\n\n${lista}\n\n` +
+        `¿Querés que agregue alguno al carrito o te paso más opciones similares?`;
+      return res.status(200).json({ reply });
+    }
 
-    const prompt = `
-Sos *Paniquiños Bot*, un asistente cálido y simpático de la confitería Paniquiños 🍰.
-Usá un tono amable, natural y paraguayo neutral.
-Nunca inventes productos que no existan en la base de datos.
-Si no sabés algo, admitilo con empatía. Podés sugerir consultar a un empleado.
-Respondé con frases breves, naturales y con emojis si queda bien.
-Si el usuario pide agregar productos al carrito, confirmá con el nombre real del producto y el precio.
+    // 2) Si no hubo match en productos, probamos RAG con kb
+    let contexto = "No hay contexto adicional.";
+    try {
+      const emb = await openai.embeddings.create({
+        model: "text-embedding-3-small",
+        input: userMsg || "menu",
+      });
+      const embedding = emb.data[0].embedding;
 
-Contexto de productos:
-${contextText}
+      const { data: ctx } = await supa.rpc("kb_search", {
+        query_embedding: embedding,
+        match_count: 5,
+      });
 
-Usuario: ${question}
-`;
+      if (ctx?.length) {
+        contexto = ctx.map((r) => r.content).join("\n");
+      }
+    } catch (e) {
+      // si kb falla, seguimos igual sin romper
+      console.warn("kb_search falló (continuo sin RAG):", e?.message);
+    }
+
+    // 3) LLM para respuesta natural con tono cálido
+    const system = `
+Sos "Paniquiños Bot", asistente de una confitería de Paraguay.
+Reglas:
+- Tono amable, claro y conciso; emojis suaves, nada exagerado.
+- NO inventes productos ni precios. Si no estás seguro, proponé alternativas (bocaditos, alfajores, tortas, combos).
+- Si el usuario pide horarios, sugiere consultar el local o el sitio (no inventes horarios).
+- Si no hay info suficiente, pedí una aclaración breve.
+Contexto (si sirve):
+${contexto}
+    `.trim();
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      messages: [{ role: "system", content: prompt }],
-      temperature: 0.7,
+      temperature: 0.5,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: userMsg || "Hola" },
+      ],
     });
 
     const reply =
       completion.choices?.[0]?.message?.content?.trim() ||
-      "Lo siento, no pude generar una respuesta en este momento.";
-
-    console.log("✅ Respuesta generada:", reply.slice(0, 100) + "...");
+      "No pude responder ahora mismo 😅. ¿Podés reformular en pocas palabras?";
 
     return res.status(200).json({ reply });
   } catch (err) {
-    console.error("💥 Error interno en /api/ask:", err);
-    return res.status(500).json({
-      error: "Error interno del servidor",
-      detail: err.message,
-    });
+    console.error("Error /api/ask:", err);
+    return res.status(500).json({ error: "Error interno del servidor" });
   }
 }
