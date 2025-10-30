@@ -1,5 +1,5 @@
 /* JS/chatbot.brain.js
-   NLU liviano para catálogo + carrito + respuestas de producto + reservas catering (multi-turno).
+   NLU liviano para catálogo + carrito + respuestas + reservas catering (multi-turno).
    (sin OpenAI, todo frontend)
 */
 (() => {
@@ -8,20 +8,18 @@
     ocho:8, nueve:9, diez:10, once:11, doce:12 };
 
   const normalize = (s="") =>
-    String(s)
-      .toLowerCase()
-      .normalize("NFD").replace(/[\u0300-\u036f]/g,"") // compatible total
+    String(s).toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
       .replace(/[.,;:!¡¿?()"]/g," ")
       .replace(/\s+/g," ")
       .trim();
 
   const preclean = (s="") =>
-    s
-      .replace(/\b(al|a|en)\s+mi?\s+carrito\b/gi, "")
-      .replace(/\bcarrito(s)?\b/gi, "")
-      .replace(/\bpor\s+favor\b/gi, "")
-      .replace(/\bgracias\b/gi, "")
-      .trim();
+    s.replace(/\b(al|a|en)\s+mi?\s+carrito\b/gi, "")
+     .replace(/\bcarrito(s)?\b/gi, "")
+     .replace(/\bpor\s+favor\b/gi, "")
+     .replace(/\bgracias\b/gi, "")
+     .trim();
 
   const toNumber = (w) => /^\d+$/.test(w||"") ? parseInt(w,10) : (NUM_PAL[w] ?? NaN);
   const fmtGs = n => new Intl.NumberFormat("es-PY").format(Math.max(0, Number(n)||0)) + " Gs";
@@ -43,14 +41,10 @@
   };
 
   const FLAVORS = [
-    // salados
     "carne","pollo","huevo","mandioca","queso","jamon","jamón","jamon y queso","jamón y queso",
     "saltena","salteña","milanesa",
-    // confitería
     "dulce de leche","chocolate","maicena","vainilla","coco","membrillo","frutilla","guayaba",
-    // panes
     "baguette","gallego","campo","chip",
-    // otros
     "anana","ananá","pina","piña","manzana"
   ];
 
@@ -63,9 +57,9 @@
     milanesas: SYN.milanesa
   };
 
-  // =============== KB (precios / incluye) breve ===============
+  // =============== KB breve ===============
   const KB = {
-    // -- BOCADITOS
+    // BOCADITOS
     "bocaditos combo 1": { precio: 55000,  incluye: "2 empanadas (a elegir), 2 sándwiches y 4 chipas" },
     "bocaditos combo 2": { precio: 50000,  incluye: "3 empanadas, 3 sandwichitos, 2 payagua/pajagua, 2 chipa guasú, 4 chipas y 4 mbejú" },
     "bocaditos combo 3": { precio: 150000, incluye: "4 empanadas, 3 chipas, 3 chipa guasú, 3 sopas, 10 aperitivos, 5 payagua, 4 milanesas y 5 mbejú" },
@@ -73,7 +67,7 @@
     "bocadito personal": { precio: 35000,  incluye: "5 empanadas + 2 salsas (kétchup y lactonesa)" },
     "bocadito en pareja":{ precio: 65000,  incluye: "11 empanadas + 2 salsas (kétchup y lactonesa)" },
 
-    // -- CONFITERÍA
+    // CONFITERÍA
     "alfajores": { precio: 25000, incluye: "Maicena y maicena bañada en chocolate" },
     "croissants": { precio: 30000, incluye: "Crujientes de manteca (unidad)" },
     "dulces (caja 20)": { precio: 25000, incluye: "1 caja con 20 dulces surtidos" },
@@ -83,7 +77,7 @@
     "pai de manzana": { precio: 35000 },
     "pai de anana": { precio: 35000, incluye: "También conocido como pai de piña/ananá" },
 
-    // -- PANIFICADOS
+    // PANIFICADOS
     "pan baguette (1)": { precio: 15000 },
     "pan casero (1)": { precio: 20000 },
     "pan chip (pack 10)": { precio: 15000 },
@@ -91,7 +85,7 @@
     "pan del campo (kilo)": { precio: 22000 },
     "pan gallego (kilo)": { precio: 19000 },
 
-    // -- ROSTISERÍA / SALADOS
+    // ROSTISERÍA / SALADOS
     "empanada de carne": { precio: 19000 },
     "empanada de huevo": { precio: 17000 },
     "empanada de mandioca": { precio: 10000 },
@@ -117,7 +111,7 @@
     ["flanes","flanes (2)"],["flan","flanes (2)"],
     ["pasta flora","pasta floras (kilo)"],["pastaflora","pasta floras (kilo)"],
     ["torta dulce de leche","torta dulce de leche (pequena congelada)"],
-    ["pai de piña","pai de anana"],["pai de anana","pai de anana"],["pai de ananá","pai de anana"],["pai de allana","pai de anana"],
+    ["pai de piña","pai de anana"],["pai de anana","pai de anana"],["pai de ananá","pai de anana"],
 
     // Panificados
     ["baguette","pan baguette (1)"],["pan buguete","pan baguette (1)"],["baguet","pan baguette (1)"],
@@ -241,7 +235,7 @@
     return { count: inCat.length, names: names.slice(0,10), flavors: Array.from(flavors) };
   }
 
-  // =============== Parser de intención (carrito + info) ===============
+  // =============== Parsers de intención ===============
   function extractFlavor(fragment){
     const multi = /(jamon y queso|dulce de leche|papa frita|milanesa|chipaguazu|pan del campo|sopa paraguaya)/;
     const m = (fragment||"").match(multi);
@@ -291,7 +285,7 @@
     return null;
   }
 
-  // =============== --- CATERING: helpers + flujo --- ===============
+  // =============== CATERING: helpers + flujo ===============
   const CATERING_FIELDS = [
     { key:"razonsocial", prompt:"¿A nombre de quién es el servicio? (empresa o nombre)", required:true },
     { key:"telefono",    prompt:"¿Cuál es el teléfono de contacto?", required:true },
@@ -325,7 +319,6 @@
   function tryFillDraftFromText(draft, text){
     const msg = normalize(text);
 
-    // nombre / empresa
     const mNom = msg.match(/(a\s*nombre\s*de|empresa|razon|razón)\s+([a-z0-9 áéíóúñ\.-]+)/i);
     if (mNom && !draft.razonsocial) draft.razonsocial = mNom[2].trim();
 
@@ -391,7 +384,6 @@
   }
 
   async function actCatering(userText){
-    // sesión requerida
     try {
       const { data } = await window.supabase.auth.getSession();
       if (!data?.session) {
@@ -399,30 +391,25 @@
       }
     } catch {}
 
-    // Recupero/actualizo borrador
     let draft = {};
     try{ draft = JSON.parse(localStorage.getItem(DRAFT_KEY)||"{}"); }catch{}
     tryFillDraftFromText(draft, userText);
 
-    // Normalizaciones
     if (draft.fecha && !parseFecha(draft.fecha)) draft.fecha = null;
     if (draft.hora  && !parseHora(draft.hora))   draft.hora  = null;
     if (draft.invitados && isNaN(Number(draft.invitados))) draft.invitados = null;
 
-    // Preguntar lo que falta
     const missing = getNextMissing(draft);
     if (missing){
       localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
       return { text: missing.prompt };
     }
 
-    // Validar cupo
     const cupo = await checkCupo(draft.fecha);
     if (!cupo.ok){
       return { text:`⚠️ Cupo lleno para ${draft.fecha}. Capacidad: ${cupo.lim}. Probá con otra fecha.` };
     }
 
-    // Ejecutar RPC
     try{
       const payload = {
         p_razonsocial: draft.razonsocial,
@@ -454,7 +441,6 @@
       return { text: "❌ No pude registrar la reserva ahora. Revisá los datos o intentá de nuevo." };
     }
   }
-  // =============== FIN helpers CATERING ===============
 
   function parseMessage(msgRaw=""){
     const msg = normalize(preclean(msgRaw));
@@ -616,6 +602,16 @@ También puedo agendar tu catering:
   }
 
   async function actProductInfo({ topic, prodTxt }){
+    // promos dinámicas por ventana
+    if (/\b(promo|promos|oferta|2x1|descuento)\b/.test((prodTxt||"") + " " + (topic||""))) {
+      const promos = getActivePromos();
+      if (promos.length) {
+        const p = promos[0];
+        return { text: `¡Sí! ${p.title}. ${p.detail}` };
+      }
+      return { text: "Ahora mismo no hay una promo activa, pero los viernes de 17:00 a 19:00 tenemos 2x1 en empanadas. 😉" };
+    }
+
     const kb = kbLookup(prodTxt);
     if (!kb) {
       const prod = findProduct(prodTxt);
@@ -651,22 +647,45 @@ También puedo agendar tu catering:
     try{
       const parsed = parseMessage(userText||"");
       switch(parsed.intent){
-        case "add":            return await actAdd(parsed.items);
-        case "remove":         return await actRemove(parsed.items);
-        case "set_qty":        return await actSetQty(parsed);
-        case "show_total":     return await actShowTotal();
-        case "show_cart":      return await actShowCart();
-        case "empty_cart":     return await actEmpty();
-        case "help":           return actHelp();
-        case "category_info":  return await actCategoryInfo(parsed);
-        case "product_info":   return await actProductInfo(parsed);
-        case "category_prices":return await actCategoryPrices(parsed);
-        case "catering_book":  return await actCatering(parsed.raw);
-        default:               return null; // sin match -> backend
+        case "add":             return await actAdd(parsed.items);
+        case "remove":          return await actRemove(parsed.items);
+        case "set_qty":         return await actSetQty(parsed);
+        case "show_total":      return await actShowTotal();
+        case "show_cart":       return await actShowCart();
+        case "empty_cart":      return await actEmpty();
+        case "help":            return actHelp();
+        case "category_info":   return await actCategoryInfo(parsed);
+        case "product_info":    return await actProductInfo(parsed);
+        case "category_prices": return await actCategoryPrices(parsed);
+        case "catering_book":   return await actCatering(parsed.raw);
+        default:                return null;
       }
     }catch(e){
       console.error("[ChatBrain] handleMessage error:", e);
       return { text:"Algo salió mal al interpretar tu pedido. Probá de nuevo 😅" };
     }
   };
+
+  // --- Promos dinámicas (viernes 17:00–19:00, zona PY) ---
+  function isPromoWindowNow() {
+    try {
+      const now = new Date();
+      const day = now.getDay(); // 0=Dom .. 5=Vie
+      const hh = now.getHours();
+      const mm = now.getMinutes();
+      return (day === 5) && (hh > 16 && (hh < 19 || (hh === 19 && mm === 0)));
+    } catch { return false; }
+  }
+  function getActivePromos() {
+    const promos = [];
+    if (isPromoWindowNow()) {
+      promos.push({
+        id: "emp-2x1",
+        title: "2x1 en Empanadas",
+        detail: "Válido hoy de 17:00 a 19:00. ¡Aprovechá! 🥟✨",
+        cta: { text: "Ver opciones", payload: "ver empanadas" }
+      });
+    }
+    return promos;
+  }
 })();
