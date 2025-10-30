@@ -1,9 +1,7 @@
 // JS/script-chatbot.js
-// Chat flotante: usa lógica local (ChatBrain) y reservas (ChatCatering).
-// Si nada responde, consulta al backend semántico (/api/ask).
+// Chat flotante: NLU local + reservas + backend de IA con respuestas naturales.
 (() => {
-  // ---- Endpoint del backend semántico ----
-  // Si usas Vercel: /api/ask debe existir (ask.js).
+  // 👉 Ahora apuntamos al endpoint de IA que hiciste:
   const CHAT_ENDPOINT = "/api/ask";
 
   // ---- Nodos ----
@@ -15,14 +13,14 @@
   const chatbotToggler  = $(".chatbot-toggler");
 
   if (!chatInput || !sendChatBtn || !chatbox) {
-    console.warn("[chatbot] Falta markup del chat. Revisa el HTML.");
+    console.warn("[chatbot] Falta markup del chat.");
     return;
   }
 
-  // ---- Utiles ----
+  // ---- Helpers UI ----
   const inputIniHeight = chatInput.scrollHeight || 0;
 
-  function createChatLi(message, className) {
+  function createChatLiHTML(html, className) {
     const li = document.createElement("li");
     li.classList.add("chat", className);
 
@@ -33,33 +31,71 @@
       img.src = "https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinosico.ico";
       li.appendChild(img);
     }
-    const p = document.createElement("p");
-    p.textContent = String(message ?? "");
-    li.appendChild(p);
+
+    const bubble = document.createElement("div");
+    bubble.className = "msg";
+    bubble.innerHTML = html; // ← Render rico (ya sanitizado/transformado)
+    li.appendChild(bubble);
     return li;
   }
 
-  function appendIncoming(text) {
-    chatbox.append(createChatLi(text, "incoming"));
+  function appendIncomingHTML(html) {
+    chatbox.append(createChatLiHTML(html, "incoming"));
     chatbox.scrollTop = chatbox.scrollHeight;
   }
   function appendOutgoing(text) {
-    chatbox.append(createChatLi(text, "outgoing"));
+    const safe = escapeHTML(text);
+    chatbox.append(createChatLiHTML(`<p>${safe}</p>`, "outgoing"));
     chatbox.scrollTop = chatbox.scrollHeight;
   }
 
   function setSending(on) {
     if (!sendChatBtn) return;
-    if (on) {
-      sendChatBtn.setAttribute("aria-disabled", "true");
-      sendChatBtn.classList.add("disabled");
-    } else {
-      sendChatBtn.removeAttribute("aria-disabled");
-      sendChatBtn.classList.remove("disabled");
-    }
+    on ? (sendChatBtn.setAttribute("aria-disabled", "true"), sendChatBtn.classList.add("disabled"))
+       : (sendChatBtn.removeAttribute("aria-disabled"), sendChatBtn.classList.remove("disabled"));
   }
 
-  // Espera hasta que fn() devuelva algo truthy (o se acabe el timeout)
+  // ---- Mini markdown seguro (negritas, listas, saltos) ----
+  const escapeHTML = (s="") =>
+    String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+
+  function mdLiteToHTML(text="") {
+    // 1) escapar
+    let t = escapeHTML(text);
+
+    // 2) **negritas** y *itálicas*
+    t = t.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+    t = t.replace(/\*(.+?)\*/g, "<em>$1</em>");
+
+    // 3) listas (- o • al inicio de línea)
+    // separar por líneas y agrupar en <ul>
+    const lines = t.split(/\r?\n/);
+    const chunks = [];
+    let listOpen = false;
+    for (const line of lines) {
+      const m = line.match(/^\s*(?:-|•)\s+(.*)$/);
+      if (m) {
+        if (!listOpen) { chunks.push("<ul>"); listOpen = true; }
+        chunks.push(`<li>${m[1]}</li>`);
+      } else {
+        if (listOpen) { chunks.push("</ul>"); listOpen = false; }
+        if (line.trim()) chunks.push(`<p>${line}</p>`);
+        else chunks.push("<br/>");
+      }
+    }
+    if (listOpen) chunks.push("</ul>");
+    let html = chunks.join("");
+
+    // 4) enlaces “http…”
+    html = html.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+
+    return html;
+  }
+
+  // ---- Esperita para scripts de reservas ----
   function waitFor(fn, { interval = 50, timeout = 800 } = {}) {
     return new Promise((resolve) => {
       const start = Date.now();
@@ -75,63 +111,21 @@
     });
   }
 
-  // ---- Backend semántico (/api/ask) ----
-  async function askBackend(question) {
-    if (!CHAT_ENDPOINT) return { ok: false, text: null };
+  // ---- Backend IA ----
+  async function askBackendNatural(question) {
+    if (!CHAT_ENDPOINT) return { ok:false, text:null };
     try {
-      // /api/ask soportado como GET ?question=
+      // usamos GET con query param ?question=
       const url = `${CHAT_ENDPOINT}?question=${encodeURIComponent(question)}`;
-      const res = await fetch(url, { method: "GET" });
+      const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
       const data = await res.json();
-      return { ok: true, text: parseAskResponse(data) };
+      const text = data?.reply || "No tengo respuesta ahora.";
+      return { ok:true, text };
     } catch (e) {
       console.error("[chatbot] backend error:", e);
-      return { ok: false, text: "Oops, ocurrió un error. Intenta de nuevo." };
+      return { ok:false, text:"Oops, ocurrió un error. Intenta de nuevo." };
     }
-  }
-
-  // Interpreta la respuesta del /api/ask:
-  // - Si viene {reply: "..."} lo usa directo
-  // - Si viene array de matches [{content, similarity, meta...}], arma un texto útil
-  function parseAskResponse(data) {
-    // Caso 1: objeto con reply
-    if (data && typeof data === "object" && !Array.isArray(data) && data.reply) {
-      return String(data.reply);
-    }
-
-    // Caso 2: array de matches (kb_search)
-    if (Array.isArray(data) && data.length) {
-      const top = data[0];
-      const txt = String(top.content ?? "").trim();
-
-      // Intento extraer "Horarios: { ... }" si existe
-      const m = txt.match(/Horarios:\s*({[\s\S]*?})/i);
-      if (m) {
-        try {
-          const horarios = JSON.parse(m[1]);
-          const map = {
-            lun: "Lun", mar: "Mar", mie: "Mié", jue: "Jue",
-            vie: "Vie", sab: "Sáb", dom: "Dom"
-          };
-          const lineas = Object.keys(map)
-            .filter(k => k in horarios)
-            .map(k => `${map[k]}: ${horarios[k]}`);
-          if (lineas.length) {
-            return "🕒 Horarios:\n" + lineas.join("\n");
-          }
-        } catch {}
-      }
-
-      // Si no hay horarios, devolvemos el contenido recortado
-      if (txt) return txt.slice(0, 220) + (txt.length > 220 ? "…" : "");
-
-      // Si no hay content, mostramos algo genérico
-      return "Tengo información relacionada pero no pude formatearla. Probá preguntarme de otra forma (ej: “¿Abren los domingos?”).";
-    }
-
-    // Default
-    return "No encontré información relacionada 😕";
   }
 
   // ---- Manejo principal ----
@@ -143,43 +137,39 @@
     chatInput.value = "";
     if (inputIniHeight) chatInput.style.height = `${inputIniHeight}px`;
 
-    // Pinta salida del usuario
+    // Mensaje del usuario
     appendOutgoing(userMessage);
 
-    // 1) Intento NLU local (carrito/catálogo)
+    // 1) NLU local: carrito/catálogo
     try {
       const local = await (window.ChatBrain?.handleMessage?.(userMessage));
       if (local && local.text) {
-        appendIncoming(local.text);
+        appendIncomingHTML(mdLiteToHTML(local.text));
         return;
       }
-    } catch (e) {
-      console.warn("[chatbot] ChatBrain error:", e);
-    }
+    } catch (e) { console.warn("[chatbot] ChatBrain error:", e); }
 
-    // 2) Intento reservas catering (espera breve por si el script aún carga)
+    // 2) Reservas catering
     try {
       const ChatCatering = await waitFor(() => window.ChatCatering?.handle);
       if (ChatCatering) {
         const res = await window.ChatCatering.handle(userMessage);
         if (res && res.text) {
-          appendIncoming(res.text);
+          appendIncomingHTML(mdLiteToHTML(res.text));
           return;
         }
       }
-    } catch (e) {
-      console.warn("[chatbot] ChatCatering error:", e);
-    }
+    } catch (e) { console.warn("[chatbot] ChatCatering error:", e); }
 
-    // 3) Backend semántico
+    // 3) Backend IA con estilo natural
     setSending(true);
-    const loadingLi = createChatLi("Cargando...", "incoming");
-    chatbox.appendChild(loadingLi);
+    const loading = createChatLiHTML(`<p>Escribiendo…</p>`, "incoming");
+    chatbox.appendChild(loading);
     chatbox.scrollTop = chatbox.scrollHeight;
 
-    const { ok, text } = await askBackend(userMessage);
-    loadingLi.querySelector("p").textContent =
-      text || (ok ? "No tengo respuesta ahora." : "Oops, ocurrió un error. Intenta de nuevo.");
+    const { ok, text } = await askBackendNatural(userMessage);
+    loading.querySelector(".msg").innerHTML =
+      mdLiteToHTML(text || (ok ? "No tengo respuesta ahora." : "Oops, ocurrió un error."));
 
     setSending(false);
   }

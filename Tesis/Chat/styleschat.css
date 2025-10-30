@@ -182,3 +182,43 @@ h2{
         display: block;
     }
 }
+/* Respuestas “tipo ChatGPT” */
+.chatbox .chat .msg {
+  max-width: 100%;
+  background: #fff;
+  color: #1f2937;
+  border-radius: 14px;
+  padding: 12px 14px;
+  box-shadow: 0 6px 22px rgba(0,0,0,.08);
+  border: 1px solid rgba(0,0,0,.06);
+}
+
+.chatbox .chat.incoming .msg {
+  background: #fff;
+}
+.chatbox .chat.outgoing .msg {
+  background: #6f5c38;          /* tu marrón */
+  color: #fff;
+  border-color: rgba(0,0,0,.0);
+}
+
+.chatbox .chat .msg p {
+  margin: 0.25rem 0;
+  line-height: 1.45;
+}
+
+.chatbox .chat .msg strong { font-weight: 800; }
+.chatbox .chat .msg em     { font-style: italic; }
+
+.chatbox .chat .msg ul {
+  margin: 0.25rem 0 0.25rem 1.25rem;
+  padding: 0;
+}
+.chatbox .chat .msg li {
+  margin: 0.15rem 0;
+}
+
+.chatbox .chat .msg a {
+  text-decoration: underline;
+  word-break: break-word;
+}
