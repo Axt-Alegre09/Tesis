@@ -3,15 +3,19 @@ import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
 
 /**
- * ENV requeridas:
+ * ENV obligatorias:
  * - SUPABASE_URL
  * - SUPABASE_SERVICE_ROLE
  * - OPENAI_API_KEY
  */
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const supa = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE, {
-  auth: { persistSession: false, autoRefreshToken: false },
-});
+
+// Service Role: SOLO en servidor
+const supa = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE,
+  { auth: { persistSession: false, autoRefreshToken: false } }
+);
 
 /* ============== Utils ============== */
 const toPY = (v) => {
@@ -25,102 +29,71 @@ const has = (t, ...words) => words.some((w) => t.includes(w));
 
 /* ============== Categorías & NLU ============== */
 const CATEGORY_MAP = [
-  { key: "empanadas", terms: ["empanada", "empanadas"] },
-  { key: "bocaditos", terms: ["bocadito", "bocaditos", "saladitos"] },
-  { key: "alfajores", terms: ["alfajor", "alfajores"] },
-  { key: "tortas", terms: ["torta", "tortas", "minitorta", "mini torta"] },
-  { key: "combos", terms: ["combo", "combos"] },
+  { key: "empanadas",  terms: ["empanada", "empanadas"] },
+  { key: "bocaditos",  terms: ["bocadito", "bocaditos", "saladitos"] },
+  { key: "alfajores",  terms: ["alfajor", "alfajores"] },
+  { key: "tortas",     terms: ["torta", "tortas", "minitorta", "mini torta"] },
+  { key: "combos",     terms: ["combo", "combos"] },
   { key: "confitería", terms: ["confiteria", "confitería", "dulces"] },
-  { key: "panificados", terms: ["pan", "panes", "panificados"] },
+  { key: "panificados",terms: ["pan", "panes", "panificados"] },
   { key: "rostisería", terms: ["rostiseria", "rosticeria", "rostisería", "rosticería"] },
 ];
 
-// Alias de cómo realmente figuran en categoria_nombre de la vista
-const CATEGORY_ALIASES = {
-  empanadas: ["rostisería", "rosticería", "rostiseria"], // tu catálogo mete empanadas en Rostisería
-  bocaditos: ["bocaditos"],
-  alfajores: ["alfajores"],
-  tortas: ["tortas"],
-  combos: ["combos"],
-  "confitería": ["confitería", "confiteria", "dulces"],
-  panificados: ["panificados", "pan", "panes"],
-  "rostisería": ["rostisería", "rosticería", "rostiseria"],
-};
-
 function detectCategory(q) {
   const t = norm(q);
-  for (const { key, terms } of CATEGORY_MAP) {
-    if (terms.some((w) => t.includes(w))) return key;
-  }
+  for (const { key, terms } of CATEGORY_MAP) if (terms.some(w => t.includes(w))) return key;
   return null;
 }
 
-/* ============== Acceso BD ============== */
-function rowToSimple(p) {
-  return {
-    id: p.id,
-    nombre: p.nombre,
-    precio: Number(p.precio || 0),
-    categoria: p.categoria_nombre || null,
-  };
+function parseQty(text) {
+  const m = text.match(/\b(\d+)\b/);
+  return m ? Math.max(1, parseInt(m[1], 10)) : 1;
+}
+function extractProductHint(text) {
+  let t = text.replace(/\b(agrega?r?|sumar?|pon(e|er)?|añadi(r|me)?|quitar?|remover?|saca?r?|elimina?r?)\b/gi, " ");
+  t = t.replace(/\b(al|a|la|las|los|el|de|del|por|para|mi|me|carrito|al carrito)\b/gi, " ");
+  t = t.replace(/\s+/g, " ").trim();
+  return t.length ? t : text;
 }
 
-async function findProductsByText(q, limit = 6) {
+/* ============== DB helpers ============== */
+const cols = "id, nombre, precio, categoria_nombre";
+
+const rowToSimple = (p) => ({
+  id: p.id,
+  nombre: p.nombre,
+  precio: Number(p.precio || 0),
+  categoria: p.categoria_nombre || null,
+});
+
+async function findByText(q, limit = 6) {
   const t = norm(q);
   if (!t) return [];
   const tokens = t.split(" ").filter(Boolean).slice(0, 4);
-  if (!tokens.length) return [];
   const or = tokens.map((x) => `nombre.ilike.%${x}%`).join(",");
   const { data, error } = await supa
     .from("v_productos_publicos")
-    .select("id, nombre, precio, categoria_nombre")
+    .select(cols)
     .or(or)
     .limit(limit);
-  if (error) {
-    console.warn("findProductsByText:", error.message);
-    return [];
-  }
+  if (error) { console.warn("findByText:", error.message); return []; }
   return (data || []).map(rowToSimple);
 }
 
-async function findProductsByCategoryNameLike(cat, limit = 6) {
+async function findByCategory(cat, limit = 6) {
   const { data, error } = await supa
     .from("v_productos_publicos")
-    .select("id, nombre, precio, categoria_nombre")
+    .select(cols)
     .ilike("categoria_nombre", `%${cat}%`)
+    .order("nombre", { ascending: true })
     .limit(limit);
-  if (error) {
-    console.warn("findProductsByCategoryNameLike:", error.message);
-    return [];
-  }
+  if (error) { console.warn("findByCategory:", error.message); return []; }
   return (data || []).map(rowToSimple);
 }
 
-// Intención “mostrar X”: prueba alias de categoría; si nada, busca por nombre
-async function findProductsForIntent(keyOrTerm, limit = 6) {
-  const aliases = CATEGORY_ALIASES[keyOrTerm] || [];
-  if (aliases.length) {
-    const orCat = aliases.map((a) => `categoria_nombre.ilike.%${a}%`).join(",");
-    const { data, error } = await supa
-      .from("v_productos_publicos")
-      .select("id, nombre, precio, categoria_nombre")
-      .or(orCat)
-      .limit(limit);
-    if (!error && data?.length) return data.map(rowToSimple);
-  }
-  const term = keyOrTerm === "empanadas" ? "empanad" : keyOrTerm; // “empanad%” cubre singular/plural
-  const byName = await findProductsByText(term, limit);
-  return byName;
-}
-
-async function findFirstProductLike(q) {
-  const list = await findProductsByText(q, 1);
+async function findFirstLike(q) {
+  const list = await findByText(q, 1);
   return list?.[0] || null;
-}
-
-function listWithPrices(arr) {
-  if (!arr.length) return "No encontré coincidencias.";
-  return arr.map((p) => `• **${p.nombre}** — ${toPY(p.precio)} Gs`).join("\n");
 }
 
 /* ============== KB (RAG) ============== */
@@ -134,10 +107,7 @@ async function kbLookup(userMsgRaw) {
       query_embedding: emb.data[0].embedding,
       match_count: 5,
     });
-    if (error) {
-      console.warn("kb_search:", error.message);
-      return "";
-    }
+    if (error) { console.warn("kb_search:", error.message); return ""; }
     return (data || []).map((r) => r.content).join("\n");
   } catch (e) {
     console.warn("RAG fail:", e?.message);
@@ -145,19 +115,17 @@ async function kbLookup(userMsgRaw) {
   }
 }
 
-/* ============== NLU carrito ============== */
-function parseQty(text) {
-  const m = text.match(/\b(\d+)\b/);
-  return m ? Math.max(1, parseInt(m[1], 10)) : 1;
+/* ============== Core reply builders ============== */
+function listTop3(arr) {
+  if (!arr.length) return "No encontré coincidencias.";
+  const top = arr.slice(0, 3);
+  const bullets = top.map((p) => `• ${p.nombre} — ${toPY(p.precio)} Gs`).join("\n");
+  const more = arr.length > 3 ? `\n…y ${arr.length - 3} más. Decime cuál querés.` : "\n¿Te agrego alguno?";
+  return `${bullets}\n${more}`;
 }
-function extractProductHint(text) {
-  let t = text.replace(
-    /\b(agrega?r?|agregame|sumar?|pon(e|er)?|añadi(r|me)?|quitar?|remover?|saca?r?|elimina?r?)\b/g,
-    " "
-  );
-  t = t.replace(/\b(al|a|la|las|los|el|de|del|por|para|mi|me|al carrito|carrito)\b/g, " ");
-  t = t.replace(/\s+/g, " ").trim();
-  return t.length ? t : text;
+
+function shortPriceLine(p) {
+  return `${p.nombre}: ${toPY(p.precio)} Gs.`;
 }
 
 /* ============== Handler ============== */
@@ -165,80 +133,139 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Método no permitido" });
 
   try {
-    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body || {};
+    const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
     const userMsgRaw = body?.messages?.[0]?.content ?? "";
     const t = norm(userMsgRaw);
 
-    // --- Carrito: agregar
-    if (has(t, "agrega", "agregame", "sumar", "pone", "poner", "añadi", "añade")) {
+    // Estado que viene del cliente (memoria de la charla)
+    const stateIn = body?.state || {}; // { lastCategory, lastProduct, lastListIds:[], lastListNames:[] }
+    const stateOut = { ...stateIn };
+
+    // ========== 1) Intents de carrito (ADD / REMOVE / TOTAL) ==========
+    if (has(t, "agrega", "agregame", "sumar", "pone", "poner", "añade", "añadime", "agregar")) {
       const qty = parseQty(t);
-      const hint = extractProductHint(t);
-      const prod = await findFirstProductLike(hint);
+
+      // Referencias: “esa”, “primera”, “uno”
+      let prod = null;
+      if (has(t, "esa", "ese", "primera", "primero")) {
+        // Si el cliente nos pasó la última lista, usamos el 1°
+        if (stateIn.lastListIds?.length && stateIn.lastListNames?.length) {
+          prod = await findFirstLike(stateIn.lastListNames[0]) || null;
+        } else if (stateIn.lastProduct?.nombre) {
+          prod = await findFirstLike(stateIn.lastProduct.nombre) || null;
+        }
+      }
+
+      // Si no hay referencia contextual, intentamos por texto
+      if (!prod) {
+        const hint = extractProductHint(t);
+        prod = await findFirstLike(hint);
+      }
+
       if (prod) {
+        stateOut.lastProduct = { id: prod.id, nombre: prod.nombre };
         return res.status(200).json({
-          reply: `Agregué ${qty}× ${prod.nombre}.`,
+          reply: `Listo, agregué ${qty}× ${prod.nombre}.`,
           action: { type: "ADD_TO_CART", product: { id: prod.id, nombre: prod.nombre, precio: prod.precio }, qty },
+          state: stateOut,
         });
       }
-      return res.status(200).json({ reply: "No ubiqué ese producto. Decime el nombre exacto." });
+      return res.status(200).json({ reply: `No ubiqué el producto. Decime el nombre exacto.`, state: stateOut });
     }
 
-    // --- Carrito: quitar
     if (has(t, "quita", "quitar", "remueve", "remover", "saca", "sacar", "elimina", "eliminar")) {
       const qty = parseQty(t);
-      const hint = extractProductHint(t);
-      const prod = await findFirstProductLike(hint);
+      let prod = null;
+
+      if (has(t, "esa", "ese", "primera", "primero")) {
+        if (stateIn.lastListIds?.length && stateIn.lastListNames?.length) {
+          prod = await findFirstLike(stateIn.lastListNames[0]) || null;
+        } else if (stateIn.lastProduct?.nombre) {
+          prod = await findFirstLike(stateIn.lastProduct.nombre) || null;
+        }
+      }
+      if (!prod) {
+        const hint = extractProductHint(t);
+        prod = await findFirstLike(hint);
+      }
+
       if (prod) {
+        stateOut.lastProduct = { id: prod.id, nombre: prod.nombre };
         return res.status(200).json({
-          reply: `Saqué ${qty}× ${prod.nombre}.`,
+          reply: `Ok, quité ${qty}× ${prod.nombre}.`,
           action: { type: "REMOVE_FROM_CART", product: { id: prod.id, nombre: prod.nombre }, qty },
+          state: stateOut,
         });
       }
-      return res.status(200).json({ reply: "No identifiqué cuál quitar. Decime el nombre." });
+      return res.status(200).json({ reply: `No identifiqué cuál quitar. Decime el nombre.`, state: stateOut });
     }
 
-    // --- Carrito: total
     if (has(t, "total", "cuanto sale", "cuánto sale", "cuanto es", "cuánto es", "monto", "pagar")) {
       return res.status(200).json({
-        reply: "Este es tu total:",
+        reply: `Este es tu total 👇`,
         action: { type: "GET_CART_TOTAL" },
+        state: stateOut,
       });
     }
 
-    // --- “precios de X”
+    // ========== 2) Preguntas de precio “precio de X” ==========
     if (has(t, "precio", "precios", "cuesta", "vale", "valen", "costo")) {
       const cat = detectCategory(t);
-      const list = cat ? await findProductsForIntent(cat, 6) : await findProductsByText(t, 6);
+      const list = cat ? await findByCategory(cat, 6) : await findByText(t, 6);
       if (list.length) {
-        return res.status(200).json({ reply: `${listWithPrices(list)}\n\n¿Te agrego alguno?` });
-      }
-      // si no hay, continúa a KB/LLM
-    }
-
-    // --- “¿tenés X?” (descubrimiento por categoría)
-    const askedCat = detectCategory(t);
-    if (askedCat) {
-      const list = await findProductsForIntent(askedCat, 6);
-      if (list.length) {
+        const first = list[0];
+        stateOut.lastCategory = cat || first.categoria || stateOut.lastCategory || null;
+        stateOut.lastProduct  = { id: first.id, nombre: first.nombre };
+        stateOut.lastListIds  = list.map((x) => x.id);
+        stateOut.lastListNames = list.map((x) => x.nombre);
         return res.status(200).json({
-          reply:
-            `${askedCat.charAt(0).toUpperCase() + askedCat.slice(1)}:\n\n${listWithPrices(list)}\n\n¿Querés alguno?`,
+          reply: list.length === 1 ? shortPriceLine(first) : listTop3(list),
+          state: stateOut,
         });
       }
-      // si no hay, continúa a KB/LLM
     }
 
-    // --- Fallback: KB + LLM (horarios, IG, feriados, etc.) — respuestas cortas
+    // ========== 3) Descubrimiento por categoría (“¿tenés empanadas?”) ==========
+    const askedCat = detectCategory(t);
+    if (askedCat) {
+      const list = await findByCategory(askedCat, 6);
+      if (list.length) {
+        stateOut.lastCategory = askedCat;
+        stateOut.lastProduct  = { id: list[0].id, nombre: list[0].nombre };
+        stateOut.lastListIds  = list.map((x) => x.id);
+        stateOut.lastListNames = list.map((x) => x.nombre);
+        return res.status(200).json({
+          reply: `${askedCat.charAt(0).toUpperCase() + askedCat.slice(1)}:\n${listTop3(list)}`,
+          state: stateOut,
+        });
+      }
+    }
+
+    // ========== 4) Preguntas tipo “¿qué tiene…?” usando el contexto ==========
+    if (has(t, "que tiene", "qué tiene", "ingrediente", "ingredientes", "de que es", "de qué es")) {
+      let prod = null;
+      if (stateIn.lastProduct?.nombre) prod = await findFirstLike(stateIn.lastProduct.nombre);
+      if (!prod && stateIn.lastListNames?.length) prod = await findFirstLike(stateIn.lastListNames[0]);
+      if (prod) {
+        stateOut.lastProduct = { id: prod.id, nombre: prod.nombre };
+        // No tenemos descripción en v_productos_publicos; respondemos útil sin inventar
+        return res.status(200).json({
+          reply: `${prod.nombre}: no tengo descripción interna. Te puedo confirmar precio (${toPY(prod.precio)} Gs) y agregarte al carrito.`,
+          state: stateOut,
+        });
+      }
+    }
+
+    // ========== 5) Fallback con RAG (horarios, IG, feriados, etc.) ==========
     const contexto = await kbLookup(userMsgRaw);
     const system = `
-Sos *Paniquiños Bot*, mozo virtual. Estilo: directo, amable y breve.
+Sos *Paniquiños Bot*, mozo virtual. Estilo directo, breve y cálido.
 Reglas:
-- Máximo 1–2 líneas, sin discursos.
-- Respondé SIEMPRE dentro del chat (sin abrir secciones).
-- No inventes precios/sabores. Si falta dato: “No tengo ese dato. Podés ver el catálogo o preguntarme otra cosa.”
+- Respondé en 1–2 líneas como humano; sin listas largas ni “secciones”.
+- No inventes precios ni sabores. Si falta dato, decí “No tengo ese dato” y ofrecé ver el catálogo o preguntar otra cosa.
 Contexto:
-${contexto || "(sin contexto de KB)"}`
-      .trim();
+${contexto || "(sin contexto de KB)"}
+`.trim();
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
@@ -249,8 +276,10 @@ ${contexto || "(sin contexto de KB)"}`
       ],
     });
 
-    const llmText = completion.choices?.[0]?.message?.content?.trim() || "¿Qué te gustaría pedir o consultar?";
-    return res.status(200).json({ reply: llmText });
+    const llmText =
+      completion.choices?.[0]?.message?.content?.trim() ||
+      "¿Qué te gustaría pedir o consultar?";
+    return res.status(200).json({ reply: llmText, state: stateOut });
   } catch (err) {
     console.error("Error /api/ask:", err);
     return res.status(500).json({ error: "Error interno del servidor" });
