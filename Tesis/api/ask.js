@@ -3,7 +3,7 @@ import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
 
 /**
- * ENV:
+ * ENV requeridas:
  * - SUPABASE_URL
  * - SUPABASE_SERVICE_ROLE
  * - OPENAI_API_KEY
@@ -21,26 +21,41 @@ const toPY = (v) => {
 };
 const norm = (s = "") =>
   s.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
-const has = (t, ...words) => words.some(w => t.includes(w));
+const has = (t, ...words) => words.some((w) => t.includes(w));
 
-/* ============== Cat/Intent helpers ============== */
+/* ============== Categorías & NLU ============== */
 const CATEGORY_MAP = [
-  { key: "empanadas",  terms: ["empanada", "empanadas"] },
-  { key: "bocaditos",  terms: ["bocadito", "bocaditos", "saladitos"] },
-  { key: "alfajores",  terms: ["alfajor", "alfajores"] },
-  { key: "tortas",     terms: ["torta", "tortas", "minitorta", "mini torta"] },
-  { key: "combos",     terms: ["combo", "combos"] },
+  { key: "empanadas", terms: ["empanada", "empanadas"] },
+  { key: "bocaditos", terms: ["bocadito", "bocaditos", "saladitos"] },
+  { key: "alfajores", terms: ["alfajor", "alfajores"] },
+  { key: "tortas", terms: ["torta", "tortas", "minitorta", "mini torta"] },
+  { key: "combos", terms: ["combo", "combos"] },
   { key: "confitería", terms: ["confiteria", "confitería", "dulces"] },
-  { key: "panificados",terms: ["pan", "panes", "panificados"] },
+  { key: "panificados", terms: ["pan", "panes", "panificados"] },
   { key: "rostisería", terms: ["rostiseria", "rosticeria", "rostisería", "rosticería"] },
 ];
+
+// Alias de cómo realmente figuran en categoria_nombre de la vista
+const CATEGORY_ALIASES = {
+  empanadas: ["rostisería", "rosticería", "rostiseria"], // tu catálogo mete empanadas en Rostisería
+  bocaditos: ["bocaditos"],
+  alfajores: ["alfajores"],
+  tortas: ["tortas"],
+  combos: ["combos"],
+  "confitería": ["confitería", "confiteria", "dulces"],
+  panificados: ["panificados", "pan", "panes"],
+  "rostisería": ["rostisería", "rosticería", "rostiseria"],
+};
+
 function detectCategory(q) {
   const t = norm(q);
-  for (const { key, terms } of CATEGORY_MAP) if (terms.some(w => t.includes(w))) return key;
+  for (const { key, terms } of CATEGORY_MAP) {
+    if (terms.some((w) => t.includes(w))) return key;
+  }
   return null;
 }
 
-/* ============== BD helpers ============== */
+/* ============== Acceso BD ============== */
 function rowToSimple(p) {
   return {
     id: p.id,
@@ -54,24 +69,48 @@ async function findProductsByText(q, limit = 6) {
   const t = norm(q);
   if (!t) return [];
   const tokens = t.split(" ").filter(Boolean).slice(0, 4);
-  const or = tokens.map(x => `nombre.ilike.%${x}%`).join(",");
+  if (!tokens.length) return [];
+  const or = tokens.map((x) => `nombre.ilike.%${x}%`).join(",");
   const { data, error } = await supa
     .from("v_productos_publicos")
     .select("id, nombre, precio, categoria_nombre")
     .or(or)
     .limit(limit);
-  if (error) { console.warn("findProductsByText:", error.message); return []; }
+  if (error) {
+    console.warn("findProductsByText:", error.message);
+    return [];
+  }
   return (data || []).map(rowToSimple);
 }
 
-async function findProductsByCategory(cat, limit = 6) {
+async function findProductsByCategoryNameLike(cat, limit = 6) {
   const { data, error } = await supa
     .from("v_productos_publicos")
     .select("id, nombre, precio, categoria_nombre")
     .ilike("categoria_nombre", `%${cat}%`)
     .limit(limit);
-  if (error) { console.warn("findProductsByCategory:", error.message); return []; }
+  if (error) {
+    console.warn("findProductsByCategoryNameLike:", error.message);
+    return [];
+  }
   return (data || []).map(rowToSimple);
+}
+
+// Intención “mostrar X”: prueba alias de categoría; si nada, busca por nombre
+async function findProductsForIntent(keyOrTerm, limit = 6) {
+  const aliases = CATEGORY_ALIASES[keyOrTerm] || [];
+  if (aliases.length) {
+    const orCat = aliases.map((a) => `categoria_nombre.ilike.%${a}%`).join(",");
+    const { data, error } = await supa
+      .from("v_productos_publicos")
+      .select("id, nombre, precio, categoria_nombre")
+      .or(orCat)
+      .limit(limit);
+    if (!error && data?.length) return data.map(rowToSimple);
+  }
+  const term = keyOrTerm === "empanadas" ? "empanad" : keyOrTerm; // “empanad%” cubre singular/plural
+  const byName = await findProductsByText(term, limit);
+  return byName;
 }
 
 async function findFirstProductLike(q) {
@@ -81,7 +120,7 @@ async function findFirstProductLike(q) {
 
 function listWithPrices(arr) {
   if (!arr.length) return "No encontré coincidencias.";
-  return arr.map(p => `• **${p.nombre}** — ${toPY(p.precio)} Gs`).join("\n");
+  return arr.map((p) => `• **${p.nombre}** — ${toPY(p.precio)} Gs`).join("\n");
 }
 
 /* ============== KB (RAG) ============== */
@@ -95,21 +134,27 @@ async function kbLookup(userMsgRaw) {
       query_embedding: emb.data[0].embedding,
       match_count: 5,
     });
-    if (error) { console.warn("kb_search:", error.message); return ""; }
-    return (data || []).map(r => r.content).join("\n");
+    if (error) {
+      console.warn("kb_search:", error.message);
+      return "";
+    }
+    return (data || []).map((r) => r.content).join("\n");
   } catch (e) {
     console.warn("RAG fail:", e?.message);
     return "";
   }
 }
 
-/* ============== NLU simple (carrito) ============== */
+/* ============== NLU carrito ============== */
 function parseQty(text) {
   const m = text.match(/\b(\d+)\b/);
   return m ? Math.max(1, parseInt(m[1], 10)) : 1;
 }
 function extractProductHint(text) {
-  let t = text.replace(/\b(agrega?r?|sumar?|pon(e|er)?|añadi(r|me)?|quitar?|remover?|saca?r?|elimina?r?)\b/g, " ");
+  let t = text.replace(
+    /\b(agrega?r?|agregame|sumar?|pon(e|er)?|añadi(r|me)?|quitar?|remover?|saca?r?|elimina?r?)\b/g,
+    " "
+  );
   t = t.replace(/\b(al|a|la|las|los|el|de|del|por|para|mi|me|al carrito|carrito)\b/g, " ");
   t = t.replace(/\s+/g, " ").trim();
   return t.length ? t : text;
@@ -120,74 +165,77 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Método no permitido" });
 
   try {
-    const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
+    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body || {};
     const userMsgRaw = body?.messages?.[0]?.content ?? "";
     const t = norm(userMsgRaw);
 
-    // -- Carrito: agregar
+    // --- Carrito: agregar
     if (has(t, "agrega", "agregame", "sumar", "pone", "poner", "añadi", "añade")) {
       const qty = parseQty(t);
       const hint = extractProductHint(t);
       const prod = await findFirstProductLike(hint);
       if (prod) {
         return res.status(200).json({
-          reply: `Agrego ${qty}× ${prod.nombre}.`,
-          action: { type: "ADD_TO_CART", product: { id: prod.id, nombre: prod.nombre, precio: prod.precio }, qty }
+          reply: `Agregué ${qty}× ${prod.nombre}.`,
+          action: { type: "ADD_TO_CART", product: { id: prod.id, nombre: prod.nombre, precio: prod.precio }, qty },
         });
       }
-      return res.status(200).json({ reply: `No ubiqué ese producto. ¿Nombre exacto?` });
+      return res.status(200).json({ reply: "No ubiqué ese producto. Decime el nombre exacto." });
     }
 
-    // -- Carrito: quitar
+    // --- Carrito: quitar
     if (has(t, "quita", "quitar", "remueve", "remover", "saca", "sacar", "elimina", "eliminar")) {
       const qty = parseQty(t);
       const hint = extractProductHint(t);
       const prod = await findFirstProductLike(hint);
       if (prod) {
         return res.status(200).json({
-          reply: `Quito ${qty}× ${prod.nombre}.`,
-          action: { type: "REMOVE_FROM_CART", product: { id: prod.id, nombre: prod.nombre }, qty }
+          reply: `Saqué ${qty}× ${prod.nombre}.`,
+          action: { type: "REMOVE_FROM_CART", product: { id: prod.id, nombre: prod.nombre }, qty },
         });
       }
-      return res.status(200).json({ reply: `No identifiqué cuál quitar. Decime el nombre.` });
+      return res.status(200).json({ reply: "No identifiqué cuál quitar. Decime el nombre." });
     }
 
-    // -- Carrito: total
+    // --- Carrito: total
     if (has(t, "total", "cuanto sale", "cuánto sale", "cuanto es", "cuánto es", "monto", "pagar")) {
       return res.status(200).json({
-        reply: `Este es tu total:`,
-        action: { type: "GET_CART_TOTAL" }
+        reply: "Este es tu total:",
+        action: { type: "GET_CART_TOTAL" },
       });
     }
 
-    // -- Consultas de “precios de X”
+    // --- “precios de X”
     if (has(t, "precio", "precios", "cuesta", "vale", "valen", "costo")) {
       const cat = detectCategory(t);
-      const list = cat ? await findProductsByCategory(cat, 6) : await findProductsByText(t, 6);
+      const list = cat ? await findProductsForIntent(cat, 6) : await findProductsByText(t, 6);
       if (list.length) {
         return res.status(200).json({ reply: `${listWithPrices(list)}\n\n¿Te agrego alguno?` });
       }
+      // si no hay, continúa a KB/LLM
     }
 
-    // -- Descubrimiento por categoría/consulta (“¿tenés empanadas?”)
+    // --- “¿tenés X?” (descubrimiento por categoría)
     const askedCat = detectCategory(t);
     if (askedCat) {
-      const list = await findProductsByCategory(askedCat, 6);
+      const list = await findProductsForIntent(askedCat, 6);
       if (list.length) {
         return res.status(200).json({
-          reply: `${askedCat.charAt(0).toUpperCase() + askedCat.slice(1)}:\n\n${listWithPrices(list)}\n\n¿Querés alguno?`
+          reply:
+            `${askedCat.charAt(0).toUpperCase() + askedCat.slice(1)}:\n\n${listWithPrices(list)}\n\n¿Querés alguno?`,
         });
       }
+      // si no hay, continúa a KB/LLM
     }
 
-    // -- Fallback con KB (horarios, IG, feriados, etc.)
+    // --- Fallback: KB + LLM (horarios, IG, feriados, etc.) — respuestas cortas
     const contexto = await kbLookup(userMsgRaw);
     const system = `
 Sos *Paniquiños Bot*, mozo virtual. Estilo: directo, amable y breve.
-Reglas de respuesta:
-- Máximo 1–2 líneas. Sin discursos ni explicaciones largas.
-- Nunca abras secciones ni “mostrás categorías”. Respondé SIEMPRE dentro del chat.
-- No inventes precios/sabores: si no hay datos, decí “No tengo ese dato” y ofrecé ver el catálogo o preguntar por otra cosa.
+Reglas:
+- Máximo 1–2 líneas, sin discursos.
+- Respondé SIEMPRE dentro del chat (sin abrir secciones).
+- No inventes precios/sabores. Si falta dato: “No tengo ese dato. Podés ver el catálogo o preguntarme otra cosa.”
 Contexto:
 ${contexto || "(sin contexto de KB)"}`
       .trim();
@@ -201,9 +249,7 @@ ${contexto || "(sin contexto de KB)"}`
       ],
     });
 
-    const llmText =
-      completion.choices?.[0]?.message?.content?.trim() ||
-      "¿Qué te gustaría pedir o consultar?";
+    const llmText = completion.choices?.[0]?.message?.content?.trim() || "¿Qué te gustaría pedir o consultar?";
     return res.status(200).json({ reply: llmText });
   } catch (err) {
     console.error("Error /api/ask:", err);
