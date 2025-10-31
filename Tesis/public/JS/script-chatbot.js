@@ -1,31 +1,26 @@
-// JS/script-chatbot.js  (type="module")
+// public/JS/script-chatbot.js
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 document.addEventListener("DOMContentLoaded", async () => {
   const chatContainer = document.querySelector(".chat-container");
-  const chatBody  = document.getElementById("chat-body");
-  const chatForm  = document.getElementById("chat-form");
-  const chatInput = document.getElementById("chat-input");
-  const toggler   = document.querySelector(".chatbot-toggler");
+  const chatBody       = document.getElementById("chat-body");
+  const chatForm       = document.getElementById("chat-form");
+  const chatInput      = document.getElementById("chat-input");
+  const toggler        = document.querySelector(".chatbot-toggler");
 
-  // ===== Supabase solo para saludo dinámico =====
+  // ===== Supabase (solo para saludo dinámico) =====
   const SUPABASE_URL = "https://jyygevitfnbwrvxrjexp.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5eWdldml0Zm5id3J2eHJqZXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2OTQ2OTYsImV4cCI6MjA3MTI3MDY5Nn0.St0IiSZSeELESshctneazCJHXCDBi9wrZ28UkiEDXYo";
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  // ===== UI helpers =====
+  /* ===== UI ===== */
   const appendMessage = (text, sender = "bot") => {
     const msg = document.createElement("div");
     msg.className = `msg ${sender}`;
-    // Permite ** y \n básicos
-    const safe = String(text || "")
-      .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
-      .replace(/\n/g, "<br/>");
-    msg.innerHTML = `<p>${safe}</p>`;
+    msg.innerHTML = `<p>${text}</p>`;
     chatBody.appendChild(msg);
     chatBody.scrollTop = chatBody.scrollHeight;
   };
-
   const showLoader = () => {
     const loader = document.createElement("div");
     loader.id = "loader";
@@ -43,14 +38,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     return "🌙 ¡Buenas noches";
   };
 
-  // ===== Toggle panel =====
   toggler?.addEventListener("click", () => {
     chatContainer.classList.toggle("open");
     toggler.classList.toggle("active");
     if (chatContainer.classList.contains("open")) setTimeout(() => chatInput.focus(), 150);
   });
 
-  // ===== Mensaje inicial =====
+  // Mensaje inicial
   (async () => {
     try {
       let nombre = null;
@@ -59,40 +53,66 @@ document.addEventListener("DOMContentLoaded", async () => {
         const { data } = await supabase.from("perfiles").select("nombre").eq("id", user.id).single();
         nombre = data?.nombre || user.email?.split("@")[0];
       }
-      appendMessage(`${saludo()}${nombre ? `, <b>${nombre}</b>` : ""}! 👋 Soy <b>Paniquiños Bot</b>. Pedime <b>tortas</b>, <b>empanadas</b>, <b>alfajores</b> o <b>combos</b>.`);
+      appendMessage(`${saludo()}${nombre ? `, *${nombre}*` : ""}! 👋 Soy *Paniquiños Bot*. Hablame como a un mozo: “precios de alfajores”, “agregá 2 empanadas de carne”, “total del carrito”…`);
     } catch {
-      appendMessage(`${saludo()}! 👋 Soy <b>Paniquiños Bot</b>. ¿Te ayudo con el menú?`);
+      appendMessage(`${saludo()}! 👋 Soy *Paniquiños Bot*. ¿Menú, precios o carrito?`);
     }
   })();
 
-  // ===== Ejecutar acciones del backend =====
-  const runAction = async (action, payload) => {
-    if (!action) return;
-    switch (action) {
-      case "show_category": {
-        const slug = payload?.slug;
-        if (!slug) return;
-        // Simula click en el botón de categoría si existe
-        const btn = document.getElementById(slug);
-        if (btn) btn.click();
-        // si no existe, intentamos buscar
-        else {
-          const search = document.getElementById("searchInput");
-          if (search) {
-            search.value = slug;
-            // dispara submit de búsqueda si existe
-            document.getElementById("searchForm")?.requestSubmit();
-          }
-        }
-        break;
-      }
-      // Futuros casos: "cart_add", "cart_total", etc.
-      default:
-        break;
-    }
-  };
+  /* ===== Integración de carrito (defensiva) ===== */
+  const PRODUCTS = () => (window.__PRODUCTS__ || []).map(p => ({
+    id: String(p.id),
+    nombre: p.nombre || p.titulo || "Producto",
+    precio: Number(p.precio || 0),
+    imagen: p.imagen,
+  }));
 
-  // ===== Envío =====
+  async function addToCartById(id, qty = 1) {
+    const prod = PRODUCTS().find(p => String(p.id) === String(id));
+    if (!prod) throw new Error("Producto no encontrado en catálogo del cliente");
+    if (!window.CartAPI?.addProduct) throw new Error("CartAPI.addProduct no disponible");
+    await window.CartAPI.addProduct(prod, qty);
+    await window.CartAPI.refreshBadge?.();
+    return prod;
+  }
+
+  async function removeFromCartById(id, qty = 1) {
+    // Se apoya en APIs existentes o en localStorage (fallback)
+    if (window.CartAPI?.removeProduct) {
+      await window.CartAPI.removeProduct(String(id), qty);
+      await window.CartAPI.refreshBadge?.();
+      return;
+    }
+    // Fallback: localStorage "carrito"
+    const raw = localStorage.getItem("carrito");
+    let items = [];
+    try { items = JSON.parse(raw || "[]"); } catch {}
+    let rest = qty;
+    items = items.flatMap(it => {
+      if (String(it.id) !== String(id)) return [it];
+      const cantidad = Number(it.cantidad || it.qty || 1);
+      const quitar = Math.min(rest, cantidad);
+      rest -= quitar;
+      const nueva = cantidad - quitar;
+      if (nueva > 0) return [{ ...it, cantidad: nueva }];
+      return [];
+    });
+    localStorage.setItem("carrito", JSON.stringify(items));
+    await window.CartAPI?.refreshBadge?.();
+  }
+
+  async function getCartSummary() {
+    if (window.CartAPI?.getSummary) {
+      return await window.CartAPI.getSummary();
+    }
+    // Fallback: localStorage
+    let items = [];
+    try { items = JSON.parse(localStorage.getItem("carrito") || "[]"); } catch {}
+    const total = items.reduce((s, it) => s + Number(it.precio || 0) * Number(it.cantidad || it.qty || 1), 0);
+    return { total, items };
+  }
+
+  /* ===== Envío ===== */
   chatForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const text = chatInput.value.trim();
@@ -103,7 +123,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     showLoader();
 
     try {
-      // Cerebro local primero
       const brain = window.ChatBrain && typeof window.ChatBrain.handleMessage === "function"
         ? window.ChatBrain
         : { handleMessage: async () => null };
@@ -111,12 +130,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       const local = await brain.handleMessage(text);
       if (local) {
         hideLoader();
-        appendMessage(local.text || "👌", "bot");
-        if (local.action) await runAction(local.action, local.payload);
+        appendMessage(local.text, "bot");
         return;
       }
 
-      // Backend
       const res = await fetch("/api/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -125,13 +142,52 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       const data = await res.json();
       hideLoader();
+
       if (!res.ok) {
         console.error("HTTP", res.status, data);
         appendMessage("⚠️ Ocurrió un problema. Probá de nuevo.", "bot");
         return;
       }
-      appendMessage(data.reply || "No pude responder ahora mismo 😅", "bot");
-      if (data.action) await runAction(data.action, data.payload);
+
+      if (data?.reply) appendMessage(data.reply, "bot");
+
+      // === Ejecutar acciones solicitadas por el backend ===
+      const act = data?.action;
+      if (act && typeof act === "object" && act.type) {
+        try {
+          switch (act.type) {
+            case "ADD_TO_CART": {
+              const { product, qty = 1 } = act;
+              const p = await addToCartById(product.id, qty);
+              appendMessage(`Agregado ✅ ${qty}× ${p?.nombre}. ¿Algo más?`, "bot");
+              break;
+            }
+            case "REMOVE_FROM_CART": {
+              const { product, qty = 1 } = act;
+              await removeFromCartById(product.id, qty);
+              appendMessage(`Listo, quité ${qty}× del producto.`, "bot");
+              break;
+            }
+            case "GET_CART_TOTAL": {
+              const { total, items } = await getCartSummary();
+              const lineas = (items || [])
+                .map(it => `• ${it.cantidad || it.qty || 1}× ${it.nombre || it.titulo} — ${toPY(it.precio || 0)} Gs`)
+                .join("\n");
+              appendMessage(
+                `${lineas ? `${lineas}\n\n` : ""}Total: **${toPY(total)} Gs**. ¿Confirmás el pedido o agregamos algo más?`,
+                "bot"
+              );
+              break;
+            }
+            default:
+              // si llega algo desconocido, solo lo logeamos
+              console.warn("Acción no manejada:", act);
+          }
+        } catch (err) {
+          console.error("Action error:", err);
+          appendMessage("No pude realizar esa acción del carrito 😢. Probá otra vez.", "bot");
+        }
+      }
     } catch (err) {
       console.error("Chat error:", err);
       hideLoader();
@@ -146,4 +202,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       chatForm.requestSubmit();
     }
   });
+
+  // Util local para formateo
+  function toPY(v) {
+    const n = Number(v || 0);
+    return n.toLocaleString("es-PY");
+  }
 });
