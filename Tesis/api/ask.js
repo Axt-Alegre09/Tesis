@@ -3,12 +3,11 @@ import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
 
 /**
- * ENV en Vercel:
+ * ENV:
  * - SUPABASE_URL
  * - SUPABASE_SERVICE_ROLE
  * - OPENAI_API_KEY
  */
-
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const supa = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE, {
   auth: { persistSession: false, autoRefreshToken: false },
@@ -20,13 +19,36 @@ const toPY = (v) => {
   if (!Number.isFinite(n)) return String(v ?? "");
   return n.toLocaleString("es-PY");
 };
-
 const norm = (s = "") =>
   s.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
-
 const has = (t, ...words) => words.some(w => t.includes(w));
 
+/* ============== Cat/Intent helpers ============== */
+const CATEGORY_MAP = [
+  { key: "empanadas",  terms: ["empanada", "empanadas"] },
+  { key: "bocaditos",  terms: ["bocadito", "bocaditos", "saladitos"] },
+  { key: "alfajores",  terms: ["alfajor", "alfajores"] },
+  { key: "tortas",     terms: ["torta", "tortas", "minitorta", "mini torta"] },
+  { key: "combos",     terms: ["combo", "combos"] },
+  { key: "confitería", terms: ["confiteria", "confitería", "dulces"] },
+  { key: "panificados",terms: ["pan", "panes", "panificados"] },
+  { key: "rostisería", terms: ["rostiseria", "rosticeria", "rostisería", "rosticería"] },
+];
+function detectCategory(q) {
+  const t = norm(q);
+  for (const { key, terms } of CATEGORY_MAP) if (terms.some(w => t.includes(w))) return key;
+  return null;
+}
+
 /* ============== BD helpers ============== */
+function rowToSimple(p) {
+  return {
+    id: p.id,
+    nombre: p.nombre,
+    precio: Number(p.precio || 0),
+    categoria: p.categoria_nombre || null,
+  };
+}
 
 async function findProductsByText(q, limit = 6) {
   const t = norm(q);
@@ -35,14 +57,21 @@ async function findProductsByText(q, limit = 6) {
   const or = tokens.map(x => `nombre.ilike.%${x}%`).join(",");
   const { data, error } = await supa
     .from("v_productos_publicos")
-    .select("id, nombre, precio, url_imagen, imagen, categoria_nombre")
+    .select("id, nombre, precio, categoria_nombre")
     .or(or)
     .limit(limit);
-  if (error) {
-    console.warn("findProductsByText:", error.message);
-    return [];
-  }
-  return data ?? [];
+  if (error) { console.warn("findProductsByText:", error.message); return []; }
+  return (data || []).map(rowToSimple);
+}
+
+async function findProductsByCategory(cat, limit = 6) {
+  const { data, error } = await supa
+    .from("v_productos_publicos")
+    .select("id, nombre, precio, categoria_nombre")
+    .ilike("categoria_nombre", `%${cat}%`)
+    .limit(limit);
+  if (error) { console.warn("findProductsByCategory:", error.message); return []; }
+  return (data || []).map(rowToSimple);
 }
 
 async function findFirstProductLike(q) {
@@ -50,40 +79,37 @@ async function findFirstProductLike(q) {
   return list?.[0] || null;
 }
 
-function formatPrices(arr) {
+function listWithPrices(arr) {
+  if (!arr.length) return "No encontré coincidencias.";
   return arr.map(p => `• **${p.nombre}** — ${toPY(p.precio)} Gs`).join("\n");
 }
 
 /* ============== KB (RAG) ============== */
 async function kbLookup(userMsgRaw) {
-  let contexto = "";
   try {
     const emb = await openai.embeddings.create({
       model: "text-embedding-3-small",
       input: userMsgRaw || "menu",
     });
-    const { data: ctx, error } = await supa.rpc("kb_search", {
+    const { data, error } = await supa.rpc("kb_search", {
       query_embedding: emb.data[0].embedding,
       match_count: 5,
     });
-    if (error) console.warn("kb_search error:", error.message);
-    if (ctx?.length) contexto = ctx.map(r => r.content).join("\n");
+    if (error) { console.warn("kb_search:", error.message); return ""; }
+    return (data || []).map(r => r.content).join("\n");
   } catch (e) {
     console.warn("RAG fail:", e?.message);
+    return "";
   }
-  return contexto;
 }
 
-/* ============== NLU muy enfocado (regex) ============== */
+/* ============== NLU simple (carrito) ============== */
 function parseQty(text) {
   const m = text.match(/\b(\d+)\b/);
   return m ? Math.max(1, parseInt(m[1], 10)) : 1;
 }
-
 function extractProductHint(text) {
-  // ejemplo: “2 empanadas de carne”, “agrega 3 alfajores”, “quitar combo 1”
-  // devolvemos lo que no sea verbo/stopword para buscar
-  let t = text.replace(/\b(agrega?r?|sumar?|pon(e|er)?|añadi(r|me)?|quitar?|remover?|saca?r?)\b/g, " ");
+  let t = text.replace(/\b(agrega?r?|sumar?|pon(e|er)?|añadi(r|me)?|quitar?|remover?|saca?r?|elimina?r?)\b/g, " ");
   t = t.replace(/\b(al|a|la|las|los|el|de|del|por|para|mi|me|al carrito|carrito)\b/g, " ");
   t = t.replace(/\s+/g, " ").trim();
   return t.length ? t : text;
@@ -98,78 +124,77 @@ export default async function handler(req, res) {
     const userMsgRaw = body?.messages?.[0]?.content ?? "";
     const t = norm(userMsgRaw);
 
-    // -------- INTENCIONES DE CARRITO (cliente ejecuta) --------
-    // ADD
-    if (has(t, "agrega", "agregame", "sumar", "pone", "poner", "añadi", "añadime", "añade", "agregar")) {
+    // -- Carrito: agregar
+    if (has(t, "agrega", "agregame", "sumar", "pone", "poner", "añadi", "añade")) {
       const qty = parseQty(t);
       const hint = extractProductHint(t);
       const prod = await findFirstProductLike(hint);
       if (prod) {
         return res.status(200).json({
-          reply: `¡Listo! Voy a agregar **${qty}× ${prod.nombre}** al carrito 🧺`,
-          action: { type: "ADD_TO_CART", product: { id: prod.id, nombre: prod.nombre, precio: Number(prod.precio) }, qty }
-        });
-      } else {
-        return res.status(200).json({
-          reply: `No ubiqué ese producto todavía. ¿Querés que te muestre opciones relacionadas?`
+          reply: `Agrego ${qty}× ${prod.nombre}.`,
+          action: { type: "ADD_TO_CART", product: { id: prod.id, nombre: prod.nombre, precio: prod.precio }, qty }
         });
       }
+      return res.status(200).json({ reply: `No ubiqué ese producto. ¿Nombre exacto?` });
     }
 
-    // REMOVE
+    // -- Carrito: quitar
     if (has(t, "quita", "quitar", "remueve", "remover", "saca", "sacar", "elimina", "eliminar")) {
       const qty = parseQty(t);
       const hint = extractProductHint(t);
       const prod = await findFirstProductLike(hint);
       if (prod) {
         return res.status(200).json({
-          reply: `Ok, quito **${qty}× ${prod.nombre}** del carrito.`,
+          reply: `Quito ${qty}× ${prod.nombre}.`,
           action: { type: "REMOVE_FROM_CART", product: { id: prod.id, nombre: prod.nombre }, qty }
         });
-      } else {
-        return res.status(200).json({ reply: `No identifiqué el producto a quitar. Decime el nombre exacto, por fa 😅` });
       }
+      return res.status(200).json({ reply: `No identifiqué cuál quitar. Decime el nombre.` });
     }
 
-    // TOTAL / RESUMEN
+    // -- Carrito: total
     if (has(t, "total", "cuanto sale", "cuánto sale", "cuanto es", "cuánto es", "monto", "pagar")) {
       return res.status(200).json({
-        reply: `Te digo el total actual del carrito 👇`,
+        reply: `Este es tu total:`,
         action: { type: "GET_CART_TOTAL" }
       });
     }
 
-    // -------- PREGUNTAS DE PRECIOS (respuesta con BD) --------
-    if (has(t, "precio", "precios", "cuesta", "vale", "valen", "costo", "cuánto")) {
-      const list = await findProductsByText(t, 6);
+    // -- Consultas de “precios de X”
+    if (has(t, "precio", "precios", "cuesta", "vale", "valen", "costo")) {
+      const cat = detectCategory(t);
+      const list = cat ? await findProductsByCategory(cat, 6) : await findProductsByText(t, 6);
+      if (list.length) {
+        return res.status(200).json({ reply: `${listWithPrices(list)}\n\n¿Te agrego alguno?` });
+      }
+    }
+
+    // -- Descubrimiento por categoría/consulta (“¿tenés empanadas?”)
+    const askedCat = detectCategory(t);
+    if (askedCat) {
+      const list = await findProductsByCategory(askedCat, 6);
       if (list.length) {
         return res.status(200).json({
-          reply: `Mirá estos precios:\n\n${formatPrices(list)}\n\n¿Te agrego alguno al carrito?`
+          reply: `${askedCat.charAt(0).toUpperCase() + askedCat.slice(1)}:\n\n${listWithPrices(list)}\n\n¿Querés alguno?`
         });
       }
     }
 
-    // -------- DESCUBRIMIENTO POR TEXTO (BD) --------
-    const candidates = await findProductsByText(t, 6);
-    if (candidates.length) {
-      return res.status(200).json({
-        reply: `Tengo esto relacionado:\n\n${formatPrices(candidates)}\n\n¿Querés que te agregue alguno? Decime el nombre o cantidad.`
-      });
-    }
-
-    // -------- RAG (KB: horarios, feriados, IG, contacto, etc.) --------
+    // -- Fallback con KB (horarios, IG, feriados, etc.)
     const contexto = await kbLookup(userMsgRaw);
     const system = `
-Sos *Paniquiños Bot*, mozo virtual de Paniquiños (Villa Elisa, PY).
-Hablás breve, natural y amable. No inventes datos: usá el Contexto si responde la pregunta.
-Si no hay datos, ofrecé ver el catálogo o ayudar con el carrito.
+Sos *Paniquiños Bot*, mozo virtual. Estilo: directo, amable y breve.
+Reglas de respuesta:
+- Máximo 1–2 líneas. Sin discursos ni explicaciones largas.
+- Nunca abras secciones ni “mostrás categorías”. Respondé SIEMPRE dentro del chat.
+- No inventes precios/sabores: si no hay datos, decí “No tengo ese dato” y ofrecé ver el catálogo o preguntar por otra cosa.
 Contexto:
-${contexto || "(sin contexto de KB)"}
-    `.trim();
+${contexto || "(sin contexto de KB)"}`
+      .trim();
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      temperature: 0.4,
+      temperature: 0.3,
       messages: [
         { role: "system", content: system },
         { role: "user", content: userMsgRaw || "Hola" },
@@ -178,8 +203,7 @@ ${contexto || "(sin contexto de KB)"}
 
     const llmText =
       completion.choices?.[0]?.message?.content?.trim() ||
-      "¿Querés que te muestre el menú por categorías o te ayudo con el carrito?";
-
+      "¿Qué te gustaría pedir o consultar?";
     return res.status(200).json({ reply: llmText });
   } catch (err) {
     console.error("Error /api/ask:", err);
