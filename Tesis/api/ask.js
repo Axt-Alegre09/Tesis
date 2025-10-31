@@ -3,130 +3,121 @@ import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
 
 /**
- * ENV obligatorias (en Vercel):
+ * ENV requeridas en Vercel:
  * - SUPABASE_URL
  * - SUPABASE_SERVICE_ROLE
  * - OPENAI_API_KEY
  */
-
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-// Service Role: SOLO en servidor
 const supa = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
-/* ===================== Utils ===================== */
+/* ==== Utils ==== */
 const toPY = (v) => {
   const n = Number(v);
   if (!Number.isFinite(n)) return String(v ?? "");
   return n.toLocaleString("es-PY");
 };
-
 const norm = (s = "") =>
   s.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
 
-// Mapeo de categorías y sinónimos
-const CATEGORY_MAP = [
-  { key: "empanadas", terms: ["empanada", "empanadas"] },
-  { key: "bocaditos", terms: ["bocadito", "bocaditos", "saladitos"] },
-  { key: "alfajores", terms: ["alfajor", "alfajores"] },
-  { key: "tortas", terms: ["torta", "tortas", "mini torta", "minitorta"] },
-  { key: "combos", terms: ["combo", "combos"] },
-  { key: "confitería", terms: ["confiteria", "confitería", "dulces"] },
-  { key: "panificados", terms: ["pan", "panes", "panificados"] },
-  { key: "rostisería", terms: ["rostiseria", "rosticeria", "rostisería", "rosticería"] },
+const CAT_ALIASES = [
+  { slug: "bocaditos",   terms: ["bocadito", "bocaditos", "saladitos", "chipitas"] },
+  { slug: "confiteria",  terms: ["confiteria", "confitería", "dulces", "alfajor", "alfajores"] },
+  { slug: "panificados", terms: ["pan", "panes", "panificados"] },
+  { slug: "rosticeria",  terms: ["rosticeria", "rostiseria", "rosticería", "rostisería", "empanada", "empanadas"] },
+  { slug: "tortas",      terms: ["torta", "tortas", "minitorta", "mini torta"] },
+  { slug: "combos",      terms: ["combo", "combos"] },
 ];
-
-function detectCategory(q) {
+function detectCategorySlug(q) {
   const t = norm(q);
-  for (const { key, terms } of CATEGORY_MAP) {
-    if (terms.some((w) => t.includes(w))) return key;
+  for (const { slug, terms } of CAT_ALIASES) {
+    if (terms.some(w => t.includes(w))) return slug;
   }
   return null;
 }
 
-// ============ Búsqueda texto libre ============
+function formatProductList(arr) {
+  return arr.map(p =>
+    `• **${p.nombre}** — ${toPY(p.precio)} Gs${Number(p.stock) > 0 ? ` (stock: ${p.stock})` : " (por encargo)"}`
+  ).join("\n");
+}
+
+/* ==== Catálogo (consulta directa cuando hay match) ==== */
 async function searchProductsByText(q, limit = 6) {
   const term = norm(q);
   if (!term) return [];
-
   const tokens = term.split(" ").filter(Boolean).slice(0, 3);
   if (!tokens.length) return [];
-
-  // Formato correcto para Supabase SDK
-  const orFilter = tokens.map((tk) => `nombre.ilike.%${tk}%`).join(",");
-
+  const orFilter = tokens.map(tk => `nombre.ilike.%${tk}%`).join(",");
   const { data, error } = await supa
     .from("productos")
-    .select("id, nombre, precio, stock, activo")
+    .select("id,nombre,precio,stock,activo")
     .eq("activo", true)
     .or(orFilter)
     .limit(limit);
-
   if (error) {
-    console.warn("searchProductsByText error:", error.message);
+    console.warn("searchProductsByText:", error.message);
     return [];
   }
   return data ?? [];
 }
 
-// ============ Búsqueda por categoría ============
-async function searchProductsByCategory(cat, limit = 6) {
-  if (!cat) return [];
+async function searchProductsByCategorySlug(slug, limit = 6) {
+  if (!slug) return [];
+  // Matchea por nombre de categoría en vista pública (si existe)
   const { data, error } = await supa
-    .from("productos")
-    .select("id, nombre, precio, stock, activo")
-    .eq("activo", true)
-    .ilike("nombre", `%${cat}%`)
+    .from("v_productos_publicos")
+    .select("id,nombre,precio,stock,activo,categoria_slug")
+    .eq("categoria_slug", slug)
     .limit(limit);
-  if (error) {
-    console.warn("searchProductsByCategory error:", error.message);
-    return [];
-  }
-  return data ?? [];
+  if (!error && data?.length) return data;
+
+  // Fallback: buscar por nombre contiene slug
+  const { data: d2, error: e2 } = await supa
+    .from("productos")
+    .select("id,nombre,precio,stock,activo")
+    .eq("activo", true)
+    .ilike("nombre", `%${slug}%`)
+    .limit(limit);
+  if (e2) console.warn("searchProductsByCategorySlug:", e2.message);
+  return d2 ?? [];
 }
 
-// ============ Formato lista ============
-function formatProductList(arr) {
-  return arr
-    .map(
-      (p) =>
-        `• **${p.nombre}** — ${toPY(p.precio)} Gs` +
-        (Number(p.stock) > 0 ? ` (stock: ${p.stock})` : ` (por encargo)`)
-    )
-    .join("\n");
-}
-
-/* ===================== Handler ===================== */
+/* ==== Handler ==== */
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Método no permitido" });
 
   try {
-    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body || {};
+    const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
     const userMsgRaw = body?.messages?.[0]?.content ?? "";
     const userMsg = norm(userMsgRaw);
 
-    // ---- 1) Intento directo ----
-    let productos = await searchProductsByText(userMsg, 6);
-
-    if (!productos.length) {
-      const cat = detectCategory(userMsg);
-      if (cat) productos = await searchProductsByCategory(cat, 6);
-      if (productos.length) {
-        const lista = formatProductList(productos);
-        return res.status(200).json({
-          reply: `Estas son algunas opciones de **${cat}** que tenemos:\n\n${lista}\n\n¿Querés más detalles o agrego alguna al carrito?`,
-        });
-      }
-    } else {
-      const lista = formatProductList(productos);
+    // 0) ¿piden explícitamente una categoría? -> acción UI
+    const slug = detectCategorySlug(userMsg);
+    if (slug) {
+      const prods = await searchProductsByCategorySlug(slug, 6);
+      const intro = prods.length
+        ? `Dale, te muestro *${slug}*.`
+        : `Te abro *${slug}*. Si no ves opciones, decime y buscamos algo parecido.`;
       return res.status(200).json({
-        reply: `Te paso lo más relacionado con lo que pediste:\n\n${lista}\n\n¿Querés ver más opciones similares?`,
+        reply: intro,
+        action: "show_category",
+        payload: { slug }
       });
     }
 
-    // ---- 2) RAG con kb_search ----
+    // 1) ¿hay match por texto en productos? -> respuesta concreta (sin LLM)
+    const productos = await searchProductsByText(userMsgRaw, 6);
+    if (productos.length) {
+      const lista = formatProductList(productos);
+      return res.status(200).json({
+        reply: `Encontré estas opciones:\n\n${lista}\n\n¿Querés que agregue alguna al carrito?`
+      });
+    }
+
+    // 2) RAG a tu KB (si no hubo nada de productos)
     let contexto = "";
     try {
       const emb = await openai.embeddings.create({
@@ -140,39 +131,35 @@ export default async function handler(req, res) {
         match_count: 5,
       });
       if (kbErr) console.warn("kb_search error:", kbErr.message);
-
-      if (ctx?.length) contexto = ctx.map((r) => r.content).join("\n");
+      if (ctx?.length) contexto = ctx.map(r => r.content).join("\n");
     } catch (e) {
-      console.warn("RAG falló, continuo sin contexto:", e?.message);
+      console.warn("RAG falló:", e?.message);
     }
 
-    // ---- 3) LLM (responde natural, tono mozo) ----
+    // 3) LLM (con tono mozo, breve y sin inventar)
     const system = `
-Sos *Paniquiños Bot*, un mozo virtual amable y alegre de la confitería Paniquiños (Villa Elisa, Paraguay).
-Tu misión es conversar como un humano, cálido y atento 🍰, recomendando productos reales sin inventar nada.
-Si no sabés algo, pedí consultar el catálogo. Respondé breve y natural, sin tecnicismos.
-Contexto adicional (puede estar vacío):
-${contexto || "(sin contexto de KB)"}
-`.trim();
+Sos *Paniquiños Bot*, mozo virtual de Paniquiños (Villa Elisa, Paraguay).
+Contestá cálido, breve y natural. NO inventes precios/variedades.
+Si falta info, ofrecé mostrar el catálogo por categoría o consultar al local.
+Contexto (KB):
+${contexto || "(sin contexto)"}`
+      .trim();
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      temperature: 0.5,
+      temperature: 0.4,
       messages: [
         { role: "system", content: system },
         { role: "user", content: userMsgRaw || "Hola" },
       ],
     });
 
-    const llmText =
-      completion.choices?.[0]?.message?.content?.trim() ||
-      "¿Querés que te muestre el menú o las promos de hoy? 🍰";
+    const llmText = completion.choices?.[0]?.message?.content?.trim()
+      || "¿Querés que te muestre por categorías (empanadas, bocaditos, alfajores, tortas o combos)?";
 
-    const safeHelp =
-      llmText +
-      `\n\nSi querés, te muestro directamente:\n• Empanadas\n• Bocaditos\n• Alfajores\n• Tortas\n• Combos\nDecime cuál preferís 😄`;
-
-    return res.status(200).json({ reply: safeHelp });
+    return res.status(200).json({
+      reply: llmText
+    });
   } catch (err) {
     console.error("Error /api/ask:", err);
     return res.status(500).json({ error: "Error interno del servidor" });
