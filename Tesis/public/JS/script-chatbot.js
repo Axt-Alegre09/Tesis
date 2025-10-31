@@ -1,19 +1,18 @@
-// public/JS/script-chatbot.js  (cargar con type="module")
+// public/JS/script-chatbot.js
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 document.addEventListener("DOMContentLoaded", async () => {
   const chatContainer = document.querySelector(".chat-container");
-  const chatBody       = document.getElementById("chat-body");
-  const chatForm       = document.getElementById("chat-form");
-  const chatInput      = document.getElementById("chat-input");
-  const toggler        = document.querySelector(".chatbot-toggler");
+  const chatBody = document.getElementById("chat-body");
+  const chatForm = document.getElementById("chat-form");
+  const chatInput = document.getElementById("chat-input");
+  const toggler = document.querySelector(".chatbot-toggler");
 
-  // ===== Supabase solo para saludo dinámico (opcional) =====
   const SUPABASE_URL = "https://jyygevitfnbwrvxrjexp.supabase.co";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5eWdldml0Zm5id3J2eHJqZXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2OTQ2OTYsImV4cCI6MjA3MTI3MDY5Nn0.St0IiSZSeELESshctneazCJHXCDBi9wrZ28UkiEDXYo";
+  const SUPABASE_ANON_KEY =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5eWdldml0Zm5id3J2eHJqZXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2OTQ2OTYsImV4cCI6MjA3MTI3MDY5Nn0.St0IiSZSeELESshctneazCJHXCDBi9wrZ28UkiEDXYo";
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  // ===== Utilidades UI =====
   const appendMessage = (text, sender = "bot") => {
     const msg = document.createElement("div");
     msg.className = `msg ${sender}`;
@@ -55,9 +54,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         const { data } = await supabase.from("perfiles").select("nombre").eq("id", user.id).single();
         nombre = data?.nombre || user.email?.split("@")[0];
       }
-      appendMessage(`${saludo()}${nombre ? `, *${nombre}*` : ""}! 👋 Soy *Paniquiños Bot*. Preguntame por *tortas*, *empanadas*, *alfajores* o *combos*.`);
+      appendMessage(`${saludo()}${nombre ? `, *${nombre}*` : ""}! 👋 Soy *Paniquiños Bot*. Podés preguntarme por *tortas*, *empanadas*, *alfajores* o *combos*.`);
     } catch {
-      appendMessage(`${saludo()}! 👋 Soy *Paniquiños Bot*. ¿Te ayudo con el menú o precios de hoy?`);
+      appendMessage(`${saludo()}! 👋 Soy *Paniquiños Bot*. ¿Querés conocer las promos o el menú de hoy?`);
     }
   })();
 
@@ -72,7 +71,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     showLoader();
 
     try {
-      // ⚠️ Fallback seguro si ChatBrain no existe
       const brain = window.ChatBrain && typeof window.ChatBrain.handleMessage === "function"
         ? window.ChatBrain
         : { handleMessage: async () => null };
@@ -84,7 +82,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         return;
       }
 
-      // Backend
       const res = await fetch("/api/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -93,20 +90,22 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       const data = await res.json();
       hideLoader();
+
       if (!res.ok) {
         console.error("HTTP", res.status, data);
-        appendMessage("⚠️ Ocurrió un problema. Probá de nuevo.", "bot");
+        appendMessage("⚠️ Ocurrió un problema al comunicar con el mozo virtual. Intentá de nuevo.", "bot");
         return;
       }
+
       appendMessage(data.reply || "No pude responder ahora mismo 😅", "bot");
     } catch (err) {
       console.error("Chat error:", err);
       hideLoader();
-      appendMessage("⚠️ Ocurrió un problema de conexión. Probá de nuevo.", "bot");
+      appendMessage("⚠️ Error de conexión. Intentá nuevamente.", "bot");
     }
   });
 
-  // Enter para enviar
+  // ===== Enter para enviar =====
   chatInput?.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();

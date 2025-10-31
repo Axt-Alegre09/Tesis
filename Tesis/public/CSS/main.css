@@ -546,3 +546,53 @@ main{
   .producto-titulo{ font-size: .9rem; }
   .producto-agregar{ padding: .38rem .55rem; font-size: .78rem; }
 }
+
+
+
+/* === User dropdown fallback (no rompe estilos existentes) === */
+.user-menu { position: relative; }
+
+.user-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .4rem .7rem;
+  border-radius: 999px;
+  border: 1px solid rgba(0,0,0,.08);
+  background: #fff;
+  cursor: pointer;
+}
+
+.user-chip .chevron { transition: transform .15s ease; }
+.user-chip.active .chevron,
+.user-chip[aria-expanded="true"] .chevron { transform: rotate(180deg); }
+
+.user-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 220px;
+  border: 1px solid rgba(0,0,0,.08);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(0,0,0,.12);
+  padding: 6px;
+  display: none;
+  z-index: 2000; /* Sobre topbar */
+}
+
+.user-dropdown.open { display: block; }
+
+.user-dropdown .dropdown-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  background: transparent;
+  border: 0;
+  font: inherit;
+  padding: .6rem .7rem;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.user-dropdown .dropdown-item:hover { background: #f7f7f7; }

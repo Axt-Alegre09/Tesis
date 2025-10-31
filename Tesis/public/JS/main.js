@@ -204,4 +204,52 @@ async function init() {
   });
 }
 
+
+// === User Menu Dropdown (safe, sin dependencias) ===
+(() => {
+  const menuWrap = document.querySelector('.user-menu');
+  const btn = document.getElementById('userMenuBtn');
+  const dd  = document.getElementById('userDropdown');
+
+  if (!menuWrap || !btn || !dd) return;
+
+  // Asegura posicionamiento relativo del contenedor
+  if (!getComputedStyle(menuWrap).position || getComputedStyle(menuWrap).position === 'static') {
+    menuWrap.style.position = 'relative';
+  }
+
+  // Accesibilidad
+  btn.setAttribute('aria-haspopup', 'true');
+  btn.setAttribute('aria-expanded', 'false');
+
+  const open = () => {
+    dd.classList.add('open');
+    btn.classList.add('active');
+    btn.setAttribute('aria-expanded', 'true');
+  };
+  const close = () => {
+    dd.classList.remove('open');
+    btn.classList.remove('active');
+    btn.setAttribute('aria-expanded', 'false');
+  };
+  const toggle = () => dd.classList.contains('open') ? close() : open();
+
+  // Click en el botón
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggle();
+  });
+
+  // Cerrar con click afuera
+  document.addEventListener('click', (e) => {
+    if (!menuWrap.contains(e.target)) close();
+  });
+
+  // Cerrar con Escape
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') close();
+  });
+})();
+
 init();

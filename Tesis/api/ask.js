@@ -23,27 +23,21 @@ const toPY = (v) => {
   return n.toLocaleString("es-PY");
 };
 
-// Normaliza texto para búsquedas simples
 const norm = (s = "") =>
-  s
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s]/gu, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  s.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
 
-// Sinónimos por categoría base
+// Mapeo de categorías y sinónimos
 const CATEGORY_MAP = [
-  { key: "empanadas",  terms: ["empanada", "empanadas"] },
-  { key: "bocaditos",  terms: ["bocadito", "bocaditos", "saladitos"] },
-  { key: "alfajores",  terms: ["alfajor", "alfajores"] },
-  { key: "tortas",     terms: ["torta", "tortas", "mini torta", "minitorta"] },
-  { key: "combos",     terms: ["combo", "combos"] },
+  { key: "empanadas", terms: ["empanada", "empanadas"] },
+  { key: "bocaditos", terms: ["bocadito", "bocaditos", "saladitos"] },
+  { key: "alfajores", terms: ["alfajor", "alfajores"] },
+  { key: "tortas", terms: ["torta", "tortas", "mini torta", "minitorta"] },
+  { key: "combos", terms: ["combo", "combos"] },
   { key: "confitería", terms: ["confiteria", "confitería", "dulces"] },
-  { key: "panificados",terms: ["pan", "panes", "panificados"] },
+  { key: "panificados", terms: ["pan", "panes", "panificados"] },
   { key: "rostisería", terms: ["rostiseria", "rosticeria", "rostisería", "rosticería"] },
 ];
 
-// Intenta detectar una categoría por palabras clave
 function detectCategory(q) {
   const t = norm(q);
   for (const { key, terms } of CATEGORY_MAP) {
@@ -52,14 +46,16 @@ function detectCategory(q) {
   return null;
 }
 
-// Búsqueda por texto libre en 'nombre'
+// ============ Búsqueda texto libre ============
 async function searchProductsByText(q, limit = 6) {
   const term = norm(q);
   if (!term) return [];
 
-  // Construimos un OR con hasta 3 tokens significativos
   const tokens = term.split(" ").filter(Boolean).slice(0, 3);
-  const orFilter = tokens.map((tk) => `ilike.nombre.%${tk}%`).join(",");
+  if (!tokens.length) return [];
+
+  // Formato correcto para Supabase SDK
+  const orFilter = tokens.map((tk) => `nombre.ilike.%${tk}%`).join(",");
 
   const { data, error } = await supa
     .from("productos")
@@ -75,7 +71,7 @@ async function searchProductsByText(q, limit = 6) {
   return data ?? [];
 }
 
-// Búsqueda por “categoría aproximada” (usa coincidencia en nombre)
+// ============ Búsqueda por categoría ============
 async function searchProductsByCategory(cat, limit = 6) {
   if (!cat) return [];
   const { data, error } = await supa
@@ -84,7 +80,6 @@ async function searchProductsByCategory(cat, limit = 6) {
     .eq("activo", true)
     .ilike("nombre", `%${cat}%`)
     .limit(limit);
-
   if (error) {
     console.warn("searchProductsByCategory error:", error.message);
     return [];
@@ -92,7 +87,7 @@ async function searchProductsByCategory(cat, limit = 6) {
   return data ?? [];
 }
 
-// Formatea lista “• Nombre — 12.345 Gs (stock…)”
+// ============ Formato lista ============
 function formatProductList(arr) {
   return arr
     .map(
@@ -108,14 +103,14 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Método no permitido" });
 
   try {
-    const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
-    const userMsg = norm(body?.messages?.[0]?.content ?? "");
+    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body || {};
+    const userMsgRaw = body?.messages?.[0]?.content ?? "";
+    const userMsg = norm(userMsgRaw);
 
-    // -------- 1) Intento directo por texto --------
+    // ---- 1) Intento directo ----
     let productos = await searchProductsByText(userMsg, 6);
 
     if (!productos.length) {
-      // -------- 1.5) Fallback por categoría aproximada --------
       const cat = detectCategory(userMsg);
       if (cat) productos = await searchProductsByCategory(cat, 6);
       if (productos.length) {
@@ -125,19 +120,18 @@ export default async function handler(req, res) {
         });
       }
     } else {
-      // match directo por texto
       const lista = formatProductList(productos);
-      return res
-        .status(200)
-        .json({ reply: `Te paso lo más relacionado con lo que pediste:\n\n${lista}\n\n¿Querés ver más opciones similares?` });
+      return res.status(200).json({
+        reply: `Te paso lo más relacionado con lo que pediste:\n\n${lista}\n\n¿Querés ver más opciones similares?`,
+      });
     }
 
-    // -------- 2) RAG con kb_search (si no hubo productos) --------
+    // ---- 2) RAG con kb_search ----
     let contexto = "";
     try {
       const emb = await openai.embeddings.create({
         model: "text-embedding-3-small",
-        input: userMsg || "menu",
+        input: userMsgRaw || "menu",
       });
       const embedding = emb.data[0].embedding;
 
@@ -152,33 +146,28 @@ export default async function handler(req, res) {
       console.warn("RAG falló, continuo sin contexto:", e?.message);
     }
 
-    // -------- 3) LLM con instrucciones bien acotadas --------
+    // ---- 3) LLM (responde natural, tono mozo) ----
     const system = `
-Sos "Paniquiños Bot", asistente virtual de la confitería Paniquiños (Villa Elisa, Paraguay).
-Objetivo: ayudar a descubrir productos (bocaditos, empanadas, alfajores, tortas y combos) sin inventar nada.
-Reglas:
-- Tono cálido y breve; emojis suaves 🍰🥟.
-- Si piden productos, sugerí categorías cercanas y pedí confirmación.
-- NO inventes sabores ni precios. Si falta info, ofrecé consultar o mostrar el catálogo.
-- Si preguntan por horarios, sugiere consultar el local/sitio.
-Contexto (puede estar vacío):
+Sos *Paniquiños Bot*, un mozo virtual amable y alegre de la confitería Paniquiños (Villa Elisa, Paraguay).
+Tu misión es conversar como un humano, cálido y atento 🍰, recomendando productos reales sin inventar nada.
+Si no sabés algo, pedí consultar el catálogo. Respondé breve y natural, sin tecnicismos.
+Contexto adicional (puede estar vacío):
 ${contexto || "(sin contexto de KB)"}
-    `.trim();
+`.trim();
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      temperature: 0.4,
+      temperature: 0.5,
       messages: [
         { role: "system", content: system },
-        { role: "user", content: userMsg || "Hola" },
+        { role: "user", content: userMsgRaw || "Hola" },
       ],
     });
 
     const llmText =
       completion.choices?.[0]?.message?.content?.trim() ||
-      "¿Te paso el catálogo por categorías (empanadas, bocaditos, alfajores, tortas y combos)?";
+      "¿Querés que te muestre el menú o las promos de hoy? 🍰";
 
-    // Si el LLM no encontró nada específico, guiamos a categorías reales
     const safeHelp =
       llmText +
       `\n\nSi querés, te muestro directamente:\n• Empanadas\n• Bocaditos\n• Alfajores\n• Tortas\n• Combos\nDecime cuál preferís 😄`;
