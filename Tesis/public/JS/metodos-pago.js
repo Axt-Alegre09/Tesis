@@ -1,5 +1,13 @@
 // JS/metodos-pago.js
-import { supabase } from './supabase.js';
+
+// Importar Supabase
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+// Configuración de Supabase
+const SUPABASE_URL = 'https://jyygevitfnbwrvxrjexp.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5eWdldml0Zm5id3J2eHJqZXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ1NTU5MzksImV4cCI6MjA1MDEzMTkzOX0.g3fEncynaqsubaY3OwnybJIjSm2oue61CY6c5Z3a7zg';
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // Variables globales
 let usuarioActual = null;
@@ -19,6 +27,12 @@ async function cargarUsuario() {
   try {
     const { data: { user }, error } = await supabase.auth.getUser();
     if (error) throw error;
+    
+    if (!user) {
+      window.location.href = 'login.html';
+      return;
+    }
+    
     usuarioActual = user;
   } catch (error) {
     console.error('Error al cargar usuario:', error);
@@ -43,8 +57,8 @@ async function cargarTarjetas() {
     if (!tarjetas || tarjetas.length === 0) {
       listaTarjetas.innerHTML = `
         <div class="empty-state">
-          <i class="bi bi-credit-card"></i>
-          <p>No tenés tarjetas guardadas</p>
+          <i class="bi bi-credit-card" style="font-size: 3rem; color: #999; margin-bottom: 1rem;"></i>
+          <p style="font-size: 1.1rem; margin-bottom: 0.5rem;">No tenés tarjetas guardadas</p>
           <p class="text-muted">Agregá una tarjeta para pagar más rápido</p>
         </div>
       `;
@@ -55,15 +69,24 @@ async function cargarTarjetas() {
     
     // Agregar eventos a los botones
     document.querySelectorAll('.btn-editar-tarjeta').forEach(btn => {
-      btn.addEventListener('click', (e) => editarTarjeta(e.target.closest('.btn-editar-tarjeta').dataset.id));
+      btn.addEventListener('click', (e) => {
+        const id = e.target.closest('.btn-editar-tarjeta').dataset.id;
+        editarTarjeta(id);
+      });
     });
 
     document.querySelectorAll('.btn-eliminar-tarjeta').forEach(btn => {
-      btn.addEventListener('click', (e) => eliminarTarjeta(e.target.closest('.btn-eliminar-tarjeta').dataset.id));
+      btn.addEventListener('click', (e) => {
+        const id = e.target.closest('.btn-eliminar-tarjeta').dataset.id;
+        eliminarTarjeta(id);
+      });
     });
 
     document.querySelectorAll('.btn-predeterminar').forEach(btn => {
-      btn.addEventListener('click', (e) => establecerPredeterminada(e.target.closest('.btn-predeterminar').dataset.id));
+      btn.addEventListener('click', (e) => {
+        const id = e.target.closest('.btn-predeterminar').dataset.id;
+        establecerPredeterminada(id);
+      });
     });
 
   } catch (error) {
@@ -470,15 +493,32 @@ function mostrarMensaje(texto, tipo = 'info') {
     <i class="bi bi-check-circle-fill"></i>
     ${texto}
   `;
+  alerta.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    opacity: 0;
+    transform: translateY(-20px);
+    transition: all 0.3s ease;
+  `;
   
   document.body.appendChild(alerta);
   
   setTimeout(() => {
-    alerta.classList.add('show');
+    alerta.style.opacity = '1';
+    alerta.style.transform = 'translateY(0)';
   }, 100);
 
   setTimeout(() => {
-    alerta.classList.remove('show');
+    alerta.style.opacity = '0';
+    alerta.style.transform = 'translateY(-20px)';
     setTimeout(() => alerta.remove(), 300);
   }, 3000);
 }
