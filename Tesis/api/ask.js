@@ -87,8 +87,19 @@ function initState(state) {
     history: state?.history || [],
     cart: state?.cart || {},
     lastCategory: state?.lastCategory || null,
-    // 🆕 NUEVO: Estado para recopilar datos de catering
-    cateringData: state?.cateringData || null,
+    // 🆕 NUEVO: Estado para recopilar datos de catering paso a paso
+    cateringData: state?.cateringData || {
+      enProgreso: false,
+      razonsocial: null,
+      tipoevento: null,
+      fecha: null,
+      hora: null,
+      tipocomida: null,
+      lugar: null,
+      invitados: null,
+      telefono: null,
+      email: null
+    },
   };
 }
 
@@ -135,12 +146,30 @@ async function buildContextForGPT(userMsg, state) {
   const total = carritoItems.reduce((sum, item) => 
     sum + (item.precio * item.qty), 0
   );
+
+  // 🆕 Contexto de catering en progreso
+  const cateringInfo = state.cateringData?.enProgreso ? 
+    `\n\n**CATERING EN PROGRESO:**
+Datos recopilados hasta ahora:
+${state.cateringData.razonsocial ? `- Nombre: ${state.cateringData.razonsocial}` : '- Nombre: FALTA'}
+${state.cateringData.tipoevento ? `- Tipo evento: ${state.cateringData.tipoevento}` : '- Tipo evento: FALTA'}
+${state.cateringData.fecha ? `- Fecha: ${state.cateringData.fecha}` : '- Fecha: FALTA'}
+${state.cateringData.hora ? `- Hora: ${state.cateringData.hora}` : '- Hora: FALTA'}
+${state.cateringData.tipocomida ? `- Menú: ${state.cateringData.tipocomida}` : '- Menú: FALTA'}
+${state.cateringData.lugar ? `- Lugar: ${state.cateringData.lugar}` : '- Lugar: FALTA'}
+${state.cateringData.invitados ? `- Invitados: ${state.cateringData.invitados}` : ''}
+${state.cateringData.telefono ? `- Teléfono: ${state.cateringData.telefono}` : ''}
+${state.cateringData.email ? `- Email: ${state.cateringData.email}` : ''}
+
+SOLO preguntá por los datos que dicen "FALTA". Si ya están completos los obligatorios, agendá automáticamente.`
+    : '';
   
   return {
     catalogo: catalogoTexto,
     carrito: carritoTexto,
     total: toPY(total),
-    totalNumerico: total
+    totalNumerico: total,
+    cateringInfo
   };
 }
 
@@ -169,6 +198,12 @@ Paniquiños ofrece servicio de catering para eventos. Podés agendar directament
 - Teléfono de contacto (opcional)
 - Email (opcional)
 
+**IMPORTANTE sobre CATERING:**
+- Los productos mencionados para catering NO se agregan al carrito
+- El catering se agenda en la base de datos y luego el cliente coordina detalles y pago por WhatsApp
+- Si el cliente pide productos para catering (ej: "Quiero Combo 1 para el catering"), anotá eso en "tipocomida" pero NO lo agregues al carrito
+- Solo agregá productos al carrito si el cliente dice explícitamente "agregá al carrito" o "quiero comprar ahora"
+
 Cuando el cliente mencione catering o eventos, recopilá los datos de forma conversacional y natural.
 
 **CATÁLOGO DISPONIBLE:**
@@ -177,22 +212,27 @@ ${context.catalogo}
 **CARRITO ACTUAL DEL CLIENTE:**
 ${context.carrito}
 **Total actual:** ${context.total} Gs
+${context.cateringInfo || ''}
 
 **INSTRUCCIONES:**
 1. Cuando te pregunten por productos o categorías, menciona SIEMPRE los nombres exactos y precios del catálogo
 2. Si preguntan "¿Tienen empanadas?" → Lista los tipos de empanadas con sus precios
 3. Si piden agregar algo, identifica el producto EXACTO del catálogo y responde confirmando
-4. Para agendar catering, recopilá los datos necesarios de forma conversacional
-5. Si faltan datos para agendar, preguntá amablemente por ellos uno a uno
-6. Cuando tengas todos los datos obligatorios, agendá automáticamente
-7. Cuando pregunten por el total, calcula sumando todo el carrito
-8. Si piden quitar algo, confirma qué se quitó y el nuevo total
-9. Si preguntan por horarios, delivery o contacto, usa la información de la tienda
-10. Sé conversacional pero preciso: usa los datos reales
-11. Usa formato claro cuando listes productos:
+4. **CATERING - Modo conversacional natural:**
+   - Recopilá datos UNO A LA VEZ, de forma natural
+   - RECORDÁ los datos que ya te dieron (no los pidas de nuevo)
+   - Si mencionan productos mientras agendás catering, agregalos al carrito pero SEGUÍ con el catering
+   - Cuando te den un producto/combo para el catering, preguntá "¿Algo más para el menú o seguimos con los datos?"
+   - Cuando tengas TODOS los datos obligatorios (nombre, tipo evento, fecha, hora, menú, lugar), agendá automáticamente
+   - Si falta algún dato, preguntá solo por ESE dato que falta
+5. Cuando pregunten por el total, calcula sumando todo el carrito
+6. Si piden quitar algo, confirma qué se quitó y el nuevo total
+7. Si preguntan por horarios, delivery o contacto, usa la información de la tienda
+8. Sé conversacional pero preciso: usa los datos reales
+9. Usa formato claro cuando listes productos:
     - Nombre: Precio Gs
-12. NUNCA inventes productos, precios o información de la tienda
-13. Mantén respuestas cortas (2-4 líneas) salvo que listen varios productos
+10. NUNCA inventes productos, precios o información de la tienda
+11. Mantén respuestas cortas (2-4 líneas) salvo que listen varios productos o estés en medio de agendar catering
 
 **ESTILO:**
 - Amigable y cercano (vos argentino/paraguayo)
@@ -373,6 +413,8 @@ async function processWithGPT(userMsg, state) {
         // 🆕 NUEVO CASO: Agendar catering
         case "agendar_catering": {
           try {
+            console.log('[CATERING] Intentando agendar con args:', args);
+            
             // Llamar a la función de Supabase
             const { data, error } = await supa.rpc("catering_agendar", {
               p_razonsocial: args.razonsocial,
@@ -388,8 +430,10 @@ async function processWithGPT(userMsg, state) {
             });
 
             if (error) {
+              console.error('[CATERING] Error de Supabase:', error);
+              
               // Si es error de cupo lleno
-              if (error.message.includes('Cupo lleno')) {
+              if (error.message.includes('Cupo lleno') || error.message.includes('cupo')) {
                 return {
                   reply: `❌ ${error.message}\n\n¿Querés probar con otra fecha? Los fines de semana tenemos más disponibilidad (hasta 3 servicios).`,
                   state
@@ -397,16 +441,30 @@ async function processWithGPT(userMsg, state) {
               }
               
               // Otro tipo de error
-              console.error("Error catering_agendar:", error);
               return {
-                reply: "Disculpá, hubo un problema al agendar. ¿Podés verificar los datos e intentar de nuevo?",
+                reply: `❌ Hubo un problema: ${error.message}\n\n¿Podés verificar los datos? Especialmente la fecha (debe ser YYYY-MM-DD) y hora (HH:MM).`,
                 state
               };
             }
 
-            // Éxito
+            console.log('[CATERING] Agendado exitosamente:', data);
+
+            // Éxito - Limpiar estado de catering
+            state.cateringData = {
+              enProgreso: false,
+              razonsocial: null,
+              tipoevento: null,
+              fecha: null,
+              hora: null,
+              tipocomida: null,
+              lugar: null,
+              invitados: null,
+              telefono: null,
+              email: null
+            };
+
             return {
-              reply: `🎉 ¡Listo! Tu servicio de catering fue agendado exitosamente.\n\n📋 **Detalles:**\n- Evento: ${args.tipoevento}\n- Fecha: ${args.fecha}\n- Hora: ${args.hora}\n- Lugar: ${args.lugar}\n- Menú: ${args.tipocomida}${args.invitados ? `\n- Invitados: ${args.invitados}` : ''}\n\n✅ Podés ver tu reserva en el panel de catering.\n💬 Para cambios, contactanos al +595 992 544 305`,
+              reply: `🎉 ¡Perfecto! Tu catering está pre-agendado.\n\n📋 **Resumen:**\n- Evento: ${args.tipoevento}\n- Fecha: ${args.fecha}\n- Hora: ${args.hora}\n- Lugar: ${args.lugar}\n- Menú: ${args.tipocomida}${args.invitados ? `\n- Invitados: ${args.invitados}` : ''}${args.telefono ? `\n- Contacto: ${args.telefono}` : ''}\n\n📱 **Siguiente paso:**\nContactanos por WhatsApp al **+595 992 544 305** para:\n✓ Confirmar disponibilidad\n✓ Ajustar menú y cantidades\n✓ Coordinar forma de pago (transferencia/efectivo)\n✓ Detalles finales del servicio\n\n¡Gracias por elegirnos! 😊`,
               action: {
                 type: "CATERING_AGENDADO",
                 data: data
@@ -415,9 +473,9 @@ async function processWithGPT(userMsg, state) {
             };
 
           } catch (err) {
-            console.error("Error agendar_catering:", err);
+            console.error("[CATERING] Error catch:", err);
             return {
-              reply: "Disculpá, hubo un error técnico al agendar. Por favor intentá de nuevo o contactanos por WhatsApp: +595 992 544 305",
+              reply: `⚠️ Error técnico: ${err.message}\n\nPor favor intentá de nuevo o contactanos por WhatsApp: +595 992 544 305`,
               state
             };
           }
