@@ -1,4 +1,4 @@
-/* ===== POPUP Recomendaciones Mejorado ===== */
+/* ===== POPUP Recomendaciones Mejorado y Responsive ===== */
 #recoModalOverlay[hidden] { 
   display: none; 
 }
@@ -6,12 +6,13 @@
 #recoModalOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.75); /* Más oscuro */
-  backdrop-filter: blur(4px); /* Blur más pronunciado */
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
   display: grid;
   place-items: center;
   z-index: 10000;
   animation: fadeIn 0.3s ease;
+  padding: 16px;
 }
 
 @keyframes fadeIn {
@@ -20,11 +21,11 @@
 }
 
 #recoModal {
-  width: min(1100px, calc(100vw - 32px));
+  width: min(1100px, 100%);
   max-height: min(90vh, 850px);
   background: #fff;
   border-radius: 20px;
-  border: 1px solid rgba(111, 92, 56, 0.15); /* Borde fino */
+  border: 1px solid rgba(111, 92, 56, 0.15);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   display: grid;
   grid-template-rows: auto 1fr;
@@ -82,6 +83,7 @@
   display: grid;
   place-items: center;
   transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
 .reco-close:hover {
@@ -139,6 +141,7 @@
   background: linear-gradient(135deg, rgba(111, 92, 56, 0.05) 0%, transparent 100%);
   opacity: 0;
   transition: opacity 0.3s ease;
+  pointer-events: none;
 }
 
 .reco-card:hover {
@@ -151,12 +154,51 @@
   opacity: 1;
 }
 
+/* Botón favorito en el card */
+.reco-btn-favorito {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  appearance: none;
+  border: 0;
+  background: rgba(255, 255, 255, 0.95);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: all 0.2s ease;
+}
+
+.reco-btn-favorito:hover {
+  transform: scale(1.1);
+  background: white;
+}
+
+.reco-btn-favorito i {
+  font-size: 1.2rem;
+  color: #6f5c38;
+  transition: all 0.2s ease;
+}
+
+.reco-btn-favorito.active i {
+  color: #e74c3c;
+}
+
+.reco-btn-favorito:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Badge de última compra */
 .reco-card[data-ultima="true"]::after {
   content: '🔥 Repetir';
   position: absolute;
   top: 12px;
-  right: 12px;
+  left: 12px;
   background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
   color: white;
   padding: 4px 10px;
@@ -268,6 +310,11 @@
   box-shadow: 0 4px 12px rgba(39, 174, 96, 0.3);
 }
 
+.reco-btn-add:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* Estados vacío */
 .reco-empty {
   grid-column: 1 / -1;
@@ -283,26 +330,240 @@
   opacity: 0.3;
 }
 
-/* Responsive */
+/* ========== RESPONSIVE ========== */
+
+/* Tablets grandes (hasta 1024px) */
+@media (max-width: 1024px) {
+  .reco-grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 18px;
+    padding: 24px;
+  }
+  
+  .reco-header h2 {
+    font-size: 1.3rem;
+  }
+}
+
+/* Tablets (hasta 768px) */
 @media (max-width: 768px) {
+  #recoModalOverlay {
+    padding: 12px;
+  }
+  
+  #recoModal {
+    border-radius: 16px;
+    max-height: 88vh;
+  }
+  
+  .reco-header {
+    padding: 16px 20px;
+  }
+  
+  .reco-header h2 {
+    font-size: 1.2rem;
+    gap: 8px;
+  }
+  
+  .reco-header h2::before {
+    font-size: 1.4rem;
+  }
+  
+  .reco-close {
+    width: 32px;
+    height: 32px;
+    font-size: 1.2rem;
+  }
+  
   .reco-grid {
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
     gap: 16px;
     padding: 20px;
+    max-height: calc(88vh - 80px);
+  }
+  
+  .reco-card {
+    padding: 12px;
+    gap: 10px;
+  }
+  
+  .reco-btn-favorito {
+    width: 32px;
+    height: 32px;
+    top: 10px;
+    right: 10px;
+  }
+  
+  .reco-btn-favorito i {
+    font-size: 1.1rem;
+  }
+  
+  .reco-card[data-ultima="true"]::after {
+    top: 10px;
+    left: 10px;
+    padding: 3px 8px;
+    font-size: 0.7rem;
+  }
+  
+  .reco-title {
+    font-size: 0.9rem;
+  }
+  
+  .reco-price {
+    font-size: 1rem;
+  }
+  
+  .reco-btn-add {
+    padding: 10px 0;
+    font-size: 0.9rem;
+  }
+}
+
+/* Móviles (hasta 480px) */
+@media (max-width: 480px) {
+  #recoModalOverlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+  
+  #recoModal {
+    width: 100%;
+    max-height: 92vh;
+    border-radius: 20px 20px 0 0;
+    animation: slideUpMobile 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  
+  @keyframes slideUpMobile {
+    from {
+      opacity: 0;
+      transform: translateY(100%);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .reco-header {
+    padding: 14px 16px;
   }
   
   .reco-header h2 {
     font-size: 1.1rem;
+    gap: 6px;
   }
   
-  #recoModal {
-    border-radius: 16px 16px 0 0;
-    max-height: 85vh;
+  .reco-header h2::before {
+    font-size: 1.2rem;
+  }
+  
+  .reco-close {
+    width: 30px;
+    height: 30px;
+    font-size: 1.1rem;
+  }
+  
+  .reco-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    padding: 16px;
+    max-height: calc(92vh - 70px);
+  }
+  
+  .reco-card {
+    padding: 10px;
+    gap: 8px;
+    border-radius: 12px;
+  }
+  
+  .reco-btn-favorito {
+    width: 28px;
+    height: 28px;
+    top: 8px;
+    right: 8px;
+  }
+  
+  .reco-btn-favorito i {
+    font-size: 1rem;
+  }
+  
+  .reco-card[data-ultima="true"]::after {
+    top: 8px;
+    left: 8px;
+    padding: 2px 6px;
+    font-size: 0.65rem;
+  }
+  
+  .reco-imgwrap {
+    border-radius: 10px;
+  }
+  
+  .reco-title {
+    font-size: 0.85rem;
+    line-height: 1.2;
+  }
+  
+  .reco-price {
+    font-size: 0.95rem;
+  }
+  
+  .reco-veces {
+    font-size: 0.75rem;
+  }
+  
+  .reco-btn-add {
+    padding: 9px 0;
+    font-size: 0.85rem;
+    border-radius: 10px;
+  }
+  
+  .reco-empty {
+    padding: 40px 16px;
+  }
+  
+  .reco-empty i {
+    font-size: 3rem;
   }
 }
 
-@media (max-width: 480px) {
+/* Móviles muy pequeños (hasta 360px) */
+@media (max-width: 360px) {
   .reco-grid {
     grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 12px;
+  }
+  
+  .reco-header h2 {
+    font-size: 1rem;
+  }
+  
+  .reco-title {
+    font-size: 0.8rem;
+  }
+  
+  .reco-price {
+    font-size: 0.9rem;
+  }
+  
+  .reco-btn-add {
+    padding: 8px 0;
+    font-size: 0.8rem;
+  }
+}
+
+/* Ajustes para landscape en móviles */
+@media (max-height: 600px) and (orientation: landscape) {
+  #recoModal {
+    max-height: 95vh;
+  }
+  
+  .reco-grid {
+    max-height: calc(95vh - 70px);
+    padding: 16px;
+  }
+  
+  .reco-header {
+    padding: 12px 20px;
   }
 }
