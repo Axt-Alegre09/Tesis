@@ -1,8 +1,8 @@
 // JS/historial.js
 import { supabase } from "./ScriptLogin.js";
 
-const contenedor = document.getElementById("pedidosContainer");
-const resumenBox = document.getElementById("resumen");
+const contenedor   = document.getElementById("pedidosContainer");
+const resumenBox   = document.getElementById("resumen");
 const filtroPeriodo = document.getElementById("filtroPeriodo");
 
 let TODOS_LOS_PEDIDOS = [];
@@ -13,9 +13,18 @@ function fmtGs(n) {
   return new Intl.NumberFormat("es-PY").format(Number(n || 0)) + " Gs";
 }
 
+function getTotalPedido(p) {
+  return Number(p.monto_total ?? 0);
+}
+
+function getNumeroPedido(p) {
+  // de momento usamos el id acortado como "número"
+  return p.id;
+}
+
 function estadoBadgeClase(estado) {
   const s = String(estado || "").toLowerCase();
-  if (s === "entregado" || s === "finalizado") return "entregado";
+  if (s === "finalizado") return "entregado";
   if (s === "en preparación" || s === "preparacion") return "preparacion";
   if (s === "cancelado") return "cancelado";
   return "pendiente";
@@ -37,20 +46,19 @@ function renderResumen(pedidosFiltrados) {
 
   const totalPedidos = pedidosFiltrados.length;
   const totalGs = pedidosFiltrados.reduce(
-    (acc, p) => acc + Number(p.total || 0),
+    (acc, p) => acc + getTotalPedido(p),
     0
   );
 
-  const entregados = pedidosFiltrados.filter(
-    (p) => String(p.estado || "").toLowerCase() === "entregado"
-      || String(p.estado || "").toLowerCase() === "finalizado"
+  const entregados = pedidosFiltrados.filter((p) =>
+    ["finalizado", "entregado"].includes(String(p.estado || "").toLowerCase())
   ).length;
 
   resumenBox.innerHTML = `
     <div class="card-resumen">
       <span class="label">Pedidos en el periodo</span>
       <span class="value">${totalPedidos}</span>
-      <span class="sub">${entregados} marcados como entregados</span>
+      <span class="sub">${entregados} marcados como finalizados</span>
     </div>
     <div class="card-resumen">
       <span class="label">Total consumido</span>
@@ -84,12 +92,15 @@ function renderPedidos(pedidosFiltrados) {
       });
 
       const estadoClase = estadoBadgeClase(p.estado);
+      const total = getTotalPedido(p);
+      const numero = getNumeroPedido(p);
+      const metodoPago = p.metodo_pago || null;
 
       return `
       <article class="pedido-card">
         <div class="pedido-main">
           <div class="pedido-header">
-            <span class="pedido-id">Pedido #${(p.numero || p.id || "").toString().slice(0, 8)}</span>
+            <span class="pedido-id">Pedido #${String(numero).slice(0, 8)}</span>
             <span class="badge-estado ${estadoClase}">${p.estado}</span>
           </div>
           <span class="pedido-fecha">
@@ -97,11 +108,11 @@ function renderPedidos(pedidosFiltrados) {
           </span>
           <div class="pedido-detalle">
             <span class="tag">
-              <i class="bi bi-currency-dollar"></i> Total: ${fmtGs(p.total)}
+              <i class="bi bi-currency-dollar"></i> Total: ${fmtGs(total)}
             </span>
             ${
-              p.metodo_pago
-                ? `<span class="tag"><i class="bi bi-credit-card"></i> ${p.metodo_pago}</span>`
+              metodoPago
+                ? `<span class="tag"><i class="bi bi-credit-card"></i> ${metodoPago}</span>`
                 : ""
             }
           </div>
@@ -139,6 +150,7 @@ function renderPedidos(pedidosFiltrados) {
 
 function aplicarFiltro() {
   const val = filtroPeriodo.value;
+
   if (!TODOS_LOS_PEDIDOS.length) {
     renderResumen([]);
     contenedor.innerHTML = "";
@@ -186,10 +198,11 @@ async function cargarHistorial() {
     return;
   }
 
+  // 👇 Ahora usamos los nombres reales: usuario_id, monto_total, creado_en, etc.
   const { data, error } = await supabase
     .from("pedidos")
-    .select("id, creado_en, total, estado, metodo_pago, numero")
-    .eq("user_id", user.id)
+    .select("id, usuario_id, estado, estado_pago, metodo_pago, monto_total, notas, creado_en, actualizado_en, paga_con")
+    .eq("usuario_id", user.id)
     .order("creado_en", { ascending: false });
 
   if (error) {
@@ -218,7 +231,7 @@ async function cargarHistorial() {
 
 async function descargarFactura(pedidoId) {
   try {
-    // Aquí podés conectar con una RPC que genere el PDF y devuelva una URL
+    // Asegurate de tener esta RPC creada; si no, después la armamos.
     const { data, error } = await supabase.rpc("generar_factura_pdf", {
       p_pedido_id: pedidoId,
     });
@@ -243,8 +256,6 @@ async function repetirPedido(pedidoId) {
     if (error) throw error;
 
     alert("Pedido agregado al carrito. Podés revisar tu carrito para confirmar.");
-    // Si tenés CartAPI y querés refrescar badge, podrías llamar a una RPC
-    // o recargar la página principal después.
   } catch (err) {
     console.error(err);
     alert("No se pudo repetir el pedido.");
