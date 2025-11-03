@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Métodos de Pago - Paniquiños</title>
+
+  <link rel="shortcut icon" href="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinosico.ico" type="image/x-icon">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="CSS/main.css">
+  <link rel="stylesheet" href="CSS/metodos-pago.css">
+</head>
+<body>
+  <div class="wrapper">
+    <aside>
+      <header>
+        <h1 class="logo">
+          <img class="logo-principal" src="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinos.png" alt="Paniquiños">
+        </h1>
+      </header>
+
+      <nav>
+        <ul>
+          <li><a class="boton-menu boton-volver" href="index.html"><i class="bi bi-arrow-return-left"></i> Volver al inicio</a></li>
+          <li><a class="boton-menu" href="carrito.html"><i class="bi bi-cart-fill"></i> Carrito</a></li>
+        </ul>
+      </nav>
+
+      <footer><p class="texto-footer">© Paniquiños</p></footer>
+    </aside>
+
+    <main>
+      <div class="metodos-container">
+        <h2 class="titulo-principal">Métodos de Pago</h2>
+        <p class="subtitulo">Guardá tus tarjetas para pagar más rápido</p>
+
+        <!-- Lista de tarjetas guardadas -->
+        <section class="tarjetas-guardadas" id="tarjetas-guardadas">
+          <h3>Tus tarjetas</h3>
+          <div id="lista-tarjetas" class="lista-tarjetas">
+            <div class="loading">
+              <div class="spinner-border" role="status"></div>
+              <span>Cargando tarjetas...</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Botón para agregar nueva tarjeta -->
+        <button class="btn-agregar-tarjeta" id="btn-agregar">
+          <i class="bi bi-plus-circle"></i> Agregar nueva tarjeta
+        </button>
+
+        <!-- Modal para agregar/editar tarjeta -->
+        <div class="modal-overlay" id="modal-tarjeta" hidden>
+          <div class="modal-content">
+            <button class="modal-close" id="modal-close">&times;</button>
+            
+            <h3 class="modal-title">Agregar tarjeta</h3>
+
+            <div class="card-form-container">
+              <!-- Tarjeta animada -->
+              <div class="credit-card" id="credit-card">
+                <div class="card-front">
+                  <div class="card-chip">
+                    <svg width="50" height="40" viewBox="0 0 50 40">
+                      <rect width="50" height="40" rx="5" fill="#d4af37"/>
+                      <rect x="5" y="5" width="15" height="12" rx="2" fill="#c99b2e"/>
+                      <rect x="25" y="5" width="15" height="12" rx="2" fill="#c99b2e"/>
+                      <rect x="5" y="22" width="15" height="12" rx="2" fill="#c99b2e"/>
+                      <rect x="25" y="22" width="15" height="12" rx="2" fill="#c99b2e"/>
+                    </svg>
+                  </div>
+                  <div class="card-logo">VISA</div>
+                  <div class="card-number" id="card-display-number">
+                    <span>####</span>
+                    <span>####</span>
+                    <span>####</span>
+                    <span>####</span>
+                  </div>
+                  <div class="card-holder">
+                    <div class="card-label">Nombre</div>
+                    <div class="card-value" id="card-display-name">TU NOMBRE</div>
+                  </div>
+                  <div class="card-expiry">
+                    <div class="card-label">Vencimiento</div>
+                    <div class="card-value" id="card-display-exp">MM/AA</div>
+                  </div>
+                </div>
+
+                <div class="card-back">
+                  <div class="card-strip"></div>
+                  <div class="card-cvv-container">
+                    <div class="card-cvv-label">CVV</div>
+                    <div class="card-cvv-value" id="card-display-cvv">***</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Formulario -->
+              <form class="card-form" id="form-tarjeta">
+                <div class="form-group">
+                  <label class="form-label" for="input-numero">Número de tarjeta</label>
+                  <input 
+                    class="form-input" 
+                    id="input-numero" 
+                    type="text" 
+                    inputmode="numeric"
+                    maxlength="19" 
+                    placeholder="4586 6651 0004 4785"
+                    required
+                  >
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="input-nombre">Nombre (como figura en la tarjeta)</label>
+                  <input 
+                    class="form-input" 
+                    id="input-nombre" 
+                    type="text" 
+                    placeholder="MARIA FLORENCIA DEM"
+                    required
+                  >
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group">
+                    <label class="form-label">Vencimiento</label>
+                    <div class="expiry-inputs">
+                      <select class="form-select" id="input-mes" required>
+                        <option value="">Mes</option>
+                        <option value="01">01</option>
+                        <option value="02">02</option>
+                        <option value="03">03</option>
+                        <option value="04">04</option>
+                        <option value="05">05</option>
+                        <option value="06">06</option>
+                        <option value="07">07</option>
+                        <option value="08">08</option>
+                        <option value="09">09</option>
+                        <option value="10">10</option>
+                        <option value="11">11</option>
+                        <option value="12">12</option>
+                      </select>
+                      <select class="form-select" id="input-anio" required>
+                        <option value="">Año</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label" for="input-cvv">CVV</label>
+                    <input 
+                      class="form-input" 
+                      id="input-cvv" 
+                      type="password"
+                      inputmode="numeric"
+                      maxlength="4" 
+                      placeholder="***"
+                      required
+                    >
+                  </div>
+                </div>
+
+                <div class="form-check">
+                  <input type="checkbox" id="input-predeterminado" class="form-checkbox">
+                  <label for="input-predeterminado">Usar como tarjeta predeterminada</label>
+                </div>
+
+                <div class="form-actions">
+                  <button type="button" class="btn-secondary" id="btn-cancelar">Cancelar</button>
+                  <button type="submit" class="btn-primary">
+                    <i class="bi bi-check-circle"></i> Guardar tarjeta
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Scripts -->
+  <script type="module">
+    import { requireAuth } from "./JS/ScriptLogin.js";
+    await requireAuth();
+  </script>
+  <script type="module" src="JS/metodos-pago.js"></script>
+</body>
+</html>
