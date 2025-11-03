@@ -6,13 +6,15 @@ const contenedorProductos = document.querySelector("#contenedor-productos");
 const botonesCategorias = document.querySelectorAll(".boton-categoria");
 const tituloPrincipal = document.querySelector("#titulo-principal");
 
-let CATALOGO = []; // cache del catálogo público
+let CATALOGO = [];            // cache del catálogo público
 let FAVORITOS_IDS = new Set(); // IDs de productos favoritos
 
 const IMG_FALLBACK = "https://placehold.co/512x512?text=Imagen";
 const STORAGE_BASE = "https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/";
 
-const fmtGs = (n) => new Intl.NumberFormat("es-PY").format(Number(n || 0)) + " Gs";
+const fmtGs = (n) =>
+  new Intl.NumberFormat("es-PY").format(Number(n || 0)) + " Gs";
+
 const slug = (s) =>
   String(s || "")
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
@@ -22,7 +24,9 @@ const toImg = (v) => {
   if (!v) return IMG_FALLBACK;
   let s = String(v).trim();
   if (/^https?:\/\//i.test(s)) return s;
-  if (s.toLowerCase().startsWith("productos/")) s = s.slice("productos/".length);
+  if (s.toLowerCase().startsWith("productos/")) {
+    s = s.slice("productos/".length);
+  }
   return STORAGE_BASE + encodeURIComponent(s);
 };
 
@@ -34,12 +38,12 @@ async function loadFavoritosIds() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { data, error } = await supabase.rpc('get_favoritos');
+    const { data, error } = await supabase.rpc("get_favoritos");
     if (error) throw error;
 
-    FAVORITOS_IDS = new Set((data || []).map(f => f.producto_id));
+    FAVORITOS_IDS = new Set((data || []).map((f) => f.producto_id));
   } catch (error) {
-    console.error('Error cargar favoritos:', error);
+    console.error("Error cargar favoritos:", error);
   }
 }
 
@@ -47,38 +51,37 @@ async function loadFavoritosIds() {
 async function toggleFavorito(productoId, btn) {
   try {
     const { data: { user } } = await supabase.auth.getUser();
-    
+
     if (!user) {
-      showToast('Debes iniciar sesión para guardar favoritos', 'warning');
-      setTimeout(() => window.location.href = 'login.html', 1500);
+      showToast("Debes iniciar sesión para guardar favoritos", "warning");
+      setTimeout(() => (window.location.href = "login.html"), 1500);
       return;
     }
-    
+
     btn.disabled = true;
-    
-    const { data, error } = await supabase.rpc('toggle_favorito', {
-      p_producto_id: productoId
+
+    const { data, error } = await supabase.rpc("toggle_favorito", {
+      p_producto_id: productoId,
     });
-    
+
     if (error) throw error;
-    
+
     const result = data[0];
     const esFavorito = result.es_favorito;
-    
+
     // Actualizar el Set local
     if (esFavorito) {
       FAVORITOS_IDS.add(productoId);
     } else {
       FAVORITOS_IDS.delete(productoId);
     }
-    
+
     // Actualizar UI del botón
     updateFavoritoButton(btn, esFavorito);
-    showToast(result.mensaje, 'success');
-    
+    showToast(result.mensaje, "success");
   } catch (error) {
-    console.error('Error toggle favorito:', error);
-    showToast('Error al actualizar favorito', 'error');
+    console.error("Error toggle favorito:", error);
+    showToast("Error al actualizar favorito", "error");
   } finally {
     btn.disabled = false;
   }
@@ -86,28 +89,36 @@ async function toggleFavorito(productoId, btn) {
 
 // Actualizar UI del botón de favorito
 function updateFavoritoButton(btn, esFavorito) {
-  const icon = btn.querySelector('i');
+  const icon = btn.querySelector("i");
+  if (!icon) return;
+
   if (esFavorito) {
-    icon.classList.remove('bi-heart');
-    icon.classList.add('bi-heart-fill');
-    btn.classList.add('active');
+    icon.classList.remove("bi-heart");
+    icon.classList.add("bi-heart-fill");
+    btn.classList.add("active");
   } else {
-    icon.classList.remove('bi-heart-fill');
-    icon.classList.add('bi-heart');
-    btn.classList.remove('active');
+    icon.classList.remove("bi-heart-fill");
+    icon.classList.add("bi-heart");
+    btn.classList.remove("active");
   }
+
+  // animación de latido
+  btn.classList.add("animate");
+  setTimeout(() => btn.classList.remove("animate"), 400);
 }
 
 // Toast notification
-function showToast(message, type = 'success') {
-  const toast = document.createElement('div');
+function showToast(message, type = "success") {
+  const toast = document.createElement("div");
   toast.className = `toast toast-${type}`;
   toast.textContent = message;
   toast.style.cssText = `
     position: fixed;
     bottom: 24px;
     right: 24px;
-    background: ${type === 'error' ? '#e74c3c' : type === 'warning' ? '#f39c12' : '#27ae60'};
+    background: ${
+      type === "error" ? "#e74c3c" : type === "warning" ? "#f39c12" : "#27ae60"
+    };
     color: white;
     padding: 12px 20px;
     border-radius: 8px;
@@ -116,27 +127,27 @@ function showToast(message, type = 'success') {
     animation: slideInToast 0.3s ease;
     font-family: inherit;
   `;
-  
-  const style = document.createElement('style');
+
+  const style = document.createElement("style");
   style.textContent = `
     @keyframes slideInToast {
       from { transform: translateX(100%); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
+      to   { transform: translateX(0);   opacity: 1; }
     }
     @keyframes slideOutToast {
-      from { transform: translateX(0); opacity: 1; }
-      to { transform: translateX(100%); opacity: 0; }
+      from { transform: translateX(0);   opacity: 1; }
+      to   { transform: translateX(100%); opacity: 0; }
     }
   `;
-  if (!document.querySelector('style[data-toast]')) {
-    style.setAttribute('data-toast', '');
+  if (!document.querySelector("style[data-toast]")) {
+    style.setAttribute("data-toast", "");
     document.head.appendChild(style);
   }
-  
+
   document.body.appendChild(toast);
-  
+
   setTimeout(() => {
-    toast.style.animation = 'slideOutToast 0.3s ease';
+    toast.style.animation = "slideOutToast 0.3s ease";
     setTimeout(() => toast.remove(), 300);
   }, 3000);
 }
@@ -149,17 +160,19 @@ async function fetchProductosCatalogo() {
     .from("v_productos_publicos")
     .select("*")
     .order("nombre");
+
   if (error) {
     console.error("Carga catálogo:", error);
     return [];
   }
+
   return (data || []).map((p) => ({
     id: p.id,
     nombre: p.nombre,
     titulo: p.nombre,
     imagen: toImg(p.imagen || p.url_imagen),
     precio: p.precio,
-    categoria: { id: p.categoria_slug, nombre: p.categoria_nombre }
+    categoria: { id: p.categoria_slug, nombre: p.categoria_nombre },
   }));
 }
 
@@ -169,45 +182,47 @@ async function fetchPopularesPortada(limit = 12) {
     .from("populares_para_portada")
     .select("*")
     .limit(limit);
+
   if (error) {
     console.error("Populares:", error);
     return [];
   }
+
   return (data || []).map((p) => ({
     id: p.id,
     nombre: p.nombre,
     titulo: p.nombre,
     imagen: toImg(p.url_imagen || p.imagen),
-    precio: p.precio
+    precio: p.precio,
   }));
 }
 
-// 3) Cargar favoritos
+// 3) Cargar favoritos (para página Mis Favoritos)
 async function fetchFavoritos() {
   try {
     const { data: { user } } = await supabase.auth.getUser();
-    
+
     if (!user) {
-      return { error: 'not_authenticated', productos: [] };
+      return { error: "not_authenticated", productos: [] };
     }
-    
-    const { data, error } = await supabase.rpc('get_favoritos');
-    
+
+    const { data, error } = await supabase.rpc("get_favoritos");
+
     if (error) throw error;
-    
+
     return {
       error: null,
-      productos: (data || []).map(f => ({
+      productos: (data || []).map((f) => ({
         id: f.producto_id,
         nombre: f.nombre,
         titulo: f.nombre,
         imagen: toImg(f.imagen),
         precio: f.precio,
-        categoria: { nombre: f.categoria_nombre }
-      }))
+        categoria: { nombre: f.categoria_nombre },
+      })),
     };
   } catch (error) {
-    console.error('Error cargar favoritos:', error);
+    console.error("Error cargar favoritos:", error);
     return { error: error.message, productos: [] };
   }
 }
@@ -216,7 +231,7 @@ async function fetchFavoritos() {
 
 function montar(productos, esFavoritos = false) {
   contenedorProductos.innerHTML = "";
-  
+
   if (!productos.length) {
     if (esFavoritos) {
       contenedorProductos.innerHTML = `
@@ -227,33 +242,42 @@ function montar(productos, esFavoritos = false) {
         </div>
       `;
     } else {
-      contenedorProductos.innerHTML = `<div class="alerta-vacia">No hay productos para mostrar.</div>`;
+      contenedorProductos.innerHTML =
+        '<div class="alerta-vacia">No hay productos para mostrar.</div>';
     }
     return;
   }
-  
+
   for (const producto of productos) {
     const div = document.createElement("div");
     div.className = "producto";
     div.dataset.id = producto.id;
-    
+
     const esFav = FAVORITOS_IDS.has(producto.id);
-    
+
     div.innerHTML = `
-      <button class="btn-favorito ${esFav ? 'active' : ''}" data-producto-id="${producto.id}" aria-label="Favorito">
-        <i class="bi ${esFav ? 'bi-heart-fill' : 'bi-heart'}"></i>
+      <img class="producto-imagen" src="${
+        producto.imagen || IMG_FALLBACK
+      }" alt="${producto.titulo}">
+      <button class="btn-favorito ${esFav ? "active" : ""}"
+              data-producto-id="${producto.id}"
+              aria-label="Favorito">
+        <i class="bi ${esFav ? "bi-heart-fill" : "bi-heart"}"></i>
       </button>
-      <img class="producto-imagen" src="${producto.imagen || IMG_FALLBACK}" alt="${producto.titulo}">
       <div class="producto-detalles">
         <h3 class="producto-titulo">${producto.titulo}</h3>
         <b><p class="producto-precio">${fmtGs(producto.precio)}</p></b>
         <button class="producto-agregar" data-id="${producto.id}">Agregar</button>
-      </div>`;
-    
-    div.querySelector(".producto-imagen")?.addEventListener("error", (e) => (e.currentTarget.src = IMG_FALLBACK));
+      </div>
+    `;
+
+    div
+      .querySelector(".producto-imagen")
+      ?.addEventListener("error", (e) => (e.currentTarget.src = IMG_FALLBACK));
+
     contenedorProductos.appendChild(div);
   }
-  
+
   // Handler botón favorito
   document.querySelectorAll(".btn-favorito").forEach((btn) => {
     btn.addEventListener("click", (e) => {
@@ -262,27 +286,42 @@ function montar(productos, esFavoritos = false) {
       toggleFavorito(id, e.currentTarget);
     });
   });
-  
-  // Handler Agregar
+
+  // Handler Agregar al carrito
   document.querySelectorAll(".producto-agregar").forEach((btn) => {
     btn.addEventListener("click", async (e) => {
       const id = e.currentTarget.dataset.id;
-      const prod = [...productos, ...CATALOGO].find((p) => String(p.id) === String(id)) || null;
-      const fallbackProd = prod || (() => {
-        const card = e.currentTarget.closest(".producto");
-        const nombre = card?.querySelector(".producto-titulo")?.textContent?.trim() || "Producto";
-        const precioText = card?.querySelector(".producto-precio")?.textContent || "0";
-        const precioNum = Number((precioText.replace(/[^\d]/g, "")) || 0);
-        return { id, nombre, titulo: nombre, precio: precioNum, imagen: card?.querySelector("img")?.src || IMG_FALLBACK };
-      })();
+      const prod =
+        [...productos, ...CATALOGO].find(
+          (p) => String(p.id) === String(id)
+        ) || null;
+
+      const fallbackProd =
+        prod ||
+        (() => {
+          const card = e.currentTarget.closest(".producto");
+          const nombre =
+            card?.querySelector(".producto-titulo")?.textContent?.trim() ||
+            "Producto";
+          const precioText =
+            card?.querySelector(".producto-precio")?.textContent || "0";
+          const precioNum = Number(precioText.replace(/[^\d]/g, "") || 0);
+          return {
+            id,
+            nombre,
+            titulo: nombre,
+            precio: precioNum,
+            imagen: card?.querySelector("img")?.src || IMG_FALLBACK,
+          };
+        })();
 
       try {
         await window.CartAPI.addProduct(fallbackProd, 1);
         await window.CartAPI.refreshBadge();
-        showToast('Producto agregado al carrito', 'success');
+        showToast("Producto agregado al carrito", "success");
       } catch (err) {
         console.error("addProduct:", err);
-        showToast('No se pudo agregar. Intenta de nuevo.', 'error');
+        showToast("No se pudo agregar. Intenta de nuevo.", "error");
       }
     });
   });
@@ -296,7 +335,8 @@ function wireCategorias() {
       const filtro = slug(boton.id);
       if (filtro && filtro !== "todos") {
         const alguno = CATALOGO.find((p) => p.categoria.id === filtro);
-        tituloPrincipal.textContent = alguno?.categoria?.nombre || "Productos";
+        tituloPrincipal.textContent =
+          alguno?.categoria?.nombre || "Productos";
         montar(CATALOGO.filter((p) => p.categoria.id === filtro));
       } else {
         tituloPrincipal.textContent = "Todos los productos";
@@ -315,23 +355,29 @@ async function buscar(q) {
     montar(CATALOGO);
     return;
   }
+
   const { data, error } = await supabase
     .from("v_productos_publicos")
     .select("*")
-    .or(`nombre.ilike.%${s}%, descripcion.ilike.%${s}%, categoria_nombre.ilike.%${s}%`)
+    .or(
+      `nombre.ilike.%${s}%, descripcion.ilike.%${s}%, categoria_nombre.ilike.%${s}%`
+    )
     .order("nombre");
+
   if (error) {
     console.error("buscar:", error);
     return;
   }
+
   const resultados = (data || []).map((p) => ({
     id: p.id,
     nombre: p.nombre,
     titulo: p.nombre,
     imagen: toImg(p.imagen || p.url_imagen),
     precio: p.precio,
-    categoria: { id: p.categoria_slug, nombre: p.categoria_nombre }
+    categoria: { id: p.categoria_slug, nombre: p.categoria_nombre },
   }));
+
   tituloPrincipal.textContent = `Resultados para "${s}" (${resultados.length})`;
   montar(resultados);
 }
@@ -341,14 +387,14 @@ async function buscar(q) {
 async function init() {
   // Detectar si estamos en la página de favoritos
   const urlParams = new URLSearchParams(window.location.search);
-  const categoria = urlParams.get('categoria');
-  
-  if (categoria === 'favoritos') {
+  const categoria = urlParams.get("categoria");
+
+  if (categoria === "favoritos") {
     // Cargar página de favoritos
     tituloPrincipal.textContent = "Mis Favoritos";
     const { error, productos } = await fetchFavoritos();
-    
-    if (error === 'not_authenticated') {
+
+    if (error === "not_authenticated") {
       contenedorProductos.innerHTML = `
         <div class="empty-state">
           <i class="bi bi-heart" style="font-size: 4rem; opacity: 0.3;"></i>
@@ -358,22 +404,22 @@ async function init() {
       `;
       return;
     }
-    
+
     await loadFavoritosIds();
     montar(productos, true);
     return;
   }
-  
+
   // Flujo normal (catálogo)
   CATALOGO = await fetchProductosCatalogo();
   await loadFavoritosIds(); // Cargar favoritos del usuario
-  
-  window.__PRODUCTS__ = CATALOGO.map((p) => ({ 
-    id: p.id, 
-    nombre: p.nombre, 
-    titulo: p.titulo, 
-    precio: p.precio, 
-    imagen: p.imagen 
+
+  window.__PRODUCTS__ = CATALOGO.map((p) => ({
+    id: p.id,
+    nombre: p.nombre,
+    titulo: p.titulo,
+    precio: p.precio,
+    imagen: p.imagen,
   }));
 
   // Home feed: Populares → Catálogo
@@ -416,84 +462,88 @@ async function init() {
 
 // === User Menu Dropdown ===
 (() => {
-  const menuWrap = document.querySelector('.user-menu');
-  const btn = document.getElementById('userMenuBtn');
-  const dd  = document.getElementById('userDropdown');
+  const menuWrap = document.querySelector(".user-menu");
+  const btn = document.getElementById("userMenuBtn");
+  const dd = document.getElementById("userDropdown");
 
   if (!menuWrap || !btn || !dd) return;
 
-  if (!getComputedStyle(menuWrap).position || getComputedStyle(menuWrap).position === 'static') {
-    menuWrap.style.position = 'relative';
+  if (
+    !getComputedStyle(menuWrap).position ||
+    getComputedStyle(menuWrap).position === "static"
+  ) {
+    menuWrap.style.position = "relative";
   }
 
-  btn.setAttribute('aria-haspopup', 'true');
-  btn.setAttribute('aria-expanded', 'false');
+  btn.setAttribute("aria-haspopup", "true");
+  btn.setAttribute("aria-expanded", "false");
 
   const open = () => {
-    dd.classList.add('open');
-    btn.classList.add('active');
-    btn.setAttribute('aria-expanded', 'true');
+    dd.classList.add("open");
+    btn.classList.add("active");
+    btn.setAttribute("aria-expanded", "true");
   };
   const close = () => {
-    dd.classList.remove('open');
-    btn.classList.remove('active');
-    btn.setAttribute('aria-expanded', 'false');
+    dd.classList.remove("open");
+    btn.classList.remove("active");
+    btn.setAttribute("aria-expanded", "false");
   };
-  const toggle = () => dd.classList.contains('open') ? close() : open();
+  const toggle = () =>
+    dd.classList.contains("open") ? close() : open();
 
-  btn.addEventListener('click', (e) => {
+  btn.addEventListener("click", (e) => {
     e.preventDefault();
     e.stopPropagation();
     toggle();
   });
 
-  document.addEventListener('click', (e) => {
+  document.addEventListener("click", (e) => {
     if (!menuWrap.contains(e.target)) close();
   });
 
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') close();
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") close();
   });
 })();
 
 // === Event listeners del menú ===
 
 // Favoritos
-document.getElementById('favoritosBtn')?.addEventListener('click', () => {
-  window.location.href = 'index.html?categoria=favoritos';
+document.getElementById("favoritosBtn")?.addEventListener("click", () => {
+  window.location.href = "index.html?categoria=favoritos";
 });
 
 // Métodos de pago
-document.getElementById('metodosBtn')?.addEventListener('click', () => {
-  window.location.href = 'metodos-pago.html';
+document.getElementById("metodosBtn")?.addEventListener("click", () => {
+  window.location.href = "metodos-pago.html";
 });
 
 // Soporte WhatsApp
-document.getElementById('soporteBtn')?.addEventListener('click', async () => {
+document.getElementById("soporteBtn")?.addEventListener("click", async () => {
   const { data: { user } } = await supabase.auth.getUser();
-  
-  let nombre = 'Cliente';
+
+  let nombre = "Cliente";
   if (user) {
     const { data: perfil } = await supabase
-      .from('clientes_perfil')
-      .select('razon')
-      .eq('user_id', user.id)
+      .from("clientes_perfil")
+      .select("razon")
+      .eq("user_id", user.id)
       .maybeSingle();
-    
+
     if (perfil?.razon) {
       nombre = perfil.razon;
     } else if (user.user_metadata?.nombre) {
       nombre = user.user_metadata.nombre;
     } else if (user.email) {
-      nombre = user.email.split('@')[0];
+      nombre = user.email.split("@")[0];
     }
   }
-  
+
   const mensaje = encodeURIComponent(
     `Hola, soy ${nombre}, vengo de Paniquiños por un problema!`
   );
   const whatsappURL = `https://wa.me/595992544305?text=${mensaje}`;
-  window.open(whatsappURL, '_blank');
+  window.open(whatsappURL, "_blank");
 });
 
 init();

@@ -10,7 +10,6 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet" />
   <link rel="stylesheet" href="CSS/main.css" />
   <link rel="stylesheet" href="CSS/styleschat.css" />
-  
   <link rel="stylesheet" href="CSS/reco-popup.css" />
 
   <style>
@@ -164,6 +163,57 @@
       color: #333;
       font-weight: 700;
     }
+
+    /* ===== BOTÓN FAVORITO SOBRE CARDS ===== */
+    .producto {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-favorito {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 2;
+      background: #ffffffdd;
+      border: none;
+      border-radius: 50%;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+      transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+    }
+
+    .btn-favorito:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 14px rgba(0,0,0,0.18);
+    }
+
+    .btn-favorito i {
+      font-size: 1.3rem;
+      color: #6f5c38;
+      transition: color 0.25s ease, transform 0.25s ease;
+    }
+
+    .btn-favorito.active i {
+      color: #e63946;
+    }
+
+    @keyframes heartBeat {
+      0%   { transform: scale(1); }
+      25%  { transform: scale(1.3); }
+      50%  { transform: scale(0.9); }
+      75%  { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
+
+    .btn-favorito.animate i {
+      animation: heartBeat 0.4s ease;
+    }
   </style>
 </head>
 
@@ -182,7 +232,7 @@
 
       <nav aria-label="Categorías">
         <ul class="menu" id="menuList">
-          <li><button id="todos" class="boton-menu boton-categoria active"></i> Todos los productos</button></li>
+          <li><button id="todos" class="boton-menu boton-categoria active"> Todos los productos</button></li>
           <li><button id="bocaditos" class="boton-menu boton-categoria"><i class="bi bi-cookie"></i> Bocaditos</button></li>
           <li><button id="confiteria" class="boton-menu boton-categoria"><i class="bi bi-cupcake"></i> Confitería</button></li>
           <li><button id="panificados" class="boton-menu boton-categoria"><i class="bi bi-bagel"></i> Panificados</button></li>
@@ -204,8 +254,11 @@
           <button class="searchbar-btn" type="submit">Buscar</button>
         </form>
         <div class="user-menu">
-          <button class="user-chip" id="userMenuBtn"><i class="bi bi-person"></i><span class="user-name">Cuenta</span><i class="bi bi-chevron-down chevron"></i></button>
-
+          <button class="user-chip" id="userMenuBtn">
+            <i class="bi bi-person"></i>
+            <span class="user-name">Cuenta</span>
+            <i class="bi bi-chevron-down chevron"></i>
+          </button>
 
           <div class="user-dropdown" id="userDropdown">
             <button id="updateProfileBtn" class="dropdown-item">
@@ -225,7 +278,6 @@
               <i class="bi bi-box-arrow-right"></i> Cerrar sesión
             </button>
           </div>
-
         </div>
       </div>
     </div>
@@ -237,7 +289,9 @@
   </div>
 
   <!-- Overlay de logout -->
-  <div id="logoutOverlay" hidden><div class="spinner-border me-2" role="status"></div> Cerrando sesión…</div>
+  <div id="logoutOverlay" hidden>
+    <div class="spinner-border me-2" role="status"></div> Cerrando sesión…
+  </div>
 
   <!-- ===== POPUP Recomendaciones ===== -->
   <div id="recoModalOverlay" hidden>
