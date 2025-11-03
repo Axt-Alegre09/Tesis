@@ -1,54 +1,76 @@
-// JS/reco-popup.js
+// JS/reco-popup-v2.js
 import { supabase } from "./ScriptLogin.js";
 
 const OVERLAY_ID = "recoModalOverlay";
 const LIST_ID = "recoList";
-
-const IMG_FALLBACK = "https://placehold.co/512x512?text=Imagen";
+const IMG_FALLBACK = "https://placehold.co/512x512?text=Sin+Imagen";
 const STORAGE_BASE = "https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/";
 
 // Formateo Gs PY
 const fmtGs = (n) => new Intl.NumberFormat("es-PY").format(Number(n || 0)) + " Gs";
 
-/* ===================== Helpers de estado ===================== */
-// Guardo una marca por sesión/usuario para no mostrar el popup repetidamente
+/* ===================== Estado del popup ===================== */
 function recoKey(uid) { return `recoShown:${uid}`; }
-function markShown(uid) { try { sessionStorage.setItem(recoKey(uid), "1"); } catch {} }
-function wasShown(uid)  { try { return sessionStorage.getItem(recoKey(uid)) === "1"; } catch { return false; } }
+function markShown(uid) { 
+  try { 
+    sessionStorage.setItem(recoKey(uid), Date.now().toString()); 
+  } catch {} 
+}
+function wasShownRecently(uid, minutes = 30) {
+  try {
+    const shown = sessionStorage.getItem(recoKey(uid));
+    if (!shown) return false;
+    const elapsed = (Date.now() - parseInt(shown)) / 1000 / 60;
+    return elapsed < minutes;
+  } catch {
+    return false;
+  }
+}
 
-/* ===================== Helpers modal ===================== */
+/* ===================== Modal ===================== */
 function openReco() {
   const overlay = document.getElementById(OVERLAY_ID);
-  if (overlay) overlay.hidden = false;
+  if (overlay) {
+    overlay.hidden = false;
+    document.body.style.overflow = 'hidden'; // Prevenir scroll
+  }
 }
+
 function closeReco() {
   const overlay = document.getElementById(OVERLAY_ID);
-  if (overlay) overlay.hidden = true;
+  if (overlay) {
+    overlay.hidden = true;
+    document.body.style.overflow = ''; // Restaurar scroll
+  }
 }
 
 /* ===================== Render ===================== */
 function cardHTML(p) {
-  const id = p.id ?? p.producto_id ?? p.slug ?? "";
-  const nombre = p.nombre ?? p.titulo ?? "Producto";
-  const precio = p.precio ?? p.price ?? 0;
+  const id = p.id ?? "";
+  const nombre = p.nombre ?? "Producto";
+  const precio = p.precio ?? 0;
+  const esUltima = p.es_ultima_compra ?? false;
+  const veces = p.veces_comprado ?? 0;
 
-  const imgPath = p.imagen_url || p.url_imagen || p.img || p.imagen || p.image_path || p.imagen_url_portada || "";
+  const imgPath = p.imagen || p.imagen_url || p.url_imagen || "";
   const img = imgPath?.startsWith?.("http")
     ? imgPath
     : (imgPath ? (STORAGE_BASE + imgPath) : IMG_FALLBACK);
 
   return `
-    <article class="reco-card" data-id="${id}">
+    <article class="reco-card" data-id="${id}" data-ultima="${esUltima}">
       <div class="reco-imgwrap">
-        <img src="${img}" alt="${nombre}">
+        <img src="${img}" alt="${nombre}" loading="lazy">
       </div>
-      <div>
+      <div class="reco-info">
         <h3 class="reco-title">${nombre}</h3>
         <div class="reco-price">${fmtGs(precio)}</div>
+        ${veces > 0 ? `<div class="reco-veces">Pedido ${veces}× antes</div>` : ''}
       </div>
       <div class="reco-actions">
-        <button class="reco-btn primary" data-add="${id}">Agregar</button>
-        <button class="reco-btn ghost"  data-view="${id}">Ver</button>
+        <button class="reco-btn-add" data-add="${id}">
+          <i class="bi bi-cart-plus"></i> Agregar al carrito
+        </button>
       </div>
     </article>
   `;
@@ -57,56 +79,56 @@ function cardHTML(p) {
 function renderList(items = []) {
   const list = document.getElementById(LIST_ID);
   if (!list) return;
+  
   if (!items.length) {
-    list.innerHTML = `<div style="padding:16px">No tengo recomendaciones por ahora. Explorá nuestros <a href="#contenedor-productos">productos</a> 👇</div>`;
+    list.innerHTML = `
+      <div class="reco-empty">
+        <i class="bi bi-emoji-smile"></i>
+        <p>Aún no tenemos recomendaciones personalizadas para vos.</p>
+        <p>Empezá a explorar nuestros productos para recibir sugerencias.</p>
+      </div>
+    `;
     return;
   }
+  
   list.innerHTML = items.map(cardHTML).join("");
 }
 
-/* ===================== Data: RPC + fallback ===================== */
-// Llamo a la RPC sin prefijo de esquema (mantengo el nombre que definí en la DB)
-async function tryRpcRecomendaciones(userId, limit = 8) {
-  const { data, error } = await supabase.rpc("reco_para_usuario_v1", {
-    p_usuario: userId,
-    p_limite: limit,
-  });
-  if (error) {
-    console.warn("[reco-popup] RPC error:", {
-      code: error.code,
-      message: error.message,
-      details: error.details,
-      hint: error.hint,
-    });
-    return { data: [], error };
-  }
-  return { data: data || [], error: null };
-}
-
-// Si no hay recomendaciones o la RPC falla, cargo productos públicos
-async function fetchFallback(limit = 8) {
-  const { data, error } = await supabase
-    .from("v_productos_publicos")
-    .select("id, nombre, precio, imagen")
-    .limit(limit);
-
-  if (error) {
-    console.warn("[reco-popup] Fallback error:", error.message || error);
-    return [];
-  }
-  return data ?? [];
-}
-
+/* ===================== Data ===================== */
 async function loadRecommendations() {
   try {
-    const { data: { user} } = await supabase.auth.getUser();
-    if (user?.id) {
-      const { data } = await tryRpcRecomendaciones(user.id, 8);
-      if (Array.isArray(data) && data.length) return data;
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user?.id) {
+      // Usuario no autenticado: mostrar productos populares
+      const { data, error } = await supabase
+        .from("v_productos_publicos")
+        .select("id, nombre, precio, imagen")
+        .limit(8);
+      
+      if (error) throw error;
+      return data || [];
     }
-    return await fetchFallback(8);
+
+    // Usuario autenticado: usar la RPC mejorada
+    const { data, error } = await supabase.rpc("reco_para_usuario_v2", {
+      p_usuario: user.id,
+      p_limite: 8,
+    });
+
+    if (error) {
+      console.warn("[reco-popup] RPC error:", error);
+      // Fallback a productos públicos
+      const { data: fallback } = await supabase
+        .from("v_productos_publicos")
+        .select("id, nombre, precio, imagen")
+        .limit(8);
+      return fallback || [];
+    }
+
+    return data || [];
   } catch (e) {
-    console.warn("[reco-popup] loadRecommendations error:", e);
+    console.error("[reco-popup] loadRecommendations error:", e);
     return [];
   }
 }
@@ -115,66 +137,70 @@ async function loadRecommendations() {
 function wireModalActions() {
   const overlay = document.getElementById(OVERLAY_ID);
   const closeBtn = document.getElementById("recoCloseBtn");
-  const closeSecondary = document.getElementById("recoCloseSecondary");
 
-  // Cierro el modal desde los botones y también clic afuera
+  // Cerrar con botón y clic fuera
   closeBtn?.addEventListener("click", closeReco);
-  closeSecondary?.addEventListener("click", closeReco);
   overlay?.addEventListener("click", (ev) => {
     if (ev.target === overlay) closeReco();
   });
 
-  // Delegación: Agregar / Ver
+  // Cerrar con ESC
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key === "Escape" && !overlay?.hidden) {
+      closeReco();
+    }
+  });
+
+  // Delegación: Agregar al carrito
   const list = document.getElementById(LIST_ID);
-  list?.addEventListener("click", (ev) => {
-    const btn = ev.target.closest("button");
+  list?.addEventListener("click", async (ev) => {
+    const btn = ev.target.closest(".reco-btn-add");
     if (!btn) return;
+
     const card = btn.closest(".reco-card");
     const id = card?.dataset?.id;
     if (!id) return;
 
-    if (btn.hasAttribute("data-add")) {
-      // Agrego al carrito con la API que ya tengo en window
-      if (window.CartAPI?.addById) {
-        window.CartAPI.addById(id, 1);
-      } else if (window.CartAPI?.addProduct) {
-        const nombre = card?.querySelector(".reco-title")?.textContent?.trim() ?? "Producto";
-        const precioText = card?.querySelector(".reco-price")?.textContent || "0";
-        const precioNum = Number((precioText.replace(/[^\d]/g, "")) || 0);
-        window.CartAPI.addProduct({ id, nombre, titulo: nombre, precio: precioNum }, 1);
-      }
-      btn.textContent = "Agregado ✓";
-      setTimeout(() => (btn.textContent = "Agregar"), 1200);
-      window.CartAPI?.refreshBadge?.();
+    // Agregar al carrito
+    if (window.CartAPI?.addById) {
+      await window.CartAPI.addById(id, 1);
+    } else if (window.CartAPI?.addProduct) {
+      const nombre = card?.querySelector(".reco-title")?.textContent?.trim() ?? "Producto";
+      const precioText = card?.querySelector(".reco-price")?.textContent || "0";
+      const precioNum = Number((precioText.replace(/[^\d]/g, "")) || 0);
+      await window.CartAPI.addProduct({ id, nombre, precio: precioNum }, 1);
     }
 
-    if (btn.hasAttribute("data-view")) {
-      closeReco();
-      document.querySelector("#contenedor-productos")?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    }
+    // Feedback visual
+    btn.classList.add("added");
+    btn.innerHTML = '<i class="bi bi-check-circle-fill"></i> ¡Agregado!';
+    
+    setTimeout(() => {
+      btn.classList.remove("added");
+      btn.innerHTML = '<i class="bi bi-cart-plus"></i> Agregar al carrito';
+    }, 2000);
+
+    // Actualizar badge del carrito
+    window.CartAPI?.refreshBadge?.();
   });
 }
 
 async function personalizeTitle() {
-  // Personalizo el título con el nombre visible que ya uso en el chip (misma prioridad)
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     let display = "";
 
-    // 1) clientes_perfil.razon
+    // Prioridad: razon > nombre > email
     const { data: cp } = await supabase
       .from("clientes_perfil")
       .select("razon")
       .eq("user_id", user.id)
       .maybeSingle();
+    
     if (cp?.razon) display = String(cp.razon).trim();
 
-    // 2) profiles.nombre
     if (!display) {
       const { data: prof } = await supabase
         .from("profiles")
@@ -184,39 +210,21 @@ async function personalizeTitle() {
       if (prof?.nombre) display = String(prof.nombre).trim();
     }
 
-    // 3) user_metadata.nombre
     if (!display) {
       const metaName = user.user_metadata?.nombre;
       if (metaName) display = String(metaName).trim();
     }
 
-    // 4) email como último recurso
     if (!display) display = user.email?.split("@")[0] || "";
 
     const h2 = document.getElementById("recoModalTitle");
-    if (display && h2) h2.textContent = `Recomendado para vos, ${display}`;
+    if (display && h2) {
+      // Primer nombre solo
+      const firstName = display.split(" ")[0];
+      h2.textContent = `Recomendado para vos, ${firstName}`;
+    }
   } catch (e) {
     console.warn("[reco-popup] personalizeTitle error:", e);
-  }
-}
-
-// Siempre dejo el click en el logo como atajo manual para abrir el popup
-function wireLogoClick() {
-  const candidates = [
-    ".logo-principal",
-    ".logo img",
-    "aside header img",
-    "header .logo img",
-  ];
-  for (const sel of candidates) {
-    const el = document.querySelector(sel);
-    if (el) {
-      el.addEventListener("click", (e) => {
-        e.preventDefault();
-        openReco();
-      });
-      break;
-    }
   }
 }
 
@@ -226,33 +234,46 @@ async function boot() {
   const list = document.getElementById(LIST_ID);
   if (!overlay || !list) return;
 
-  // Cargo al menos una vez la lista de items (así el modal abre rápido)
-  list.innerHTML = `<div style="padding:16px">Cargando recomendaciones…</div>`;
+  // Cargar recomendaciones
+  list.innerHTML = `
+    <div class="reco-empty">
+      <div class="spinner-border text-primary" role="status"></div>
+      <p>Cargando recomendaciones...</p>
+    </div>
+  `;
+
   const items = await loadRecommendations();
   renderList(items);
   wireModalActions();
-  wireLogoClick();
 
-  // Solo muestro automáticamente al iniciar sesión (una vez por sesión/usuario)
+  // Mostrar automáticamente solo si:
+  // 1. Usuario autenticado
+  // 2. No se mostró recientemente (últimos 30 min)
+  // 3. Hay recomendaciones
   try {
     const { data: { user } } = await supabase.auth.getUser();
-    if (user?.id && !wasShown(user.id)) {
+    if (user?.id && !wasShownRecently(user.id, 30) && items.length > 0) {
       await personalizeTitle();
-      openReco();
-      markShown(user.id); // dejo registrado que ya se mostró en esta sesión
+      setTimeout(() => {
+        openReco();
+        markShown(user.id);
+      }, 800); // Delay de 800ms para mejor UX
     }
   } catch (e) {
     console.warn("[reco-popup] boot auto-show error:", e);
   }
 }
 
-document.addEventListener("DOMContentLoaded", boot);
+// Iniciar cuando el DOM esté listo
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", boot);
+} else {
+  boot();
+}
 
-/* ===================== Debug de consola ===================== */
-window.supabase = supabase;
+// Exportar para testing
 window.__testReco = {
   loadRecommendations,
-  tryRpcRecomendaciones,
   openReco,
   closeReco,
 };

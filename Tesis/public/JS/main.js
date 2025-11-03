@@ -7,6 +7,7 @@ const botonesCategorias = document.querySelectorAll(".boton-categoria");
 const tituloPrincipal = document.querySelector("#titulo-principal");
 
 let CATALOGO = []; // cache del catálogo público
+let FAVORITOS_IDS = new Set(); // IDs de productos favoritos
 
 const IMG_FALLBACK = "https://placehold.co/512x512?text=Imagen";
 const STORAGE_BASE = "https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/";
@@ -24,6 +25,121 @@ const toImg = (v) => {
   if (s.toLowerCase().startsWith("productos/")) s = s.slice("productos/".length);
   return STORAGE_BASE + encodeURIComponent(s);
 };
+
+/* =================== Favoritos =================== */
+
+// Cargar IDs de favoritos del usuario
+async function loadFavoritosIds() {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data, error } = await supabase.rpc('get_favoritos');
+    if (error) throw error;
+
+    FAVORITOS_IDS = new Set((data || []).map(f => f.producto_id));
+  } catch (error) {
+    console.error('Error cargar favoritos:', error);
+  }
+}
+
+// Toggle favorito (agregar/quitar)
+async function toggleFavorito(productoId, btn) {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      showToast('Debes iniciar sesión para guardar favoritos', 'warning');
+      setTimeout(() => window.location.href = 'login.html', 1500);
+      return;
+    }
+    
+    btn.disabled = true;
+    
+    const { data, error } = await supabase.rpc('toggle_favorito', {
+      p_producto_id: productoId
+    });
+    
+    if (error) throw error;
+    
+    const result = data[0];
+    const esFavorito = result.es_favorito;
+    
+    // Actualizar el Set local
+    if (esFavorito) {
+      FAVORITOS_IDS.add(productoId);
+    } else {
+      FAVORITOS_IDS.delete(productoId);
+    }
+    
+    // Actualizar UI del botón
+    updateFavoritoButton(btn, esFavorito);
+    showToast(result.mensaje, 'success');
+    
+  } catch (error) {
+    console.error('Error toggle favorito:', error);
+    showToast('Error al actualizar favorito', 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// Actualizar UI del botón de favorito
+function updateFavoritoButton(btn, esFavorito) {
+  const icon = btn.querySelector('i');
+  if (esFavorito) {
+    icon.classList.remove('bi-heart');
+    icon.classList.add('bi-heart-fill');
+    btn.classList.add('active');
+  } else {
+    icon.classList.remove('bi-heart-fill');
+    icon.classList.add('bi-heart');
+    btn.classList.remove('active');
+  }
+}
+
+// Toast notification
+function showToast(message, type = 'success') {
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.textContent = message;
+  toast.style.cssText = `
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: ${type === 'error' ? '#e74c3c' : type === 'warning' ? '#f39c12' : '#27ae60'};
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 10001;
+    animation: slideInToast 0.3s ease;
+    font-family: inherit;
+  `;
+  
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes slideInToast {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes slideOutToast {
+      from { transform: translateX(0); opacity: 1; }
+      to { transform: translateX(100%); opacity: 0; }
+    }
+  `;
+  if (!document.querySelector('style[data-toast]')) {
+    style.setAttribute('data-toast', '');
+    document.head.appendChild(style);
+  }
+  
+  document.body.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.style.animation = 'slideOutToast 0.3s ease';
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
 
 /* =================== Data sources =================== */
 
@@ -66,32 +182,92 @@ async function fetchPopularesPortada(limit = 12) {
   }));
 }
 
+// 3) Cargar favoritos
+async function fetchFavoritos() {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      return { error: 'not_authenticated', productos: [] };
+    }
+    
+    const { data, error } = await supabase.rpc('get_favoritos');
+    
+    if (error) throw error;
+    
+    return {
+      error: null,
+      productos: (data || []).map(f => ({
+        id: f.producto_id,
+        nombre: f.nombre,
+        titulo: f.nombre,
+        imagen: toImg(f.imagen),
+        precio: f.precio,
+        categoria: { nombre: f.categoria_nombre }
+      }))
+    };
+  } catch (error) {
+    console.error('Error cargar favoritos:', error);
+    return { error: error.message, productos: [] };
+  }
+}
+
 /* =================== UI render =================== */
 
-function montar(productos) {
+function montar(productos, esFavoritos = false) {
   contenedorProductos.innerHTML = "";
+  
   if (!productos.length) {
-    contenedorProductos.innerHTML = `<div class="alerta-vacia">No hay productos para mostrar.</div>`;
+    if (esFavoritos) {
+      contenedorProductos.innerHTML = `
+        <div class="empty-state">
+          <i class="bi bi-heart" style="font-size: 4rem; opacity: 0.3;"></i>
+          <p>Aún no tienes productos favoritos</p>
+          <a href="index.html" class="btn-primary">Explorar productos</a>
+        </div>
+      `;
+    } else {
+      contenedorProductos.innerHTML = `<div class="alerta-vacia">No hay productos para mostrar.</div>`;
+    }
     return;
   }
+  
   for (const producto of productos) {
     const div = document.createElement("div");
     div.className = "producto";
+    div.dataset.id = producto.id;
+    
+    const esFav = FAVORITOS_IDS.has(producto.id);
+    
     div.innerHTML = `
+      <button class="btn-favorito ${esFav ? 'active' : ''}" data-producto-id="${producto.id}" aria-label="Favorito">
+        <i class="bi ${esFav ? 'bi-heart-fill' : 'bi-heart'}"></i>
+      </button>
       <img class="producto-imagen" src="${producto.imagen || IMG_FALLBACK}" alt="${producto.titulo}">
       <div class="producto-detalles">
         <h3 class="producto-titulo">${producto.titulo}</h3>
         <b><p class="producto-precio">${fmtGs(producto.precio)}</p></b>
         <button class="producto-agregar" data-id="${producto.id}">Agregar</button>
       </div>`;
+    
     div.querySelector(".producto-imagen")?.addEventListener("error", (e) => (e.currentTarget.src = IMG_FALLBACK));
     contenedorProductos.appendChild(div);
   }
-  // handler Agregar
+  
+  // Handler botón favorito
+  document.querySelectorAll(".btn-favorito").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const id = e.currentTarget.dataset.productoId;
+      toggleFavorito(id, e.currentTarget);
+    });
+  });
+  
+  // Handler Agregar
   document.querySelectorAll(".producto-agregar").forEach((btn) => {
     btn.addEventListener("click", async (e) => {
       const id = e.currentTarget.dataset.id;
-      const prod = [...CATALOGO].find((p) => String(p.id) === String(id)) || null;
+      const prod = [...productos, ...CATALOGO].find((p) => String(p.id) === String(id)) || null;
       const fallbackProd = prod || (() => {
         const card = e.currentTarget.closest(".producto");
         const nombre = card?.querySelector(".producto-titulo")?.textContent?.trim() || "Producto";
@@ -103,9 +279,10 @@ function montar(productos) {
       try {
         await window.CartAPI.addProduct(fallbackProd, 1);
         await window.CartAPI.refreshBadge();
+        showToast('Producto agregado al carrito', 'success');
       } catch (err) {
         console.error("addProduct:", err);
-        alert("No se pudo agregar. Intenta de nuevo.");
+        showToast('No se pudo agregar. Intenta de nuevo.', 'error');
       }
     });
   });
@@ -162,11 +339,44 @@ async function buscar(q) {
 /* =================== Init =================== */
 
 async function init() {
-  // 1) Cargar catálogo base
+  // Detectar si estamos en la página de favoritos
+  const urlParams = new URLSearchParams(window.location.search);
+  const categoria = urlParams.get('categoria');
+  
+  if (categoria === 'favoritos') {
+    // Cargar página de favoritos
+    tituloPrincipal.textContent = "Mis Favoritos";
+    const { error, productos } = await fetchFavoritos();
+    
+    if (error === 'not_authenticated') {
+      contenedorProductos.innerHTML = `
+        <div class="empty-state">
+          <i class="bi bi-heart" style="font-size: 4rem; opacity: 0.3;"></i>
+          <p>Debes iniciar sesión para ver tus favoritos</p>
+          <a href="login.html" class="btn-primary">Iniciar sesión</a>
+        </div>
+      `;
+      return;
+    }
+    
+    await loadFavoritosIds();
+    montar(productos, true);
+    return;
+  }
+  
+  // Flujo normal (catálogo)
   CATALOGO = await fetchProductosCatalogo();
-  window.__PRODUCTS__ = CATALOGO.map((p) => ({ id: p.id, nombre: p.nombre, titulo: p.titulo, precio: p.precio, imagen: p.imagen }));
+  await loadFavoritosIds(); // Cargar favoritos del usuario
+  
+  window.__PRODUCTS__ = CATALOGO.map((p) => ({ 
+    id: p.id, 
+    nombre: p.nombre, 
+    titulo: p.titulo, 
+    precio: p.precio, 
+    imagen: p.imagen 
+  }));
 
-  // 2) Home feed: Populares → Catálogo
+  // Home feed: Populares → Catálogo
   let itemsHome = [];
   try {
     const pop = await fetchPopularesPortada(12);
@@ -188,7 +398,7 @@ async function init() {
   wireCategorias();
   await window.CartAPI.refreshBadge();
 
-  // 3) Búsqueda
+  // Búsqueda
   const form = document.getElementById("searchForm");
   const input = document.getElementById("searchInput");
   form?.addEventListener("submit", (e) => {
@@ -204,8 +414,7 @@ async function init() {
   });
 }
 
-
-// === User Menu Dropdown (safe, sin dependencias) ===
+// === User Menu Dropdown ===
 (() => {
   const menuWrap = document.querySelector('.user-menu');
   const btn = document.getElementById('userMenuBtn');
@@ -213,12 +422,10 @@ async function init() {
 
   if (!menuWrap || !btn || !dd) return;
 
-  // Asegura posicionamiento relativo del contenedor
   if (!getComputedStyle(menuWrap).position || getComputedStyle(menuWrap).position === 'static') {
     menuWrap.style.position = 'relative';
   }
 
-  // Accesibilidad
   btn.setAttribute('aria-haspopup', 'true');
   btn.setAttribute('aria-expanded', 'false');
 
@@ -234,22 +441,59 @@ async function init() {
   };
   const toggle = () => dd.classList.contains('open') ? close() : open();
 
-  // Click en el botón
   btn.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
     toggle();
   });
 
-  // Cerrar con click afuera
   document.addEventListener('click', (e) => {
     if (!menuWrap.contains(e.target)) close();
   });
 
-  // Cerrar con Escape
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') close();
   });
 })();
+
+// === Event listeners del menú ===
+
+// Favoritos
+document.getElementById('favoritosBtn')?.addEventListener('click', () => {
+  window.location.href = 'index.html?categoria=favoritos';
+});
+
+// Métodos de pago
+document.getElementById('metodosBtn')?.addEventListener('click', () => {
+  window.location.href = 'metodos-pago.html';
+});
+
+// Soporte WhatsApp
+document.getElementById('soporteBtn')?.addEventListener('click', async () => {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  let nombre = 'Cliente';
+  if (user) {
+    const { data: perfil } = await supabase
+      .from('clientes_perfil')
+      .select('razon')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    
+    if (perfil?.razon) {
+      nombre = perfil.razon;
+    } else if (user.user_metadata?.nombre) {
+      nombre = user.user_metadata.nombre;
+    } else if (user.email) {
+      nombre = user.email.split('@')[0];
+    }
+  }
+  
+  const mensaje = encodeURIComponent(
+    `Hola, soy ${nombre}, vengo de Paniquiños por un problema!`
+  );
+  const whatsappURL = `https://wa.me/595992544305?text=${mensaje}`;
+  window.open(whatsappURL, '_blank');
+});
 
 init();

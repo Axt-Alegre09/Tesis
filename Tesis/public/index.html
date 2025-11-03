@@ -10,6 +10,8 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet" />
   <link rel="stylesheet" href="CSS/main.css" />
   <link rel="stylesheet" href="CSS/styleschat.css" />
+  
+  <link rel="stylesheet" href="CSS/reco-popup.css" />
 
   <style>
     /* Overlay de cierre de sesión */
@@ -180,11 +182,11 @@
 
       <nav aria-label="Categorías">
         <ul class="menu" id="menuList">
-          <li><button id="todos" class="boton-menu boton-categoria active"><i class="bi bi-hand-index-fill"></i> Todos los productos</button></li>
+          <li><button id="todos" class="boton-menu boton-categoria active"></i> Todos los productos</button></li>
           <li><button id="bocaditos" class="boton-menu boton-categoria"><i class="bi bi-cookie"></i> Bocaditos</button></li>
           <li><button id="confiteria" class="boton-menu boton-categoria"><i class="bi bi-cupcake"></i> Confitería</button></li>
           <li><button id="panificados" class="boton-menu boton-categoria"><i class="bi bi-bagel"></i> Panificados</button></li>
-          <li><button id="rosticeria" class="boton-menu boton-categoria"><i class="bi bi-egg-fried"></i> Rostisería</button></li>
+          <li><button id="rosticeria" class="boton-menu boton-categoria"><i class="bi bi-bagel"></i> Rostisería</button></li>
           <li><a class="boton-menu boton-carrito" href="carrito.html"><i class="bi bi-cart-fill"></i> Carrito <span id="numerito" class="numerito">0</span></a></li>
         </ul>
       </nav>
@@ -203,10 +205,27 @@
         </form>
         <div class="user-menu">
           <button class="user-chip" id="userMenuBtn"><i class="bi bi-person"></i><span class="user-name">Cuenta</span><i class="bi bi-chevron-down chevron"></i></button>
+
+
           <div class="user-dropdown" id="userDropdown">
-            <button id="updateProfileBtn" class="dropdown-item"><i class="bi bi-gear"></i> Actualizar datos</button>
-            <button id="logoutBtn" class="dropdown-item"><i class="bi bi-box-arrow-right"></i> Cerrar sesión</button>
+            <button id="updateProfileBtn" class="dropdown-item">
+              <i class="bi bi-gear"></i> Actualizar datos
+            </button>
+            <button id="favoritosBtn" class="dropdown-item">
+              <i class="bi bi-heart-fill"></i> Mis favoritos
+            </button>
+            <button id="metodosBtn" class="dropdown-item">
+              <i class="bi bi-credit-card"></i> Métodos de pago
+            </button>
+            <button id="soporteBtn" class="dropdown-item">
+              <i class="bi bi-whatsapp"></i> Soporte WhatsApp
+            </button>
+            <hr style="margin: 8px 0; border-color: rgba(0,0,0,0.1);">
+            <button id="logoutBtn" class="dropdown-item">
+              <i class="bi bi-box-arrow-right"></i> Cerrar sesión
+            </button>
           </div>
+
         </div>
       </div>
     </div>
