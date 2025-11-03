@@ -2,12 +2,6 @@
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
 
-/**
- * ENV requeridas:
- * - SUPABASE_URL
- * - SUPABASE_SERVICE_ROLE
- * - OPENAI_API_KEY
- */
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const supa = createClient(
   process.env.SUPABASE_URL,
@@ -15,12 +9,13 @@ const supa = createClient(
   { auth: { persistSession: false, autoRefreshToken: false } }
 );
 
-/* ============== Utils base ============== */
+/* ============== Utils ============== */
 const toPY = (v) => {
   const n = Number(v);
   if (!Number.isFinite(n)) return String(v ?? "");
   return n.toLocaleString("es-PY");
 };
+
 const norm = (s = "") =>
   String(s)
     .toLowerCase()
@@ -29,13 +24,9 @@ const norm = (s = "") =>
     .replace(/\s+/g, " ")
     .trim();
 
-const tokenize = (s) => norm(s).split(" ").filter(Boolean);
-const has = (t, ...words) => words.some(w => t.includes(w));
-
-/* ============== Catálogo (cache en memoria) ============== */
-// Traigo de la vista v_productos_publicos (id, nombre, precio, categoria_nombre, imagen/url_imagen)
+/* ============== Catálogo (cache) ============== */
 let _cache = { at: 0, items: [] };
-const CACHE_MS = 1000 * 60 * 3; // 3 min
+const CACHE_MS = 1000 * 60 * 3;
 
 async function loadCatalog() {
   const now = Date.now();
@@ -43,278 +34,323 @@ async function loadCatalog() {
 
   const { data, error } = await supa
     .from("v_productos_publicos")
-    .select("id, nombre, precio, categoria_nombre");
+    .select("id, nombre, precio, categoria_nombre, descripcion");
+  
   if (error) {
     console.warn("loadCatalog:", error.message);
     return _cache.items || [];
   }
+  
   const items = (data || []).map(p => ({
     id: p.id,
     nombre: String(p.nombre || "").trim(),
     precio: Number(p.precio || 0),
     categoria: String(p.categoria_nombre || "").trim(),
-    nNombre: norm(p.nombre || ""),
-    nCat: norm(p.categoria_nombre || "")
+    descripcion: String(p.descripcion || "").trim(),
   }));
+  
   _cache = { at: now, items };
   return items;
 }
 
-/* ============== Sinónimos de categoría ============== */
-const CATEGORY_MAP = [
-  { key: "empanadas",  terms: ["empanada", "empanadas", "mandioca", "saltena", "salteña"] },
-  { key: "bocaditos",  terms: ["bocadito", "bocaditos", "saladitos", "chipitas", "mini"] },
-  { key: "alfajores",  terms: ["alfajor", "alfajores"] },
-  { key: "tortas",     terms: ["torta", "tortas", "minitorta", "mini torta", "pastel"] },
-  { key: "combos",     terms: ["combo", "combos", "promos", "promo"] },
-  { key: "confiteria", terms: ["confiteria", "dulces", "postres"] },
-  { key: "panificados",terms: ["pan", "panes", "panificados", "chipa"] },
-  { key: "rostiseria", terms: ["rostiseria", "rosticeria", "pollos", "tartas"] },
-];
-
-function detectCategoryByWords(t) {
-  const txt = norm(t);
-  for (const { key, terms } of CATEGORY_MAP) {
-    if (terms.some(w => txt.includes(norm(w)))) return key;
-  }
-  return null;
-}
-
-/* ============== Fuzzy matching local (productos) ============== */
-// Levenshtein simple para coincidencia flexible
-function levenshtein(a, b) {
-  const s = a, t = b;
-  const m = s.length, n = t.length;
-  if (!m) return n;
-  if (!n) return m;
-  const dp = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]);
-  for (let j = 0; j <= n; j++) dp[0][j] = j;
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      const cost = s[i - 1] === t[j - 1] ? 0 : 1;
-      dp[i][j] = Math.min(
-        dp[i - 1][j] + 1,
-        dp[i][j - 1] + 1,
-        dp[i - 1][j - 1] + cost
-      );
-    }
-  }
-  return dp[m][n];
-}
-
-function fuzzyScoreProduct(p, qTokens) {
-  // Puntos por tokens contenidos + penalización por distancia
-  const nameToks = tokenize(p.nNombre);
-  let overlap = 0;
-  for (const qt of qTokens) if (nameToks.includes(qt)) overlap += 2;
-  // distancia mínima a cualquier token del nombre
-  let minLev = Infinity;
-  for (const nt of nameToks) {
-    for (const qt of qTokens) {
-      minLev = Math.min(minLev, levenshtein(nt, qt));
-    }
-  }
-  const levPart = Number.isFinite(minLev) ? Math.max(0, 6 - minLev) : 0;
-  // bonus si la categoría coincide con alguna palabra
-  const catHit = qTokens.some(t => p.nCat.includes(t)) ? 2 : 0;
-  return overlap + levPart + catHit;
-}
-
-async function fuzzyFindProducts(userText, limit = 6, preferCat = null) {
-  const cat = preferCat || detectCategoryByWords(userText);
+/* ============== Funciones de búsqueda de productos ============== */
+async function buscarProductosPorCategoria(categoria) {
   const items = await loadCatalog();
-  const qTokens = tokenize(userText);
-  let pool = items;
-
-  if (cat) {
-    const nCat = norm(cat);
-    const within = items.filter(p => p.nCat.includes(nCat));
-    if (within.length) pool = within;
-  }
-
-  // Si no hay tokens, devolvemos por precio/alfabético
-  if (!qTokens.length) {
-    return pool
-      .slice()
-      .sort((a, b) => String(a.nombre).localeCompare(String(b.nombre)))
-      .slice(0, limit);
-  }
-
-  const ranked = pool
-    .map(p => ({ p, s: fuzzyScoreProduct(p, qTokens) }))
-    .filter(x => x.s > 0)
-    .sort((a, b) => b.s - a.s)
-    .slice(0, limit)
-    .map(x => x.p);
-
-  // Si nada superó 0, caemos a búsqueda ilike básica
-  if (!ranked.length) {
-    const tokens = qTokens.slice(0, 3);
-    const or = tokens.map(tk => `nombre.ilike.%${tk}%`).join(",");
-    const { data, error } = await supa
-      .from("v_productos_publicos")
-      .select("id, nombre, precio, categoria_nombre")
-      .or(or)
-      .limit(limit);
-    if (!error && data?.length) {
-      return data.map(p => ({
-        id: p.id,
-        nombre: p.nombre,
-        precio: Number(p.precio || 0),
-        categoria: p.categoria_nombre,
-        nNombre: norm(p.nombre),
-        nCat: norm(p.categoria_nombre || "")
-      }));
-    }
-  }
-
-  return ranked;
+  const catNorm = norm(categoria);
+  
+  return items.filter(p => 
+    norm(p.categoria).includes(catNorm) ||
+    norm(p.nombre).includes(catNorm)
+  );
 }
 
-async function fuzzyFindOne(userText, preferCat = null) {
-  const list = await fuzzyFindProducts(userText, 1, preferCat);
-  return list?.[0] || null;
+async function buscarProductoPorNombre(nombre) {
+  const items = await loadCatalog();
+  const nombreNorm = norm(nombre);
+  
+  // Búsqueda exacta primero
+  let producto = items.find(p => norm(p.nombre) === nombreNorm);
+  
+  // Si no hay exacta, búsqueda parcial
+  if (!producto) {
+    producto = items.find(p => 
+      norm(p.nombre).includes(nombreNorm) ||
+      nombreNorm.includes(norm(p.nombre))
+    );
+  }
+  
+  return producto || null;
 }
 
-function formatList(arr) {
-  if (!arr?.length) return "No encontré coincidencias.";
-  return arr.map(p => `• **${p.nombre}** — ${toPY(p.precio)} Gs`).join("\n");
+/* ============== Sistema de memoria conversacional ============== */
+function initState(state) {
+  return {
+    history: state?.history || [],
+    cart: state?.cart || {},
+    lastCategory: state?.lastCategory || null,
+  };
 }
 
-/* ============== KB (RAG) para info general ============== */
-async function kbAnswer(userMsgRaw) {
+function addToHistory(state, role, content) {
+  state.history.push({ role, content, timestamp: Date.now() });
+  // Mantener solo últimos 10 mensajes
+  if (state.history.length > 10) {
+    state.history = state.history.slice(-10);
+  }
+}
+
+/* ============== Construcción del contexto para GPT ============== */
+async function buildContextForGPT(userMsg, state) {
+  // Obtener catálogo completo
+  const catalogo = await loadCatalog();
+  
+  // Crear resumen del catálogo por categoría
+  const categorias = {};
+  catalogo.forEach(p => {
+    if (!categorias[p.categoria]) categorias[p.categoria] = [];
+    categorias[p.categoria].push({
+      nombre: p.nombre,
+      precio: p.precio,
+      descripcion: p.descripcion
+    });
+  });
+  
+  const catalogoTexto = Object.entries(categorias)
+    .map(([cat, prods]) => {
+      const lista = prods.map(p => 
+        `- ${p.nombre}: ${toPY(p.precio)} Gs${p.descripcion ? ` (${p.descripcion})` : ''}`
+      ).join('\n');
+      return `**${cat}**:\n${lista}`;
+    })
+    .join('\n\n');
+  
+  // Crear contexto del carrito
+  const carritoItems = Object.values(state.cart);
+  const carritoTexto = carritoItems.length > 0
+    ? carritoItems.map(item => 
+        `- ${item.qty}× ${item.nombre} (${toPY(item.precio)} Gs c/u)`
+      ).join('\n')
+    : 'Carrito vacío';
+  
+  const total = carritoItems.reduce((sum, item) => 
+    sum + (item.precio * item.qty), 0
+  );
+  
+  return {
+    catalogo: catalogoTexto,
+    carrito: carritoTexto,
+    total: toPY(total),
+    totalNumerico: total
+  };
+}
+
+/* ============== Sistema de prompt para GPT ============== */
+function buildSystemPrompt(context) {
+  return `Sos el asistente virtual de Paniquiños, una panadería y confitería. Tu objetivo es ayudar a los clientes de forma natural, amigable y eficiente.
+
+**CATÁLOGO DISPONIBLE:**
+${context.catalogo}
+
+**CARRITO ACTUAL DEL CLIENTE:**
+${context.carrito}
+**Total actual:** ${context.total} Gs
+
+**INSTRUCCIONES:**
+1. Cuando te pregunten por productos o categorías, menciona SIEMPRE los nombres exactos y precios del catálogo
+2. Si preguntan "¿Tienen empanadas?" → Lista los tipos de empanadas con sus precios
+3. Si piden agregar algo, identifica el producto EXACTO del catálogo y responde confirmando
+4. Cuando pregunten por el total, calcula sumando todo el carrito
+5. Si piden quitar algo, confirma qué se quitó y el nuevo total
+6. Sé conversacional pero preciso: usa los datos reales del catálogo
+7. Si algo no está en el catálogo, dilo claramente y sugiere alternativas
+8. Usa formato claro cuando listes productos:
+   - Nombre: Precio Gs
+9. NUNCA inventes productos o precios
+10. Mantén respuestas cortas (2-4 líneas) salvo que listen varios productos
+
+**ESTILO:**
+- Amigable y cercano (vos argentino/paraguayo)
+- Natural, como un mozo/a atento
+- Emojis ocasionales (🍰 🥐 😊)
+- Directo y útil
+- Más formal / Más casual
+  - Con/sin emojis
+  - Respuestas largas/cortas`;
+}
+
+/* ============== Procesamiento de intención con GPT ============== */
+async function processWithGPT(userMsg, state) {
+  const context = await buildContextForGPT(userMsg, state);
+  const systemPrompt = buildSystemPrompt(context);
+  
+  // Construir historial para GPT
+  const messages = [
+    { role: "system", content: systemPrompt },
+    ...state.history.slice(-6), // Últimos 6 mensajes
+    { role: "user", content: userMsg }
+  ];
+  
   try {
-    const emb = await openai.embeddings.create({
-      model: "text-embedding-3-small",
-      input: userMsgRaw || "menu",
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      temperature: 0.7,
+      messages,
+      functions: [
+        {
+          name: "agregar_al_carrito",
+          description: "Agregar productos al carrito del cliente",
+          parameters: {
+            type: "object",
+            properties: {
+              producto: { type: "string", description: "Nombre exacto del producto" },
+              cantidad: { type: "number", description: "Cantidad a agregar" }
+            },
+            required: ["producto", "cantidad"]
+          }
+        },
+        {
+          name: "quitar_del_carrito",
+          description: "Quitar productos del carrito",
+          parameters: {
+            type: "object",
+            properties: {
+              producto: { type: "string", description: "Nombre exacto del producto" },
+              cantidad: { type: "number", description: "Cantidad a quitar" }
+            },
+            required: ["producto", "cantidad"]
+          }
+        },
+        {
+          name: "mostrar_total",
+          description: "Mostrar el total del carrito",
+          parameters: { type: "object", properties: {} }
+        }
+      ]
     });
-    const { data, error } = await supa.rpc("kb_search", {
-      query_embedding: emb.data[0].embedding,
-      match_count: 5,
-    });
-    if (error) {
-      console.warn("kb_search:", error.message);
-      return "";
+    
+    const choice = completion.choices[0];
+    
+    // Si GPT decidió usar una función
+    if (choice.finish_reason === "function_call") {
+      const funcCall = choice.message.function_call;
+      const args = JSON.parse(funcCall.arguments);
+      
+      switch (funcCall.name) {
+        case "agregar_al_carrito": {
+          const prod = await buscarProductoPorNombre(args.producto);
+          if (prod) {
+            const qty = Math.max(1, parseInt(args.cantidad));
+            if (!state.cart[prod.id]) {
+              state.cart[prod.id] = { ...prod, qty: 0 };
+            }
+            state.cart[prod.id].qty += qty;
+            
+            return {
+              reply: `Listo! Agregué ${qty}× ${prod.nombre} al carrito 🛒`,
+              action: { 
+                type: "ADD_TO_CART", 
+                product: prod, 
+                qty 
+              },
+              state
+            };
+          }
+          return { 
+            reply: "No encontré ese producto exacto. ¿Podés ser más específico?",
+            state 
+          };
+        }
+        
+        case "quitar_del_carrito": {
+          const prod = await buscarProductoPorNombre(args.producto);
+          if (prod && state.cart[prod.id]) {
+            const qty = Math.max(1, parseInt(args.cantidad));
+            state.cart[prod.id].qty -= qty;
+            
+            if (state.cart[prod.id].qty <= 0) {
+              delete state.cart[prod.id];
+            }
+            
+            const items = Object.values(state.cart);
+            const newTotal = items.reduce((sum, item) => 
+              sum + (item.precio * item.qty), 0
+            );
+            
+            return {
+              reply: `Listo! Quité ${qty}× ${prod.nombre}. Tu nuevo total es ${toPY(newTotal)} Gs`,
+              action: { 
+                type: "REMOVE_FROM_CART", 
+                product: prod, 
+                qty 
+              },
+              state
+            };
+          }
+          return { 
+            reply: "Ese producto no está en tu carrito.",
+            state 
+          };
+        }
+        
+        case "mostrar_total": {
+          return {
+            reply: `Tu total actual es ${context.total} Gs 💰`,
+            action: { type: "GET_CART_TOTAL" },
+            state
+          };
+        }
+      }
     }
-    return (data || []).map(r => r.content).join("\n");
-  } catch (e) {
-    console.warn("RAG fail:", e?.message);
-    return "";
+    
+    // Respuesta normal de texto
+    const reply = choice.message.content.trim() || "¿En qué más te puedo ayudar?";
+    return { reply, state };
+    
+  } catch (err) {
+    console.error("GPT error:", err);
+    return { 
+      reply: "Disculpá, tuve un problema. ¿Podés repetir?",
+      state 
+    };
   }
-}
-
-/* ============== NLU de acciones de carrito ============== */
-function parseQty(text) {
-  const m = text.match(/\b(\d+)\b/);
-  return m ? Math.max(1, parseInt(m[1], 10)) : 1;
-}
-function stripVerbsForHint(text) {
-  // Quitamos verbos/complementos típicos para quedarnos con el "objeto"
-  let t = norm(text);
-  t = t.replace(/\b(agrega|agregame|agregar|sumar|pone|poner|anade|anadir|quita|quitar|remueve|remover|saca|sacar|elimina|eliminar)\b/g, " ");
-  t = t.replace(/\b(al|a|la|las|los|el|de|del|por|para|mi|me|carrito|al carrito)\b/g, " ");
-  t = t.replace(/\s+/g, " ").trim();
-  return t || norm(text);
 }
 
 /* ============== Handler principal ============== */
 export default async function handler(req, res) {
-  if (req.method !== "POST") return res.status(405).json({ error: "Método no permitido" });
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Método no permitido" });
+  }
 
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
     const userMsgRaw = body?.messages?.[0]?.content ?? "";
-    const t = norm(userMsgRaw);
-
-    /* ---- 1) Acciones de carrito (agregar/quitar/total) ---- */
-    if (has(t, "agrega", "agregame", "sumar", "pone", "poner", "anade", "anadir")) {
-      const qty = parseQty(t);
-      const hint = stripVerbsForHint(t);
-      // Si el mensaje menciona una categoría, la priorizamos
-      const preferCat = detectCategoryByWords(t);
-      const prod = await fuzzyFindOne(hint, preferCat);
-      if (prod) {
-        return res.status(200).json({
-          reply: `Ok, agregué ${qty}× ${prod.nombre}.`,
-          action: { type: "ADD_TO_CART", product: { id: prod.id, nombre: prod.nombre, precio: prod.precio }, qty }
-        });
-      }
-      return res.status(200).json({ reply: "No identifiqué ese producto. ¿El nombre exacto?" });
+    const userState = body?.state || {};
+    
+    // Inicializar estado
+    const state = initState(userState);
+    
+    // Agregar mensaje del usuario al historial
+    addToHistory(state, "user", userMsgRaw);
+    
+    // Procesar con GPT
+    const result = await processWithGPT(userMsgRaw, state);
+    
+    // Agregar respuesta al historial
+    if (result.reply) {
+      addToHistory(result.state || state, "assistant", result.reply);
     }
-
-    if (has(t, "quita", "quitar", "remueve", "remover", "saca", "sacar", "elimina", "eliminar")) {
-      const qty = parseQty(t);
-      const hint = stripVerbsForHint(t);
-      const preferCat = detectCategoryByWords(t);
-      const prod = await fuzzyFindOne(hint, preferCat);
-      if (prod) {
-        return res.status(200).json({
-          reply: `Listo, quité ${qty}× ${prod.nombre}.`,
-          action: { type: "REMOVE_FROM_CART", product: { id: prod.id, nombre: prod.nombre }, qty }
-        });
-      }
-      return res.status(200).json({ reply: "No identifiqué cuál quitar. Decime el nombre." });
-    }
-
-    if (has(t, "total", "cuanto sale", "cuanto es", "cuánto sale", "cuánto es", "monto", "pagar")) {
-      return res.status(200).json({
-        reply: "Este es tu total:",
-        action: { type: "GET_CART_TOTAL" }
-      });
-    }
-
-    /* ---- 2) Consultas de precio/listado por categoría o texto ---- */
-    if (has(t, "precio", "precios", "cuesta", "vale", "valen", "costo") || has(t, "tenes", "tienes", "hay", "dispones", "busco", "quiero")) {
-      const cat = detectCategoryByWords(t);
-      const list = cat
-        ? await fuzzyFindProducts(t, 6, cat)
-        : await fuzzyFindProducts(t, 6, null);
-
-      if (list.length) {
-        const header = cat ? `${cat[0].toUpperCase() + cat.slice(1)}:` : "Te paso opciones:";
-        return res.status(200).json({
-          reply: `${header}\n\n${formatList(list)}\n\n¿Querés alguno?`
-        });
-      }
-    }
-
-    // También si solo preguntan por la categoría (“empanadas?”, “bocaditos?”)
-    const askedCat = detectCategoryByWords(t);
-    if (askedCat) {
-      const list = await fuzzyFindProducts(t, 6, askedCat);
-      if (list.length) {
-        return res.status(200).json({
-          reply: `${askedCat[0].toUpperCase() + askedCat.slice(1)}:\n\n${formatList(list)}\n\n¿Te agrego alguno?`
-        });
-      }
-    }
-
-    /* ---- 3) Fallback semántico a KB (horarios, feriados, IG, etc.) ---- */
-    const contexto = await kbAnswer(userMsgRaw);
-    const system = `
-Sos "Paniquiños Bot", mozo virtual de Paniquiños. Estilo: directo, amable y breve.
-Reglas:
-- Respuestas cortas (1–2 líneas), siempre dentro del chat.
-- No inventes precios ni productos. Si no sabés, decí “No tengo ese dato” y ofrecé ver el catálogo o preguntar otra cosa.
-Contexto (puede estar vacío):
-${contexto || "(sin contexto de KB)"}`
-      .trim();
-
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      temperature: 0.3,
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: userMsgRaw || "Hola" },
-      ],
+    
+    return res.status(200).json({
+      reply: result.reply,
+      action: result.action,
+      state: result.state || state
     });
-
-    const llmText =
-      completion.choices?.[0]?.message?.content?.trim() ||
-      "¿Qué te gustaría pedir o consultar?";
-    return res.status(200).json({ reply: llmText });
+    
   } catch (err) {
     console.error("Error /api/ask:", err);
-    return res.status(500).json({ error: "Error interno del servidor" });
+    return res.status(500).json({ 
+      error: "Error interno del servidor",
+      reply: "Disculpá, hubo un problema técnico. Intentá de nuevo." 
+    });
   }
 }
