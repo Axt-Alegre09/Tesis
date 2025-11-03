@@ -13,36 +13,62 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 let usuarioActual = null;
 let tarjetaEditando = null;
 
+// Verificar autenticación PRIMERO
+async function verificarAutenticacion() {
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    
+    if (error) {
+      console.error('Error al verificar sesión:', error);
+      window.location.href = 'login.html';
+      return false;
+    }
+    
+    if (!session) {
+      console.log('No hay sesión activa');
+      window.location.href = 'login.html';
+      return false;
+    }
+
+    usuarioActual = session.user;
+    console.log('Usuario autenticado:', usuarioActual.email);
+    return true;
+
+  } catch (error) {
+    console.error('Error en verificación:', error);
+    window.location.href = 'login.html';
+    return false;
+  }
+}
+
 // Inicialización
 document.addEventListener('DOMContentLoaded', async () => {
-  await cargarUsuario();
+  console.log('Iniciando aplicación...');
+  
+  // Primero verificar autenticación
+  const autenticado = await verificarAutenticacion();
+  
+  if (!autenticado) {
+    return; // Detener si no está autenticado
+  }
+
+  // Si está autenticado, continuar
   await cargarTarjetas();
   inicializarEventos();
   generarAnios();
   inicializarAnimacionTarjeta();
 });
 
-// Cargar usuario actual
-async function cargarUsuario() {
-  try {
-    const { data: { user }, error } = await supabase.auth.getUser();
-    if (error) throw error;
-    
-    if (!user) {
-      window.location.href = 'login.html';
-      return;
-    }
-    
-    usuarioActual = user;
-  } catch (error) {
-    console.error('Error al cargar usuario:', error);
-    window.location.href = 'login.html';
-  }
-}
-
 // Cargar tarjetas del usuario
 async function cargarTarjetas() {
   const listaTarjetas = document.getElementById('lista-tarjetas');
+  
+  if (!usuarioActual) {
+    console.error('No hay usuario actual');
+    return;
+  }
+
+  console.log('Cargando tarjetas para usuario:', usuarioActual.id);
   
   try {
     const { data: tarjetas, error } = await supabase
@@ -52,7 +78,12 @@ async function cargarTarjetas() {
       .order('es_predeterminada', { ascending: false })
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error de Supabase:', error);
+      throw error;
+    }
+
+    console.log('Tarjetas cargadas:', tarjetas);
 
     if (!tarjetas || tarjetas.length === 0) {
       listaTarjetas.innerHTML = `
@@ -94,7 +125,7 @@ async function cargarTarjetas() {
     listaTarjetas.innerHTML = `
       <div class="alert alert-danger">
         <i class="bi bi-exclamation-triangle"></i>
-        Error al cargar las tarjetas. Intenta nuevamente.
+        Error al cargar las tarjetas: ${error.message}
       </div>
     `;
   }
@@ -206,14 +237,13 @@ async function editarTarjeta(id) {
     document.getElementById('input-nombre').value = tarjeta.nombre_titular;
     document.getElementById('input-mes').value = tarjeta.mes_vencimiento;
     document.getElementById('input-anio').value = tarjeta.anio_vencimiento;
-    document.getElementById('input-cvv').value = ''; // Por seguridad, no mostramos el CVV
+    document.getElementById('input-cvv').value = ''; // Por seguridad
     document.getElementById('input-predeterminado').checked = tarjeta.es_predeterminada;
 
     document.querySelector('.modal-title').textContent = 'Editar tarjeta';
     document.getElementById('modal-tarjeta').removeAttribute('hidden');
     document.body.style.overflow = 'hidden';
 
-    // Actualizar vista previa de la tarjeta
     actualizarVistaPrevia();
 
   } catch (error) {
@@ -240,7 +270,7 @@ async function guardarTarjeta(e) {
   }
 
   if (!validarCVV(cvv)) {
-    alert('CVV inválido');
+    alert('CVV inválido (debe ser de 3 o 4 dígitos)');
     return;
   }
 
@@ -264,20 +294,18 @@ async function guardarTarjeta(e) {
       nombre_titular: nombre,
       mes_vencimiento: mes,
       anio_vencimiento: anio,
-      cvv: cvv, // En producción, esto debería estar encriptado
+      cvv: cvv,
       es_predeterminada: esPredeterminada
     };
 
     let resultado;
 
     if (tarjetaEditando) {
-      // Actualizar tarjeta existente
       resultado = await supabase
         .from('metodos_pago')
         .update(datosTarjeta)
         .eq('id', tarjetaEditando.id);
     } else {
-      // Crear nueva tarjeta
       resultado = await supabase
         .from('metodos_pago')
         .insert([datosTarjeta]);
@@ -287,13 +315,11 @@ async function guardarTarjeta(e) {
 
     cerrarModal();
     await cargarTarjetas();
-    
-    // Mostrar mensaje de éxito
     mostrarMensaje('Tarjeta guardada exitosamente', 'success');
 
   } catch (error) {
     console.error('Error al guardar tarjeta:', error);
-    alert('Error al guardar la tarjeta. Intenta nuevamente.');
+    alert('Error al guardar la tarjeta: ' + error.message);
   }
 }
 
@@ -323,13 +349,11 @@ async function eliminarTarjeta(id) {
 // Establecer como predeterminada
 async function establecerPredeterminada(id) {
   try {
-    // Desmarcar todas las tarjetas
     await supabase
       .from('metodos_pago')
       .update({ es_predeterminada: false })
       .eq('usuario_id', usuarioActual.id);
 
-    // Marcar la seleccionada
     const { error } = await supabase
       .from('metodos_pago')
       .update({ es_predeterminada: true })
@@ -346,54 +370,48 @@ async function establecerPredeterminada(id) {
   }
 }
 
-// Validar número de tarjeta (algoritmo de Luhn)
+// Validaciones
 function validarNumeroTarjeta(numero) {
   if (!/^\d{13,19}$/.test(numero)) return false;
-
+  
   let suma = 0;
   let esSegundo = false;
-
+  
   for (let i = numero.length - 1; i >= 0; i--) {
     let digito = parseInt(numero.charAt(i));
-
     if (esSegundo) {
       digito *= 2;
       if (digito > 9) digito -= 9;
     }
-
     suma += digito;
     esSegundo = !esSegundo;
   }
-
+  
   return suma % 10 === 0;
 }
 
-// Validar CVV
 function validarCVV(cvv) {
   return /^\d{3,4}$/.test(cvv);
 }
 
-// Validar fecha de vencimiento
 function validarFechaVencimiento(mes, anio) {
   const hoy = new Date();
   const mesActual = hoy.getMonth() + 1;
   const anioActual = hoy.getFullYear() % 100;
-
+  
   const mesNum = parseInt(mes);
   const anioNum = parseInt(anio);
-
+  
   if (anioNum < anioActual) return false;
   if (anioNum === anioActual && mesNum < mesActual) return false;
-
+  
   return true;
 }
 
-// Formatear número de tarjeta
 function formatearNumeroTarjeta(numero) {
   return numero.replace(/(\d{4})/g, '$1 ').trim();
 }
 
-// Generar años para el select
 function generarAnios() {
   const selectAnio = document.getElementById('input-anio');
   const anioActual = new Date().getFullYear();
@@ -408,7 +426,6 @@ function generarAnios() {
   }
 }
 
-// Inicializar animación de tarjeta
 function inicializarAnimacionTarjeta() {
   const inputNumero = document.getElementById('input-numero');
   const inputNombre = document.getElementById('input-nombre');
@@ -417,11 +434,8 @@ function inicializarAnimacionTarjeta() {
   const inputCvv = document.getElementById('input-cvv');
   const tarjeta = document.getElementById('credit-card');
 
-  // Formatear número mientras se escribe
   inputNumero.addEventListener('input', (e) => {
-    let valor = e.target.value.replace(/\s/g, '');
-    valor = valor.replace(/\D/g, '');
-    valor = valor.substring(0, 16);
+    let valor = e.target.value.replace(/\s/g, '').replace(/\D/g, '').substring(0, 16);
     e.target.value = formatearNumeroTarjeta(valor);
     actualizarVistaPrevia();
   });
@@ -430,31 +444,21 @@ function inicializarAnimacionTarjeta() {
   inputMes.addEventListener('change', actualizarVistaPrevia);
   inputAnio.addEventListener('change', actualizarVistaPrevia);
 
-  // Voltear tarjeta al enfocar CVV
-  inputCvv.addEventListener('focus', () => {
-    tarjeta.classList.add('flipped');
-  });
-
-  inputCvv.addEventListener('blur', () => {
-    tarjeta.classList.remove('flipped');
-  });
-
+  inputCvv.addEventListener('focus', () => tarjeta.classList.add('flipped'));
+  inputCvv.addEventListener('blur', () => tarjeta.classList.remove('flipped'));
   inputCvv.addEventListener('input', (e) => {
-    let valor = e.target.value.replace(/\D/g, '');
-    valor = valor.substring(0, 4);
+    let valor = e.target.value.replace(/\D/g, '').substring(0, 4);
     e.target.value = valor;
     document.getElementById('card-display-cvv').textContent = valor || '***';
   });
 }
 
-// Actualizar vista previa de la tarjeta
 function actualizarVistaPrevia() {
   const numero = document.getElementById('input-numero').value.replace(/\s/g, '');
   const nombre = document.getElementById('input-nombre').value || 'TU NOMBRE';
   const mes = document.getElementById('input-mes').value || 'MM';
   const anio = document.getElementById('input-anio').value || 'AA';
 
-  // Actualizar número
   const displayNumero = document.getElementById('card-display-number');
   const grupos = numero.match(/.{1,4}/g) || [];
   displayNumero.innerHTML = '';
@@ -464,61 +468,28 @@ function actualizarVistaPrevia() {
     displayNumero.appendChild(span);
   }
 
-  // Actualizar nombre
   document.getElementById('card-display-name').textContent = nombre.toUpperCase();
-
-  // Actualizar fecha
   document.getElementById('card-display-exp').textContent = `${mes}/${anio}`;
 }
 
-// Resetear tarjeta animada
 function resetearTarjetaAnimada() {
-  document.getElementById('card-display-number').innerHTML = `
-    <span>####</span>
-    <span>####</span>
-    <span>####</span>
-    <span>####</span>
-  `;
+  document.getElementById('card-display-number').innerHTML = '<span>####</span><span>####</span><span>####</span><span>####</span>';
   document.getElementById('card-display-name').textContent = 'TU NOMBRE';
   document.getElementById('card-display-exp').textContent = 'MM/AA';
   document.getElementById('card-display-cvv').textContent = '***';
   document.getElementById('credit-card').classList.remove('flipped');
 }
 
-// Mostrar mensaje temporal
 function mostrarMensaje(texto, tipo = 'info') {
   const alerta = document.createElement('div');
-  alerta.className = `alert alert-${tipo} alert-flotante`;
-  alerta.innerHTML = `
-    <i class="bi bi-check-circle-fill"></i>
-    ${texto}
-  `;
-  alerta.style.cssText = `
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 9999;
-    padding: 1rem 1.5rem;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    opacity: 0;
-    transform: translateY(-20px);
-    transition: all 0.3s ease;
-  `;
+  alerta.className = `alert alert-${tipo}`;
+  alerta.innerHTML = `<i class="bi bi-check-circle-fill"></i> ${texto}`;
+  alerta.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; padding: 1rem 1.5rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); opacity: 0; transition: opacity 0.3s;';
   
   document.body.appendChild(alerta);
-  
-  setTimeout(() => {
-    alerta.style.opacity = '1';
-    alerta.style.transform = 'translateY(0)';
-  }, 100);
-
+  setTimeout(() => alerta.style.opacity = '1', 100);
   setTimeout(() => {
     alerta.style.opacity = '0';
-    alerta.style.transform = 'translateY(-20px)';
     setTimeout(() => alerta.remove(), 300);
   }, 3000);
 }
