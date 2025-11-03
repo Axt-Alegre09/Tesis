@@ -3,11 +3,13 @@
 // Importar Supabase
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
-// Configuración de Supabase
+// Configuración de Supabase - KEY ACTUALIZADA
 const SUPABASE_URL = 'https://jyygevitfnbwrvxrjexp.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5eWdldml0Zm5id3J2eHJqZXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ1NTU5MzksImV4cCI6MjA1MDEzMTkzOX0.g3fEncynaqsubaY3OwnybJIjSm2oue61CY6c5Z3a7zg';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5eWdldml0Zm5id3J2eHJqZXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2OTQ2OTYsImV4cCI6MjA3MTI3MDY5Nn0.St0IiSZSeELESshctneazCJHXCDBi9wrZ28UkiEDXYo';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ... resto del código igual
 
 // Variables globales
 let usuarioActual = null;
