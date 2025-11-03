@@ -546,4 +546,9 @@ document.getElementById("soporteBtn")?.addEventListener("click", async () => {
   window.open(whatsappURL, "_blank");
 });
 
+document.getElementById('historialBtn')?.addEventListener('click', () => {
+  window.location.href = 'historial.html';
+});
+
+
 init();
