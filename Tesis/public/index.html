@@ -236,25 +236,44 @@
   </div>
 
   <!-- CHATBOT FLOTANTE -->
-  <button class="chatbot-toggler" aria-label="Abrir chat"><i class="bi bi-chat-left-text"></i><i class="bi bi-x-lg"></i></button>
+  <button class="chatbot-toggler" aria-label="Abrir chat">
+    <i class="bi bi-chat-left-text"></i>
+    <i class="bi bi-x-lg"></i>
+  </button>
+
   <div class="chat-container" id="chat-container">
+    <!-- HEADER del chat -->
+    <header class="chat-header">
+      <div class="chat-header-icon">
+        🥐
+      </div>
+      <div class="chat-header-info">
+        <h3 class="chat-header-title">Paniquiños Bot IA</h3>
+        <div class="chat-header-status">En línea · Responde al instante</div>
+      </div>
+    </header>
+
+    <!-- CUERPO del chat -->
     <div class="chatbox" id="chat-body"></div>
+
+    <!-- FORMULARIO de entrada -->
     <form id="chat-form">
-      <input id="chat-input" type="text" placeholder="Escribí tu mensaje..." autocomplete="off" />
-      <button type="submit"><i class="bi bi-send-fill"></i></button>
+      <input 
+        id="chat-input" 
+        type="text" 
+        placeholder="Escribí tu mensaje..." 
+        autocomplete="off" 
+        maxlength="500"
+      />
+      <button type="submit" aria-label="Enviar mensaje">
+        <i class="bi bi-send-fill"></i>
+      </button>
     </form>
   </div>
 
-
-
-  <!-- …tus otros scripts… -->
-<script type="module" src="JS/main.js"></script>
-<script type="module" src="JS/reco-popup.js"></script>
-
-<!-- Chat: primero el “cerebro” (clásico), luego el UI (módulo) -->
-<script type="module" src="JS/script-chatbot.js"></script>
-
+  <!-- Scripts -->
+  <script type="module" src="JS/main.js"></script>
+  <script type="module" src="JS/reco-popup.js"></script>
+  <script type="module" src="JS/script-chatbot.js"></script>
 </body>
 </html>
-
-

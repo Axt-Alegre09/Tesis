@@ -34,7 +34,7 @@ async function loadCatalog() {
 
   const { data, error } = await supa
     .from("v_productos_publicos")
-    .select("id, nombre, precio, categoria_nombre, descripcion");
+    .select("id, nombre, precio, categoria_nombre");
   
   if (error) {
     console.warn("loadCatalog:", error.message);
@@ -46,7 +46,6 @@ async function loadCatalog() {
     nombre: String(p.nombre || "").trim(),
     precio: Number(p.precio || 0),
     categoria: String(p.categoria_nombre || "").trim(),
-    descripcion: String(p.descripcion || "").trim(),
   }));
   
   _cache = { at: now, items };
@@ -110,15 +109,14 @@ async function buildContextForGPT(userMsg, state) {
     if (!categorias[p.categoria]) categorias[p.categoria] = [];
     categorias[p.categoria].push({
       nombre: p.nombre,
-      precio: p.precio,
-      descripcion: p.descripcion
+      precio: p.precio
     });
   });
   
   const catalogoTexto = Object.entries(categorias)
     .map(([cat, prods]) => {
       const lista = prods.map(p => 
-        `- ${p.nombre}: ${toPY(p.precio)} Gs${p.descripcion ? ` (${p.descripcion})` : ''}`
+        `- ${p.nombre}: ${toPY(p.precio)} Gs`
       ).join('\n');
       return `**${cat}**:\n${lista}`;
     })
@@ -148,6 +146,14 @@ async function buildContextForGPT(userMsg, state) {
 function buildSystemPrompt(context) {
   return `Sos el asistente virtual de Paniquiños, una panadería y confitería. Tu objetivo es ayudar a los clientes de forma natural, amigable y eficiente.
 
+**INFORMACIÓN DE LA TIENDA:**
+📍 **Ubicación:** Asunción, Paraguay
+⏰ **Horarios:**
+   - Lunes a Viernes: 8:00 AM a 6:00 PM
+   - Sábados y Domingos: 8:00 AM a 1:00 PM
+🚚 **Delivery:** Disponible en Asunción y Gran Asunción
+📱 **WhatsApp:** +595 992 544 305
+
 **CATÁLOGO DISPONIBLE:**
 ${context.catalogo}
 
@@ -161,21 +167,20 @@ ${context.carrito}
 3. Si piden agregar algo, identifica el producto EXACTO del catálogo y responde confirmando
 4. Cuando pregunten por el total, calcula sumando todo el carrito
 5. Si piden quitar algo, confirma qué se quitó y el nuevo total
-6. Sé conversacional pero preciso: usa los datos reales del catálogo
-7. Si algo no está en el catálogo, dilo claramente y sugiere alternativas
-8. Usa formato claro cuando listes productos:
-   - Nombre: Precio Gs
-9. NUNCA inventes productos o precios
-10. Mantén respuestas cortas (2-4 líneas) salvo que listen varios productos
+6. Si preguntan por horarios, delivery o contacto, usa la información de la tienda
+7. Para pedidos por WhatsApp, menciona que pueden escribir al número de la tienda
+8. Sé conversacional pero preciso: usa los datos reales
+9. Si algo no está en el catálogo, dilo claramente y sugiere alternativas
+10. Usa formato claro cuando listes productos:
+    - Nombre: Precio Gs
+11. NUNCA inventes productos, precios o información de la tienda
+12. Mantén respuestas cortas (2-4 líneas) salvo que listen varios productos
 
 **ESTILO:**
 - Amigable y cercano (vos argentino/paraguayo)
 - Natural, como un mozo/a atento
 - Emojis ocasionales (🍰 🥐 😊)
-- Directo y útil
-- Más formal / Más casual
-  - Con/sin emojis
-  - Respuestas largas/cortas`;
+- Directo y útil`;
 }
 
 /* ============== Procesamiento de intención con GPT ============== */
