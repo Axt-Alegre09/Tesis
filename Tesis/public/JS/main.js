@@ -506,6 +506,73 @@ async function init() {
   });
 })();
 
+/* === Mobile aside toggle (hamburguesa) === */
+(() => {
+  const body = document.body;
+  const aside = document.getElementById("mobileAside");
+  const toggleBtn = document.getElementById("menuToggle");
+  const closeBtn = document.getElementById("menuClose");
+
+  if (!aside || !toggleBtn) return;
+
+  // Crear backdrop si no existe
+  let backdrop = document.querySelector(".backdrop");
+  if (!backdrop) {
+    backdrop = document.createElement("div");
+    backdrop.className = "backdrop";
+    body.appendChild(backdrop);
+  }
+
+  const mq = window.matchMedia("(max-width: 900px)");
+
+  const openAside = () => {
+    if (!mq.matches) return; // solo en móvil/tablet
+    body.classList.add("aside-open");
+    toggleBtn.setAttribute("aria-expanded", "true");
+  };
+
+  const closeAside = () => {
+    body.classList.remove("aside-open");
+    toggleBtn.setAttribute("aria-expanded", "false");
+  };
+
+  const toggleAside = () => {
+    if (body.classList.contains("aside-open")) {
+      closeAside();
+    } else {
+      openAside();
+    }
+  };
+
+  toggleBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    toggleAside();
+  });
+
+  closeBtn?.addEventListener("click", (e) => {
+    e.preventDefault();
+    closeAside();
+  });
+
+  backdrop.addEventListener("click", () => {
+    closeAside();
+  });
+
+  // Cerrar al agrandar ventana (pasar a desktop)
+  window.addEventListener("resize", () => {
+    if (!mq.matches) {
+      closeAside();
+    }
+  });
+
+  // Cerrar con ESC
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && body.classList.contains("aside-open")) {
+      closeAside();
+    }
+  });
+})();
+
 // === Event listeners del menú ===
 
 // Favoritos
@@ -546,9 +613,8 @@ document.getElementById("soporteBtn")?.addEventListener("click", async () => {
   window.open(whatsappURL, "_blank");
 });
 
-document.getElementById('historialBtn')?.addEventListener('click', () => {
-  window.location.href = 'historial.html';
+document.getElementById("historialBtn")?.addEventListener("click", () => {
+  window.location.href = "historial.html";
 });
-
 
 init();
