@@ -220,11 +220,14 @@ ${context.cateringInfo || ''}
 3. Si piden agregar algo, identifica el producto EXACTO del catálogo y responde confirmando
 4. **CATERING - Modo conversacional natural:**
    - Recopilá datos UNO A LA VEZ, de forma natural
-   - RECORDÁ los datos que ya te dieron (no los pidas de nuevo)
-   - Si mencionan productos mientras agendás catering, agregalos al carrito pero SEGUÍ con el catering
-   - Cuando te den un producto/combo para el catering, preguntá "¿Algo más para el menú o seguimos con los datos?"
+   - RECORDÁ los datos que ya te dieron - NUNCA pidas el mismo dato dos veces
+   - Si el usuario ya dijo su nombre al inicio, NO lo vuelvas a pedir
+   - Si ya mencionaron la fecha/hora/lugar, NO lo pidas de nuevo
+   - Antes de preguntar algo, verificá si ya lo tenés en el contexto de la conversación
+   - Si mencionan productos mientras agendás catering, eso es parte del menú (no va al carrito)
    - Cuando tengas TODOS los datos obligatorios (nombre, tipo evento, fecha, hora, menú, lugar), agendá automáticamente
-   - Si falta algún dato, preguntá solo por ESE dato que falta
+   - Los datos opcionales (invitados, teléfono, email) preguntá si el cliente quiere agregarlos: "¿Querés agregar teléfono/email/número de invitados?"
+   - Si falta algún dato obligatorio, preguntá solo por ESE dato
 5. Cuando pregunten por el total, calcula sumando todo el carrito
 6. Si piden quitar algo, confirma qué se quitó y el nuevo total
 7. Si preguntan por horarios, delivery o contacto, usa la información de la tienda
@@ -415,7 +418,7 @@ async function processWithGPT(userMsg, state) {
           try {
             console.log('[CATERING] Intentando agendar con args:', args);
             
-            // Llamar a la función de Supabase
+            // Llamar a la función de Supabase con el ORDEN CORRECTO de parámetros
             const { data, error } = await supa.rpc("catering_agendar", {
               p_razonsocial: args.razonsocial,
               p_tipoevento: args.tipoevento,
@@ -423,7 +426,8 @@ async function processWithGPT(userMsg, state) {
               p_hora: args.hora,
               p_tipocomida: args.tipocomida,
               p_lugar: args.lugar,
-              p_ruc: 'CHAT-BOT', // Identificador de reservas por chat
+              p_ruc: 'CHAT-BOT',
+              p_observaciones: null,
               p_invitados: args.invitados || null,
               p_telefono: args.telefono || null,
               p_email: args.email || null
