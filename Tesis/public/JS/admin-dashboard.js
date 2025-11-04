@@ -278,12 +278,12 @@ const views = {
     </div>
   `,
 
-  categorias: `
-    <h2 style="font-size: 1.75rem; font-weight: 700; margin-bottom: 2rem;">Categorías</h2>
-    <div class="card">
-      <p style="color: var(--text-secondary); text-align: center; padding: 3rem;">Vista de categorías en desarrollo...</p>
-    </div>
-  `,
+  promos: `
+   <h2 style="font-size: 1.75rem; font-weight: 700; margin-bottom: 2rem;">Promociones</h2>
+   <div class="card">
+      <iframe src="promos.html" style="width: 100%; height: 85vh; border: none; border-radius: 12px;"></iframe>
+  </div>
+`,
 
   pedidos: `
     <h2 style="font-size: 1.75rem; font-weight: 700; margin-bottom: 2rem;">Pedidos</h2>
