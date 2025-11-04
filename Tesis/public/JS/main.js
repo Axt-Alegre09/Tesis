@@ -1,4 +1,4 @@
-// JS/main.js - CON SOPORTE PARA PROMOS
+// JS/main.js - CON SOPORTE PARA PROMOS (FIXED)
 import { supabase } from "./ScriptLogin.js";
 import "./cart-api.js"; // asegura CartAPI en window
 
@@ -166,16 +166,19 @@ async function fetchProductosCatalogo() {
     return [];
   }
 
+  console.log('✅ Productos cargados:', data?.length || 0);
+  console.log('🏷️ Con promo:', data?.filter(p => p.tiene_promo).length || 0);
+
   return (data || []).map((p) => ({
     id: p.id,
     nombre: p.nombre,
     titulo: p.nombre,
     imagen: toImg(p.imagen),
-    precio: p.precio_original, // Precio original
-    precioConPromo: p.precio_con_promo, // Precio con descuento
+    precio: parseFloat(p.precio_original), // Precio original
+    precioConPromo: parseFloat(p.precio_con_promo), // Precio con descuento
     tienePromo: p.tiene_promo,
-    descuentoPorcentaje: p.descuento_porcentaje,
-    ahorroGs: p.ahorro_gs,
+    descuentoPorcentaje: parseFloat(p.descuento_porcentaje || 0),
+    ahorroGs: parseFloat(p.ahorro_gs || 0),
     promoNombre: p.promo_nombre,
     promoFin: p.promo_fin,
     categoria: { id: slug(p.categoria_nombre || ""), nombre: p.categoria_nombre },
@@ -261,7 +264,7 @@ function montar(productos, esFavoritos = false) {
 
     const esFav = FAVORITOS_IDS.has(producto.id);
     const tienePromo = producto.tienePromo;
-    const descuento = producto.descuentoPorcentaje || 0;
+    const descuento = Math.round(producto.descuentoPorcentaje || 0);
     
     // Badge de descuento
     const badgePromo = tienePromo ? `
@@ -412,11 +415,11 @@ async function buscar(q) {
     nombre: p.nombre,
     titulo: p.nombre,
     imagen: toImg(p.imagen),
-    precio: p.precio_original,
-    precioConPromo: p.precio_con_promo,
+    precio: parseFloat(p.precio_original),
+    precioConPromo: parseFloat(p.precio_con_promo),
     tienePromo: p.tiene_promo,
-    descuentoPorcentaje: p.descuento_porcentaje,
-    ahorroGs: p.ahorro_gs,
+    descuentoPorcentaje: parseFloat(p.descuento_porcentaje || 0),
+    ahorroGs: parseFloat(p.ahorro_gs || 0),
     promoNombre: p.promo_nombre,
     promoFin: p.promo_fin,
     categoria: { id: slug(p.categoria_nombre || ""), nombre: p.categoria_nombre },
