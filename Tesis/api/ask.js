@@ -24,6 +24,113 @@ const norm = (s = "") =>
     .replace(/\s+/g, " ")
     .trim();
 
+/* ============== Parser de fechas y horas naturales ============== */
+function parseFechaNatural(texto) {
+  if (!texto) return null;
+  
+  const str = texto.toLowerCase().trim();
+  
+  // Si ya está en formato YYYY-MM-DD, retornar tal cual
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+  
+  // Mapeo de meses en español
+  const meses = {
+    'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04',
+    'mayo': '05', 'junio': '06', 'julio': '07', 'agosto': '08',
+    'septiembre': '09', 'setiembre': '09', 'octubre': '10', 'noviembre': '11', 'diciembre': '12'
+  };
+  
+  // Patrón: "15 de diciembre" o "15 diciembre" o "15/12" o "15-12"
+  let dia = null, mes = null, anio = null;
+  
+  // Buscar día (1-31)
+  const matchDia = str.match(/\b(\d{1,2})\b/);
+  if (matchDia) dia = matchDia[1].padStart(2, '0');
+  
+  // Buscar mes por nombre
+  for (const [nombre, num] of Object.entries(meses)) {
+    if (str.includes(nombre)) {
+      mes = num;
+      break;
+    }
+  }
+  
+  // Si no encontró mes por nombre, buscar número (formato 15/12 o 15-12)
+  if (!mes) {
+    const matchMes = str.match(/\b\d{1,2}[\/\-](\d{1,2})\b/);
+    if (matchMes) mes = matchMes[1].padStart(2, '0');
+  }
+  
+  // Buscar año explícito (2024, 2025, etc)
+  const matchAnio = str.match(/\b(20\d{2})\b/);
+  if (matchAnio) {
+    anio = matchAnio[1];
+  } else {
+    // Si no hay año, determinar si es este año o el siguiente
+    const ahora = new Date();
+    const anioActual = ahora.getFullYear();
+    const mesActual = ahora.getMonth() + 1;
+    const diaActual = ahora.getDate();
+    
+    if (mes && parseInt(mes) < mesActual) {
+      // Si el mes ya pasó, es el año siguiente
+      anio = String(anioActual + 1);
+    } else if (mes && parseInt(mes) === mesActual && dia && parseInt(dia) < diaActual) {
+      // Si es el mismo mes pero el día ya pasó, es el año siguiente
+      anio = String(anioActual + 1);
+    } else {
+      // En cualquier otro caso, es este año
+      anio = String(anioActual);
+    }
+  }
+  
+  // Validar que tengamos día y mes
+  if (!dia || !mes) return null;
+  
+  return `${anio}-${mes}-${dia}`;
+}
+
+function parseHoraNatural(texto) {
+  if (!texto) return null;
+  
+  const str = texto.toLowerCase().trim();
+  
+  // Si ya está en formato HH:MM, retornar tal cual
+  if (/^\d{1,2}:\d{2}$/.test(str)) {
+    const parts = str.split(':');
+    return `${parts[0].padStart(2, '0')}:${parts[1]}`;
+  }
+  
+  let hora = null;
+  
+  // Patrones comunes
+  // "17 horas", "17 hs", "5 de la tarde", "5 de la mañana"
+  
+  // Buscar número de hora
+  const matchHora = str.match(/\b(\d{1,2})\b/);
+  if (matchHora) {
+    hora = parseInt(matchHora[1]);
+    
+    // Ajustar por AM/PM
+    if (str.includes('tarde') || str.includes('pm')) {
+      if (hora < 12) hora += 12;
+    } else if (str.includes('mañana') || str.includes('am')) {
+      if (hora === 12) hora = 0;
+    } else if (str.includes('noche')) {
+      if (hora < 12) hora += 12;
+    }
+    
+    // Buscar minutos si existen
+    const matchMinutos = str.match(/(\d{1,2})\s*:\s*(\d{2})/);
+    const minutos = matchMinutos ? matchMinutos[2] : '00';
+    
+    // Formato con :00 por defecto
+    return `${String(hora).padStart(2, '0')}:${minutos}`;
+  }
+  
+  return null;
+}
+
 /* ============== Catálogo (cache) ============== */
 let _cache = { at: 0, items: [] };
 const CACHE_MS = 1000 * 60 * 3;
@@ -190,8 +297,8 @@ Paniquiños ofrece servicio de catering para eventos. Podés agendar directament
 **Datos necesarios para agendar:**
 - Nombre del cliente/empresa (razonsocial)
 - Tipo de evento (cumpleaños, boda, corporativo, etc.)
-- Fecha del evento (formato YYYY-MM-DD)
-- Hora del evento (formato HH:MM en 24h)
+- Fecha del evento (acepta formato natural: "15 de diciembre", "15/12", etc.)
+- Hora del evento (acepta formato natural: "17:00", "5 de la tarde", "17 horas")
 - Tipo de comida/menú deseado
 - Lugar del evento (dirección completa)
 - Número de invitados (opcional)
@@ -201,6 +308,8 @@ Paniquiños ofrece servicio de catering para eventos. Podés agendar directament
 **IMPORTANTE sobre CATERING:**
 - Los productos mencionados para catering NO se agregan al carrito
 - El catering se agenda en la base de datos y luego el cliente coordina detalles y pago por WhatsApp
+- Aceptá fechas en formato paraguayo: "15 de diciembre", "15/12/2024", etc.
+- Aceptá horas en formato paraguayo: "5 de la tarde", "17 horas", "17:00"
 - Si el cliente pide productos para catering (ej: "Quiero Combo 1 para el catering"), anotá eso en "tipocomida" pero NO lo agregues al carrito
 - Solo agregá productos al carrito si el cliente dice explícitamente "agregá al carrito" o "quiero comprar ahora"
 
@@ -218,16 +327,15 @@ ${context.cateringInfo || ''}
 1. Cuando te pregunten por productos o categorías, menciona SIEMPRE los nombres exactos y precios del catálogo
 2. Si preguntan "¿Tienen empanadas?" → Lista los tipos de empanadas con sus precios
 3. Si piden agregar algo, identifica el producto EXACTO del catálogo y responde confirmando
-4. **CATERING - Modo conversacional natural:**
-   - Recopilá datos UNO A LA VEZ, de forma natural
-   - RECORDÁ los datos que ya te dieron - NUNCA pidas el mismo dato dos veces
-   - Si el usuario ya dijo su nombre al inicio, NO lo vuelvas a pedir
-   - Si ya mencionaron la fecha/hora/lugar, NO lo pidas de nuevo
-   - Antes de preguntar algo, verificá si ya lo tenés en el contexto de la conversación
-   - Si mencionan productos mientras agendás catering, eso es parte del menú (no va al carrito)
-   - Cuando tengas TODOS los datos obligatorios (nombre, tipo evento, fecha, hora, menú, lugar), agendá automáticamente
-   - Los datos opcionales (invitados, teléfono, email) preguntá si el cliente quiere agregarlos: "¿Querés agregar teléfono/email/número de invitados?"
-   - Si falta algún dato obligatorio, preguntá solo por ESE dato
+4. **CATERING - Recopilación natural:**
+   - Cuando el usuario mencione catering, preguntá los datos UNO POR UNO
+   - IMPORTANTE: Una vez que el usuario te dé un dato (fecha, hora, etc), YA LO TENÉS. No lo vuelvas a pedir.
+   - Cuando el usuario responda con un dato, ese dato ya está en tu memoria de conversación
+   - Cuando tengas TODOS los datos obligatorios (nombre, tipo evento, fecha, hora, menú, lugar), llamá a la función agendar_catering INMEDIATAMENTE
+   - Los datos opcionales (invitados, teléfono, email) solo preguntá si el usuario quiere agregarlos
+   - Formato de fechas: Aceptá "15 de diciembre", "15/12", etc. (el sistema los convierte automáticamente)
+   - Formato de horas: Aceptá "17:00", "5 de la tarde", "17 horas" (el sistema los convierte automáticamente)
+   - Si mencionan productos para el catering, eso es parte del "menú" (NO va al carrito)
 5. Cuando pregunten por el total, calcula sumando todo el carrito
 6. Si piden quitar algo, confirma qué se quitó y el nuevo total
 7. Si preguntan por horarios, delivery o contacto, usa la información de la tienda
@@ -308,11 +416,11 @@ async function processWithGPT(userMsg, state) {
               },
               fecha: { 
                 type: "string", 
-                description: "Fecha del evento en formato YYYY-MM-DD" 
+                description: "Fecha del evento. Puede ser en formato natural como '15 de diciembre' o '15/12/2024'" 
               },
               hora: { 
                 type: "string", 
-                description: "Hora del evento en formato HH:MM (24 horas)" 
+                description: "Hora del evento. Puede ser en formato natural como '17:00', '5 de la tarde', '17 horas'" 
               },
               tipocomida: { 
                 type: "string", 
@@ -416,14 +524,35 @@ async function processWithGPT(userMsg, state) {
         // 🆕 NUEVO CASO: Agendar catering
         case "agendar_catering": {
           try {
-            console.log('[CATERING] Intentando agendar con args:', args);
+            console.log('[CATERING] Args originales:', args);
+            
+            // 🆕 Normalizar fecha y hora a formato correcto
+            const fechaNormalizada = parseFechaNatural(args.fecha);
+            const horaNormalizada = parseHoraNatural(args.hora);
+            
+            console.log('[CATERING] Fecha normalizada:', args.fecha, '→', fechaNormalizada);
+            console.log('[CATERING] Hora normalizada:', args.hora, '→', horaNormalizada);
+            
+            if (!fechaNormalizada) {
+              return {
+                reply: `No pude entender la fecha "${args.fecha}". ¿Podés decirla de nuevo? Por ejemplo: "15 de diciembre" o "15/12/2024"`,
+                state
+              };
+            }
+            
+            if (!horaNormalizada) {
+              return {
+                reply: `No pude entender la hora "${args.hora}". ¿Podés decirla de nuevo? Por ejemplo: "17:00" o "5 de la tarde"`,
+                state
+              };
+            }
             
             // Llamar a la función de Supabase con el ORDEN CORRECTO de parámetros
             const { data, error } = await supa.rpc("catering_agendar", {
               p_razonsocial: args.razonsocial,
               p_tipoevento: args.tipoevento,
-              p_fecha: args.fecha,
-              p_hora: args.hora,
+              p_fecha: fechaNormalizada,
+              p_hora: horaNormalizada,
               p_tipocomida: args.tipocomida,
               p_lugar: args.lugar,
               p_ruc: 'CHAT-BOT',
@@ -446,7 +575,7 @@ async function processWithGPT(userMsg, state) {
               
               // Otro tipo de error
               return {
-                reply: `❌ Hubo un problema: ${error.message}\n\n¿Podés verificar los datos? Especialmente la fecha (debe ser YYYY-MM-DD) y hora (HH:MM).`,
+                reply: `❌ Hubo un problema: ${error.message}\n\n¿Podés verificar los datos e intentar de nuevo?`,
                 state
               };
             }
@@ -468,7 +597,7 @@ async function processWithGPT(userMsg, state) {
             };
 
             return {
-              reply: `🎉 ¡Perfecto! Tu catering está pre-agendado.\n\n📋 **Resumen:**\n- Evento: ${args.tipoevento}\n- Fecha: ${args.fecha}\n- Hora: ${args.hora}\n- Lugar: ${args.lugar}\n- Menú: ${args.tipocomida}${args.invitados ? `\n- Invitados: ${args.invitados}` : ''}${args.telefono ? `\n- Contacto: ${args.telefono}` : ''}\n\n📱 **Siguiente paso:**\nContactanos por WhatsApp al **+595 992 544 305** para:\n✓ Confirmar disponibilidad\n✓ Ajustar menú y cantidades\n✓ Coordinar forma de pago (transferencia/efectivo)\n✓ Detalles finales del servicio\n\n¡Gracias por elegirnos! 😊`,
+              reply: `🎉 ¡Perfecto! Tu catering está pre-agendado.\n\n📋 **Resumen:**\n- Evento: ${args.tipoevento}\n- Fecha: ${fechaNormalizada}\n- Hora: ${horaNormalizada}\n- Lugar: ${args.lugar}\n- Menú: ${args.tipocomida}${args.invitados ? `\n- Invitados: ${args.invitados}` : ''}${args.telefono ? `\n- Contacto: ${args.telefono}` : ''}\n\n📱 **Siguiente paso:**\nContactanos por WhatsApp al **+595 992 544 305** para:\n✓ Confirmar disponibilidad\n✓ Ajustar menú y cantidades\n✓ Coordinar forma de pago (transferencia/efectivo)\n✓ Detalles finales del servicio\n\n¡Gracias por elegirnos! 😊`,
               action: {
                 type: "CATERING_AGENDADO",
                 data: data
