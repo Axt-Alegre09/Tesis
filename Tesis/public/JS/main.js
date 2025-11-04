@@ -1,4 +1,4 @@
-// JS/main.js
+// JS/main.js - CON SOPORTE PARA PROMOS
 import { supabase } from "./ScriptLogin.js";
 import "./cart-api.js"; // asegura CartAPI en window
 
@@ -154,10 +154,10 @@ function showToast(message, type = "success") {
 
 /* =================== Data sources =================== */
 
-// 1) Catálogo público (vista v_productos_publicos)
+// 1) Catálogo público con promos (vista productos_con_promos)
 async function fetchProductosCatalogo() {
   const { data, error } = await supabase
-    .from("v_productos_publicos")
+    .from("productos_con_promos")
     .select("*")
     .order("nombre");
 
@@ -170,9 +170,15 @@ async function fetchProductosCatalogo() {
     id: p.id,
     nombre: p.nombre,
     titulo: p.nombre,
-    imagen: toImg(p.imagen || p.url_imagen),
-    precio: p.precio,
-    categoria: { id: p.categoria_slug, nombre: p.categoria_nombre },
+    imagen: toImg(p.imagen),
+    precio: p.precio_original, // Precio original
+    precioConPromo: p.precio_con_promo, // Precio con descuento
+    tienePromo: p.tiene_promo,
+    descuentoPorcentaje: p.descuento_porcentaje,
+    ahorroGs: p.ahorro_gs,
+    promoNombre: p.promo_nombre,
+    promoFin: p.promo_fin,
+    categoria: { id: slug(p.categoria_nombre || ""), nombre: p.categoria_nombre },
   }));
 }
 
@@ -254,8 +260,30 @@ function montar(productos, esFavoritos = false) {
     div.dataset.id = producto.id;
 
     const esFav = FAVORITOS_IDS.has(producto.id);
+    const tienePromo = producto.tienePromo;
+    const descuento = producto.descuentoPorcentaje || 0;
+    
+    // Badge de descuento
+    const badgePromo = tienePromo ? `
+      <div class="promo-badge">
+        <i class="bi bi-tag-fill"></i>
+        ${descuento}% OFF
+      </div>
+    ` : '';
+    
+    // Precios (con o sin promo)
+    const preciosHTML = tienePromo ? `
+      <div class="precios-con-promo">
+        <span class="precio-original">${fmtGs(producto.precio)}</span>
+        <b><p class="producto-precio">${fmtGs(producto.precioConPromo)}</p></b>
+        <small class="ahorro-promo">¡Ahorrás ${fmtGs(producto.ahorroGs)}!</small>
+      </div>
+    ` : `
+      <b><p class="producto-precio">${fmtGs(producto.precio)}</p></b>
+    `;
 
     div.innerHTML = `
+      ${badgePromo}
       <img class="producto-imagen" src="${
         producto.imagen || IMG_FALLBACK
       }" alt="${producto.titulo}">
@@ -266,7 +294,7 @@ function montar(productos, esFavoritos = false) {
       </button>
       <div class="producto-detalles">
         <h3 class="producto-titulo">${producto.titulo}</h3>
-        <b><p class="producto-precio">${fmtGs(producto.precio)}</p></b>
+        ${preciosHTML}
         <button class="producto-agregar" data-id="${producto.id}">Agregar</button>
       </div>
     `;
@@ -316,7 +344,17 @@ function montar(productos, esFavoritos = false) {
         })();
 
       try {
-        await window.CartAPI.addProduct(fallbackProd, 1);
+        // Si tiene promo, agregar con precio con descuento
+        const precioFinal = prod?.tienePromo ? prod.precioConPromo : prod?.precio || fallbackProd.precio;
+        
+        await window.CartAPI.addProduct({
+          ...fallbackProd,
+          precio: precioFinal,
+          precioOriginal: prod?.precio || fallbackProd.precio,
+          tienePromo: prod?.tienePromo || false,
+          descuentoPorcentaje: prod?.descuentoPorcentaje || 0
+        }, 1);
+        
         await window.CartAPI.refreshBadge();
         showToast("Producto agregado al carrito", "success");
       } catch (err) {
@@ -357,7 +395,7 @@ async function buscar(q) {
   }
 
   const { data, error } = await supabase
-    .from("v_productos_publicos")
+    .from("productos_con_promos")
     .select("*")
     .or(
       `nombre.ilike.%${s}%, descripcion.ilike.%${s}%, categoria_nombre.ilike.%${s}%`
@@ -373,9 +411,15 @@ async function buscar(q) {
     id: p.id,
     nombre: p.nombre,
     titulo: p.nombre,
-    imagen: toImg(p.imagen || p.url_imagen),
-    precio: p.precio,
-    categoria: { id: p.categoria_slug, nombre: p.categoria_nombre },
+    imagen: toImg(p.imagen),
+    precio: p.precio_original,
+    precioConPromo: p.precio_con_promo,
+    tienePromo: p.tiene_promo,
+    descuentoPorcentaje: p.descuento_porcentaje,
+    ahorroGs: p.ahorro_gs,
+    promoNombre: p.promo_nombre,
+    promoFin: p.promo_fin,
+    categoria: { id: slug(p.categoria_nombre || ""), nombre: p.categoria_nombre },
   }));
 
   tituloPrincipal.textContent = `Resultados para "${s}" (${resultados.length})`;
@@ -418,8 +462,11 @@ async function init() {
     id: p.id,
     nombre: p.nombre,
     titulo: p.titulo,
-    precio: p.precio,
+    precio: p.tienePromo ? p.precioConPromo : p.precio,
+    precioOriginal: p.precio,
     imagen: p.imagen,
+    tienePromo: p.tienePromo,
+    descuentoPorcentaje: p.descuentoPorcentaje
   }));
 
   // Home feed: Populares → Catálogo
