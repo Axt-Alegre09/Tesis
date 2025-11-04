@@ -10,7 +10,7 @@ export const supabase = createClient(
 /* ========= Utilidades ========= */
 const LOGIN_URL = "login.html";
 const HOME_CLIENTE = "index.html";
-const HOME_ADMIN = "indexAdmin.html";
+const HOME_ADMIN = "admin-dashboard.html";
 
 function go(path) {
   window.location.href = new URL(path, window.location.href).href;
