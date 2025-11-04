@@ -103,7 +103,6 @@ button {
   height: 42px;
   width: auto;
   transition: var(--transition);
-  filter: brightness(0) invert(1);
 }
 
 .sidebar.collapsed .sidebar-logo {
