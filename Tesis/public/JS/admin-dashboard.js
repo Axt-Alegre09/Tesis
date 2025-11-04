@@ -279,7 +279,7 @@ const views = {
   `,
 
   promos: `
-   <h2 style="font-size: 1.75rem; font-weight: 700; margin-bottom: 2rem;">Promociones</h2>
+   <h2 style="font-size: 1.75rem; font-weight: 700; margin-bottom: 2rem;"></h2>
    <div class="card">
       <iframe src="promos.html" style="width: 100%; height: 85vh; border: none; border-radius: 12px;"></iframe>
   </div>
