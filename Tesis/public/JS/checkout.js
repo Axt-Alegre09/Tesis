@@ -261,7 +261,7 @@
     });
   }
 
-  // ========== FACTURA PDF MEJORADA CON PROMOS ==========
+  // ========== FACTURA PDF PROFESIONAL CON PROMOS ==========
   async function generateInvoicePDF(snapshot) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
@@ -269,18 +269,19 @@
     const pw = doc.internal.pageSize.getWidth();
     const ph = doc.internal.pageSize.getHeight();
 
-    // Paleta
-    const M = 54;
+    // Paleta profesional
+    const M = 40;
     const C_TXT  = [30, 30, 30];
-    const C_MUT  = [110, 110, 110];
-    const C_LINE = [170, 170, 170];
+    const C_MUT  = [100, 100, 100];
+    const C_LIGHT = [150, 150, 150];
+    const C_LINE = [200, 200, 200];
     const C_HEAD = [111, 92, 56];
-    const C_PROMO = [230, 57, 70];
+    const C_PROMO = [220, 38, 38]; // Rojo más suave
 
     // Empresa
     const EMP = {
       nombre: 'Paniquiños',
-      actividad: ' Panaderia ',
+      actividad: 'Panadería',
       dir: 'Avda Sabor 1500',
       tel: '+595 992544305',
       ruc: '800260001-4',
@@ -320,178 +321,291 @@
     const iva10 = Math.round(totalUse / 11);
     const subBase = totalUse - iva10;
     const fecha = snap.fechaISO ? new Date(snap.fechaISO) : new Date();
+    const fechaStr = fecha.toLocaleDateString('es-PY');
     const nroFactura = `001-001-${String(Math.floor(Math.random()*1_000_000)).padStart(6,'0')}`;
 
-    // ===== Encabezado =====
-    const hbX = 28, hbY = 28, hbW = pw - 56, hbH = 150;
-    const pad = 16;
-    doc.setDrawColor(...C_LINE).setLineWidth(2).roundedRect(hbX, hbY, hbW, hbH, 10, 10);
+    // ===== HEADER PROFESIONAL =====
+    let yPos = M;
+    
+    // Línea superior decorativa
+    doc.setFillColor(...C_HEAD);
+    doc.rect(0, 0, pw, 8, 'F');
 
-    const gap = 16;
-    const logoW = 100, logoH = 100;
-    const rightW = 270;
-    const rightX = hbX + hbW - pad - rightW;
-    const leftX = hbX + pad + logoW + gap;
-    const leftW = rightX - gap - leftX;
-
+    // Logo
     try {
       const logoData = await toDataURL(EMP.logo);
-      doc.addImage(logoData, 'PNG', hbX + pad, hbY + pad, logoW, logoH);
+      doc.addImage(logoData, 'PNG', M, yPos, 90, 90);
     } catch {}
 
-    const FS_TITLE = 16, FS_LABEL = 11, FS_TEXT = 11, LH = 14;
+    // Info empresa (centro)
+    const centerX = M + 110;
+    yPos += 15;
+    
+    doc.setFont('helvetica','bold').setFontSize(18).setTextColor(...C_TXT);
+    doc.text('KuDE de FACTURA ELECTRÓNICA', centerX, yPos);
+    
+    yPos += 25;
+    doc.setFont('helvetica','bold').setFontSize(14).setTextColor(...C_HEAD);
+    doc.text(EMP.nombre, centerX, yPos);
+    
+    yPos += 18;
+    doc.setFont('helvetica','normal').setFontSize(10).setTextColor(...C_MUT);
+    doc.text(EMP.actividad, centerX, yPos);
+    
+    yPos += 14;
+    doc.text(EMP.dir, centerX, yPos);
+    
+    yPos += 14;
+    doc.text(`Tel: ${EMP.tel}`, centerX, yPos);
 
-    // Columna izquierda
-    let yL = hbY + pad + 6;
-    doc.setFont('helvetica','bold').setFontSize(FS_TITLE).setTextColor(...C_TXT);
-    const titleLines = doc.splitTextToSize('KuDE de FACTURA ELECTRÓNICA', leftW);
-    doc.text(titleLines, leftX, yL);
-    yL += titleLines.length * (FS_TITLE * 1.1) + 4;
+    // Info fiscal (derecha)
+    const rightX = pw - M - 160;
+    yPos = M + 15;
+    
+    doc.setFont('helvetica','bold').setFontSize(10).setTextColor(...C_TXT);
+    doc.text('RUC:', rightX, yPos);
+    doc.setFont('helvetica','normal');
+    doc.text(EMP.ruc, rightX + 70, yPos, { align: 'right' });
+    
+    yPos += 16;
+    doc.setFont('helvetica','bold');
+    doc.text('Timbrado:', rightX, yPos);
+    doc.setFont('helvetica','normal');
+    doc.text(EMP.timbrado, rightX + 70, yPos, { align: 'right' });
+    
+    yPos += 16;
+    doc.setFont('helvetica','bold');
+    doc.text('Inicio de:', rightX, yPos);
+    doc.setFont('helvetica','normal');
+    doc.text(EMP.inicio, rightX + 70, yPos, { align: 'right' });
 
-    doc.setFont('helvetica','normal').setFontSize(FS_TEXT).setTextColor(...C_MUT);
-    for (const t of [EMP.nombre, EMP.actividad, EMP.dir, `Tel: ${EMP.tel}`]) {
-      const lines = doc.splitTextToSize(t, leftW);
-      doc.text(lines, leftX, yL);
-      yL += lines.length * LH;
-    }
+    // Número de factura destacado
+    yPos += 24;
+    doc.setDrawColor(...C_LINE);
+    doc.setFillColor(248, 248, 248);
+    doc.roundedRect(rightX - 10, yPos - 12, 180, 32, 4, 4, 'FD');
+    
+    doc.setFont('helvetica','bold').setFontSize(11).setTextColor(...C_HEAD);
+    doc.text('FACTURA ELECTRÓNICA', rightX, yPos);
+    yPos += 16;
+    doc.setFont('helvetica','bold').setFontSize(12).setTextColor(...C_TXT);
+    doc.text(nroFactura, rightX, yPos);
 
-    // Columna derecha
-    let yR = hbY + pad + 6;
-    doc.setFont('helvetica','bold').setFontSize(FS_LABEL).setTextColor(...C_TXT);
-    doc.text(`RUC : ${EMP.ruc}`, rightX, yR);
+    // Línea separadora
+    yPos = M + 105;
+    doc.setDrawColor(...C_LINE);
+    doc.setLineWidth(0.5);
+    doc.line(M, yPos, pw - M, yPos);
 
-    yR += 20;
-    doc.text('Timbrado', rightX, yR);
-    doc.setFont('helvetica','normal').setFontSize(FS_TEXT).setTextColor(...C_TXT);
-    doc.text(EMP.timbrado, rightX + 90, yR);
+    // ===== CLIENTE =====
+    yPos += 20;
+    doc.setFont('helvetica','bold').setFontSize(11).setTextColor(...C_TXT);
+    doc.text('DATOS DEL CLIENTE', M, yPos);
+    
+    yPos += 18;
+    doc.setFont('helvetica','normal').setFontSize(10).setTextColor(...C_MUT);
+    
+    // Fila 1
+    doc.setFont('helvetica','bold');
+    doc.text('RUC/CI:', M, yPos);
+    doc.setFont('helvetica','normal');
+    doc.text(cliente.ruc || '-', M + 50, yPos);
+    
+    doc.setFont('helvetica','bold');
+    doc.text('Fecha:', pw/2, yPos);
+    doc.setFont('helvetica','normal');
+    doc.text(fechaStr, pw/2 + 40, yPos);
+    
+    // Fila 2
+    yPos += 16;
+    doc.setFont('helvetica','bold');
+    doc.text('Razón Social:', M, yPos);
+    doc.setFont('helvetica','normal');
+    doc.text(cliente.razon || '-', M + 80, yPos);
+    
+    // Fila 3
+    yPos += 16;
+    doc.setFont('helvetica','bold');
+    doc.text('Teléfono:', M, yPos);
+    doc.setFont('helvetica','normal');
+    doc.text(cliente.tel || '-', M + 50, yPos);
+    
+    doc.setFont('helvetica','bold');
+    doc.text('Email:', pw/2, yPos);
+    doc.setFont('helvetica','normal');
+    doc.text(cliente.mail || '-', pw/2 + 40, yPos);
 
-    yR += 18;
-    doc.setFont('helvetica','bold').setFontSize(FS_LABEL).setTextColor(...C_TXT);
-    doc.text('Inicio de', rightX, yR);
-    doc.setFont('helvetica','normal').setFontSize(FS_TEXT).setTextColor(...C_TXT);
-    doc.text(EMP.inicio, rightX + 90, yR);
+    yPos += 18;
+    doc.setDrawColor(...C_LINE);
+    doc.line(M, yPos, pw - M, yPos);
 
-    yR += 26;
-    doc.setFont('helvetica','bold').setFontSize(FS_LABEL + 1).setTextColor(...C_TXT);
-    doc.text('FACTURA ELECTRÓNICA', rightX, yR);
-    yR += 18;
-    doc.setFont('helvetica','normal').setFontSize(FS_TEXT).setTextColor(...C_TXT);
-    doc.text(nroFactura.replace(/-/g, ' - '), rightX, yR);
-
-    // ===== Cliente =====
-    const cliX = M, cliY = hbY + hbH + 28, cliW = pw - 2*M, cliH = 96;
-    doc.setDrawColor(210).setLineWidth(1).roundedRect(cliX, cliY, cliW, cliH, 10, 10);
-
-    doc.setFont('helvetica','bold').setFontSize(FS_LABEL).setTextColor(...C_TXT);
-    doc.text('Cliente', cliX + 14, cliY + 24);
-
-    doc.setFont('helvetica','normal').setFontSize(FS_TEXT).setTextColor(...C_MUT);
-    doc.text(`RUC/CI: ${cliente.ruc || '-'}`, cliX + 14, cliY + 46);
-    doc.text(`Razón Social: ${cliente.razon || '-'}`, cliX + cliW/2, cliY + 46);
-    doc.text(`Tel: ${cliente.tel || '-'}`, cliX + 14, cliY + 66);
-    doc.text(`Mail: ${cliente.mail || '-'}`, cliX + cliW/2, cliY + 66);
-
-    // ===== BADGE DE PROMO =====
+    // ===== BADGE DE PROMO (más sutil) =====
     if (tienePromos && ahorroTotal > 0) {
-      const badgeY = cliY + cliH + 14;
-      doc.setFillColor(...C_PROMO);
-      doc.roundedRect(cliX, badgeY, cliW, 32, 8, 8, 'F');
+      yPos += 16;
+      doc.setFillColor(255, 245, 245);
+      doc.setDrawColor(...C_PROMO);
+      doc.setLineWidth(1);
+      doc.roundedRect(M, yPos - 8, pw - 2*M, 28, 4, 4, 'FD');
       
-      doc.setFont('helvetica','bold').setFontSize(12).setTextColor(255, 255, 255);
-      doc.text('🎉 COMPRA CON DESCUENTO', cliX + 14, badgeY + 20);
-      doc.text(`Ahorraste: ${fmtGs(ahorroTotal)}`, cliX + cliW - 14, badgeY + 20, { align: 'right' });
+      doc.setFont('helvetica','bold').setFontSize(10).setTextColor(...C_PROMO);
+      doc.text('🎉 COMPRA CON DESCUENTO', M + 10, yPos + 8);
+      doc.text(`Ahorrás: ${fmtGs(ahorroTotal)}`, pw - M - 10, yPos + 8, { align: 'right' });
+      
+      yPos += 20;
     }
 
-    // ===== Tabla =====
+    // ===== TABLA PROFESIONAL =====
+    yPos += 16;
     const tableItems = items.length ? items : [{ titulo:'Servicio/Producto', cantidad:1, precio: totalUse }];
     const body = tableItems.map(it => {
       const titulo = it.titulo || 'Item';
       const tienePromo = it.tienePromo;
       const descuento = tienePromo ? Math.round(it.descuentoPorcentaje || 0) : 0;
       
-      const tituloConBadge = tienePromo ? `${titulo} (${descuento}% OFF)` : titulo;
+      const tituloDisplay = tienePromo ? `${titulo} (${descuento}% OFF)` : titulo;
       
       const precioOriginal = Number(it.precioOriginal || it.precio);
       const precioFinal = tienePromo ? Number(it.precio) : precioOriginal;
       const precioStr = tienePromo 
-        ? `${new Intl.NumberFormat('es-PY').format(precioOriginal)} → ${new Intl.NumberFormat('es-PY').format(precioFinal)} Gs`
-        : `${new Intl.NumberFormat('es-PY').format(precioFinal)} Gs`;
+        ? `${new Intl.NumberFormat('es-PY').format(precioOriginal)} → ${new Intl.NumberFormat('es-PY').format(precioFinal)}`
+        : new Intl.NumberFormat('es-PY').format(precioFinal);
       
       return [
-        tituloConBadge,
+        tituloDisplay,
         String(it.cantidad || 1),
-        precioStr,
+        precioStr + ' Gs',
         new Intl.NumberFormat('es-PY').format(precioFinal * Number(it.cantidad || 1)) + ' Gs'
       ];
     });
 
-    const tableStartY = tienePromos ? cliY + cliH + 60 : cliY + cliH + 18;
-
     doc.autoTable({
-      head: [['Descripción','Cant.','Precio','Subtotal']],
+      head: [['Descripción','Cant.','Precio Unitario','Subtotal']],
       body,
-      startY: tableStartY,
-      styles: { fontSize: 10, cellPadding: 6, textColor: C_TXT },
-      headStyles: { fillColor: C_HEAD, textColor: 255 },
-      columnStyles: { 
-        1: { halign:'center', cellWidth: 70 }, 
-        2: { halign:'right', cellWidth: 110 }, 
-        3: { halign:'right', cellWidth: 110 } 
+      startY: yPos,
+      margin: { left: M, right: M },
+      styles: { 
+        fontSize: 9.5, 
+        cellPadding: 8,
+        textColor: C_TXT,
+        lineColor: C_LINE,
+        lineWidth: 0.5
       },
-      tableLineColor: [210,210,210],
-      tableLineWidth: 0.5,
+      headStyles: { 
+        fillColor: C_HEAD, 
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: 10
+      },
+      columnStyles: { 
+        0: { cellWidth: 'auto' },
+        1: { halign: 'center', cellWidth: 50 }, 
+        2: { halign: 'right', cellWidth: 100 }, 
+        3: { halign: 'right', cellWidth: 100 } 
+      },
+      alternateRowStyles: { fillColor: [252, 252, 252] },
       theme: 'grid'
     });
 
-    // ===== Totales =====
-    let yTot = doc.lastAutoTable.finalY + 14;
-    const tx = pw - M - 226, vx = pw - M;
+    // ===== TOTALES PROFESIONALES =====
+    yPos = doc.lastAutoTable.finalY + 20;
+    
+    // Caja de totales
+    const totalsX = pw - M - 220;
+    const totalsW = 220;
+    
+    doc.setFillColor(250, 250, 250);
+    doc.setDrawColor(...C_LINE);
+    doc.roundedRect(totalsX, yPos - 10, totalsW, 90, 4, 4, 'FD');
+    
+    yPos += 4;
+    
+    // Subtotal
+    doc.setFont('helvetica','normal').setFontSize(10).setTextColor(...C_MUT);
+    doc.text('Subtotal (Base):', totalsX + 12, yPos);
+    doc.text(new Intl.NumberFormat('es-PY').format(subBase) + ' Gs', totalsX + totalsW - 12, yPos, { align: 'right' });
+    
+    yPos += 20;
+    doc.text('IVA 10%:', totalsX + 12, yPos);
+    doc.text(new Intl.NumberFormat('es-PY').format(iva10) + ' Gs', totalsX + totalsW - 12, yPos, { align: 'right' });
+    
+    // Línea separadora
+    yPos += 10;
+    doc.setDrawColor(...C_LINE);
+    doc.line(totalsX + 12, yPos, totalsX + totalsW - 12, yPos);
+    
+    // Total destacado
+    yPos += 18;
+    doc.setFont('helvetica','bold').setFontSize(13).setTextColor(...C_HEAD);
+    doc.text('TOTAL:', totalsX + 12, yPos);
+    doc.text(new Intl.NumberFormat('es-PY').format(totalUse) + ' Gs', totalsX + totalsW - 12, yPos, { align: 'right' });
 
-    doc.setFont('helvetica','bold').setFontSize(11).setTextColor(...C_TXT);
-    doc.text('SUBTOTAL (base)', tx, yTot);
-    doc.text('IVA 10%', tx, yTot + 18);
-    doc.setFont('helvetica','bold').setFontSize(13);
-    doc.text('TOTAL', tx, yTot + 36);
+    // ===== FORMA DE PAGO =====
+    yPos += 30;
+    doc.setFont('helvetica','bold').setFontSize(10).setTextColor(...C_TXT);
+    doc.text('Forma de pago:', M, yPos);
+    doc.setFont('helvetica','normal').setTextColor(...C_MUT);
+    const fp = (metodo === 'transferencia') ? 'Transferencia bancaria' :
+              (metodo === 'efectivo') ? 'Efectivo' : 'Tarjeta de crédito';
+    doc.text(fp, M + 90, yPos);
 
-    doc.setFont('helvetica','normal').setFontSize(11).setTextColor(...C_TXT);
-    doc.text(new Intl.NumberFormat('es-PY').format(subBase) + ' Gs', vx, yTot, { align:'right' });
-    doc.text(new Intl.NumberFormat('es-PY').format(iva10) + ' Gs', vx, yTot + 18, { align:'right' });
-    doc.setFont('helvetica','bold').setFontSize(13);
-    doc.text(new Intl.NumberFormat('es-PY').format(totalUse)+ ' Gs', vx, yTot + 36, { align:'right' });
-
-    // ===== Forma de pago =====
-    yTot += 56;
-    doc.setDrawColor(210).line(M, yTot - 14, pw - M, yTot - 14);
-    doc.setFont('helvetica','bold').setFontSize(11).setTextColor(...C_TXT);
-    doc.text('Forma de pago:', M, yTot);
-    doc.setFont('helvetica','normal').setFontSize(11).setTextColor(...C_MUT);
-    const fp = (metodo === 'transferencia') ? 'Transferencia bancaria (comprobante recibido).' :
-              (metodo === 'efectivo') ? 'Efectivo.' : 'Tarjeta.';
-    doc.text(fp, M + 110, yTot);
-
-    // ===== QR + nota =====
+    // ===== FOOTER CON QR =====
+    const footerY = ph - 180;
+    
+    // Línea separadora
+    doc.setDrawColor(...C_LINE);
+    doc.line(M, footerY, pw - M, footerY);
+    
     try {
       const qrData = await toDataURL(QR_SRC);
-      const qrSize = 150;
-      const qrX = M, qrY = ph - qrSize - 140;
+      const qrSize = 110;
+      const qrX = M;
+      const qrY = footerY + 20;
+      
+      // QR con borde sutil
+      doc.setDrawColor(...C_LINE);
+      doc.setLineWidth(1);
+      doc.rect(qrX - 2, qrY - 2, qrSize + 4, qrSize + 4);
       doc.addImage(qrData, 'PNG', qrX, qrY, qrSize, qrSize);
+      
+      // Indicador CDC
       doc.setFillColor(64,120,215);
-      doc.rect(qrX + qrSize - 30, qrY + qrSize - 12, 30, 12, 'F');
-      doc.rect(qrX + qrSize - 12, qrY + qrSize - 30, 12, 30, 'F');
+      doc.rect(qrX + qrSize - 22, qrY + qrSize - 10, 22, 10, 'F');
+      doc.rect(qrX + qrSize - 10, qrY + qrSize - 22, 10, 22, 'F');
 
-      doc.setFont('helvetica','normal').setFontSize(10).setTextColor(...C_MUT);
-      const noteX = qrX + qrSize + 22, noteY = qrY + 18;
-      doc.text('Este documento es una representación gráfica de una factura (simulada).', noteX, noteY);
-      doc.text('Uso demostrativo. No válida como comprobante fiscal.', noteX, noteY + 16);
+      // Texto informativo
+      const noteX = qrX + qrSize + 30;
+      let noteY = qrY + 10;
+      
+      doc.setFont('helvetica','bold').setFontSize(9).setTextColor(...C_TXT);
+      doc.text('Validez del documento', noteX, noteY);
+      
+      noteY += 16;
+      doc.setFont('helvetica','normal').setFontSize(8.5).setTextColor(...C_MUT);
+      doc.text('Este documento es una representación gráfica', noteX, noteY);
+      noteY += 12;
+      doc.text('de una factura electrónica (simulada).', noteX, noteY);
+      noteY += 12;
+      doc.text('Uso demostrativo.', noteX, noteY);
+      
       if (tienePromos) {
-        doc.setTextColor(...C_PROMO);
-        doc.text(`✓ Compra con descuentos aplicados`, noteX, noteY + 32);
+        noteY += 18;
+        doc.setFont('helvetica','bold').setFontSize(8.5).setTextColor(...C_PROMO);
+        doc.text('✓ Compra con descuentos aplicados', noteX, noteY);
       }
-      doc.setTextColor(...C_MUT);
-      doc.text('Paniquiños ©', noteX, noteY + (tienePromos ? 48 : 32));
-    } catch {}
+      
+      noteY += 18;
+      doc.setFont('helvetica','normal').setFontSize(8).setTextColor(...C_LIGHT);
+      doc.text(`© ${new Date().getFullYear()} ${EMP.nombre} - Todos los derechos reservados`, noteX, noteY);
+      
+    } catch (err) {
+      console.error('Error al cargar QR:', err);
+    }
 
-    doc.save(`Factura_Paniquinos_${nroFactura}.pdf`);
+    // Línea decorativa inferior
+    doc.setFillColor(...C_HEAD);
+    doc.rect(0, ph - 8, pw, 8, 'F');
+
+    doc.save(`Factura_${EMP.nombre}_${nroFactura}.pdf`);
   }
 
 })();
