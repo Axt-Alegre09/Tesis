@@ -441,19 +441,28 @@
       const precioFinal = Number(it.precio);
       const cantidad = Number(it.cantidad || 1);
       
-      // Formato de precio con separador de miles
-      const precioStr = tienePromo 
-        ? new Intl.NumberFormat('es-PY').format(precioOrig) + ' → ' + new Intl.NumberFormat('es-PY').format(precioFinal)
-        : new Intl.NumberFormat('es-PY').format(precioFinal);
+      // CRÍTICO: Formatear números correctamente SIN caracteres extraños
+      const formatter = new Intl.NumberFormat('es-PY', { 
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+        useGrouping: true
+      });
+      
+      // Precio unitario simple
+      const precioStr = formatter.format(precioFinal);
+      
+      // Subtotal con coma al final
+      const subtotalNum = precioFinal * cantidad;
+      const subtotalStr = formatter.format(subtotalNum) + ',';
       
       return [
         String(cantidad),
         tituloDisplay,
         precioStr,
-        '', // Descuento
+        '', // Descuento vacío
         '0.0', // Exentas
         '0.0', // 5%
-        new Intl.NumberFormat('es-PY').format(precioFinal * cantidad) + ','
+        subtotalStr // 10%
       ];
     });
 
@@ -468,22 +477,25 @@
         textColor: C_TXT,
         lineColor: C_BORDER,
         lineWidth: 1,
-        overflow: 'linebreak'
+        overflow: 'linebreak',
+        halign: 'left',
+        font: 'helvetica'
       },
       headStyles: {
         fillColor: C_HEADER_BG,
         textColor: C_TXT,
         fontStyle: 'bold',
-        halign: 'center'
+        halign: 'center',
+        fontSize: 9
       },
       columnStyles: {
-        0: { halign: 'center', cellWidth: 50 },
-        1: { halign: 'left', cellWidth: 200 },
-        2: { halign: 'right', cellWidth: 90 },
-        3: { halign: 'center', cellWidth: 70 },
-        4: { halign: 'right', cellWidth: 60 },
-        5: { halign: 'right', cellWidth: 50 },
-        6: { halign: 'right', cellWidth: 85 }
+        0: { halign: 'center', cellWidth: 45 },      // Cantida
+        1: { halign: 'left', cellWidth: 160 },       // Descripción
+        2: { halign: 'right', cellWidth: 85 },       // Precio unitario
+        3: { halign: 'center', cellWidth: 65 },      // Descuento
+        4: { halign: 'right', cellWidth: 55 },       // Exentas
+        5: { halign: 'right', cellWidth: 45 },       // 5%
+        6: { halign: 'right', cellWidth: 100 }       // 10%
       },
       theme: 'grid'
     });
@@ -491,17 +503,22 @@
     // ========== TOTALES DENTRO DE LA TABLA ==========
     y = doc.lastAutoTable.finalY;
     
-    // Convertir número a texto (simplificado para Paraguay)
-    const unidades = ['', 'UN', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE'];
-    const decenas = ['', '', 'VEINTE', 'TREINTA', 'CUARENTA', 'CINCUENTA', 'SESENTA', 'SETENTA', 'OCHENTA', 'NOVENTA'];
-    const centenas = ['', 'CIENTO', 'DOSCIENTOS', 'TRESCIENTOS', 'CUATROCIENTOS', 'QUINIENTOS', 'SEISCIENTOS', 'SETECIENTOS', 'OCHOCIENTOS', 'NOVECIENTOS'];
-    
+    // Función mejorada para convertir números a texto
     function numeroATexto(num) {
       if (num === 0) return 'CERO';
+      if (num >= 1000000) return 'UN MILLON O MAS';
+      
+      const unidades = ['', 'UNO', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE'];
+      const especiales = ['DIEZ', 'ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE', 'DIECISEIS', 'DIECISIETE', 'DIECIOCHO', 'DIECINUEVE'];
+      const decenas = ['', '', 'VEINTE', 'TREINTA', 'CUARENTA', 'CINCUENTA', 'SESENTA', 'SETENTA', 'OCHENTA', 'NOVENTA'];
+      const centenas = ['', 'CIENTO', 'DOSCIENTOS', 'TRESCIENTOS', 'CUATROCIENTOS', 'QUINIENTOS', 'SEISCIENTOS', 'SETECIENTOS', 'OCHOCIENTOS', 'NOVECIENTOS'];
+      
       if (num < 10) return unidades[num];
+      if (num < 20) return especiales[num - 10];
       if (num < 100) {
         const dec = Math.floor(num / 10);
         const uni = num % 10;
+        if (dec === 2 && uni > 0) return 'VEINTI' + unidades[uni];
         return decenas[dec] + (uni ? ' Y ' + unidades[uni] : '');
       }
       if (num < 1000) {
@@ -518,13 +535,19 @@
       return 'MONTO MAYOR';
     }
     
-    const totalEnLetras = numeroATexto(Math.floor(totalUse)) + ' GUARANÍES';
+    const totalEnLetras = numeroATexto(Math.floor(totalUse)) + ' GUARANIES';
+    
+    const formatter = new Intl.NumberFormat('es-PY', { 
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+      useGrouping: true
+    });
     
     const totalsData = [
-      ['SUBTOTAL:', '', '', '', '', '', new Intl.NumberFormat('es-PY').format(subBase) + ',00'],
-      ['TOTAL DE LA', '', '', '', '', '', new Intl.NumberFormat('es-PY').format(totalUse) + ',00'],
-      ['TOTAL EN GUARANÍES:', totalEnLetras, '', '', '', '', new Intl.NumberFormat('es-PY').format(totalUse) + ',00'],
-      ['LIQUIDACIÓN IVA:', '5%', '0,00', '10%', new Intl.NumberFormat('es-PY').format(iva10), 'TOTAL IVA', new Intl.NumberFormat('es-PY').format(iva10)]
+      ['SUBTOTAL:', '', '', '', '', '', formatter.format(subBase) + ',00'],
+      ['TOTAL DE LA', '', '', '', '', '', formatter.format(totalUse) + ',00'],
+      ['TOTAL EN GUARANIES:', totalEnLetras, '', '', '', '', formatter.format(totalUse) + ',00'],
+      ['LIQUIDACION IVA:', '5%', '0,00', '10%', formatter.format(iva10), 'TOTAL IVA', formatter.format(iva10)]
     ];
 
     doc.autoTable({
@@ -538,16 +561,17 @@
         lineColor: C_BORDER,
         lineWidth: 1,
         overflow: 'linebreak',
-        cellWidth: 'wrap'
+        valign: 'middle',
+        font: 'helvetica'
       },
       columnStyles: {
-        0: { fontStyle: 'bold', cellWidth: 100 },
-        1: { cellWidth: 100 },
-        2: { halign: 'right', cellWidth: 70 },
-        3: { cellWidth: 60 },
-        4: { halign: 'right', cellWidth: 80 },
-        5: { halign: 'right', fontStyle: 'bold', cellWidth: 80 },
-        6: { halign: 'right', fontStyle: 'bold', cellWidth: 85 }
+        0: { fontStyle: 'bold', cellWidth: 100, halign: 'left' },     // Label
+        1: { cellWidth: 100, halign: 'left' },                        // 5% o texto
+        2: { halign: 'right', cellWidth: 55 },                        // 0,00
+        3: { cellWidth: 50, halign: 'left' },                         // 10%
+        4: { halign: 'right', cellWidth: 65 },                        // Valor IVA
+        5: { halign: 'right', fontStyle: 'bold', cellWidth: 75 },     // TOTAL IVA
+        6: { halign: 'right', fontStyle: 'bold', cellWidth: 100 }     // Valor final
       },
       theme: 'grid'
     });
@@ -562,7 +586,7 @@
     // ========== FOOTER CON CDC ==========
     y = doc.lastAutoTable.finalY + 20;
     
-    const footerBoxH = 150;
+    const footerBoxH = 155;
     doc.setDrawColor(...C_BORDER);
     doc.setLineWidth(1);
     doc.rect(M, y, pw - 2*M, footerBoxH);
@@ -580,32 +604,37 @@
 
     // Texto CDC
     const cdcX = M + 130;
-    let cdcY = y + 20;
+    let cdcY = y + 22;
     
     doc.setFont('helvetica','bold').setFontSize(10).setTextColor(...C_TXT);
     const maxWidth = pw - 2*M - 145;
-    const line1 = doc.splitTextToSize('Consulte la validez de esta Factura Electrónica con el número de CDC', maxWidth);
-    doc.text(line1, cdcX, cdcY);
+    doc.text('Consulte la validez de esta Factura Electrónica con el número de CDC', cdcX, cdcY);
     
-    cdcY += 14 * line1.length;
+    cdcY += 16;
     doc.setFont('helvetica','normal').setFontSize(9).setTextColor(0, 0, 255);
     doc.textWithLink('https://ekuatia.set.gov.py/consultas/', cdcX, cdcY, { url: 'https://ekuatia.set.gov.py/consultas/' });
     
-    cdcY += 20;
+    cdcY += 22;
     doc.setFont('helvetica','bold').setFontSize(11).setTextColor(...C_TXT);
-    // Dividir CDC en grupos más legibles
-    const cdcFormatted = cdc.match(/.{1,10}/g).join(' ');
+    // Dividir CDC en grupos de 10 para mejor legibilidad
+    const cdcPart1 = cdc.substring(0, 10);
+    const cdcPart2 = cdc.substring(10, 20);
+    const cdcPart3 = cdc.substring(20, 30);
+    const cdcPart4 = cdc.substring(30, 40);
+    const cdcPart5 = cdc.substring(40, 44);
+    const cdcFormatted = `${cdcPart1} ${cdcPart2} ${cdcPart3} ${cdcPart4} ${cdcPart5}`;
     doc.text(cdcFormatted, cdcX, cdcY);
     
-    cdcY += 18;
+    cdcY += 20;
     doc.setFont('helvetica','bold').setFontSize(9);
-    const line2 = doc.splitTextToSize('ESTE DOCUMENTO ES UNA REPRESENTACIÓN GRÁFICA DE UN DOCUMENTO', maxWidth);
-    doc.text(line2, cdcX, cdcY);
+    doc.text('ESTE DOCUMENTO ES UNA REPRESENTACIÓN GRÁFICA DE UN DOCUMENTO', cdcX, cdcY);
     
-    cdcY += 14 * line2.length + 4;
+    cdcY += 16;
     doc.setFont('helvetica','normal').setFontSize(8).setTextColor(...C_GRAY);
-    const line3 = doc.splitTextToSize('Si su documento electrónico presenta algún error, podrá solicitar la modificación dentro de las 72 horas siguientes de la emisión', maxWidth);
-    doc.text(line3, cdcX, cdcY);
+    const warningText = 'Si su documento electrónico presenta algún error, podrá solicitar la modificación dentro de las 72 horas';
+    doc.text(warningText, cdcX, cdcY);
+    cdcY += 10;
+    doc.text('siguientes de la emisión', cdcX, cdcY);
 
     doc.save(`Factura_${EMP.nombre}_${nroFactura}.pdf`);
   }
