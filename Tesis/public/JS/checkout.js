@@ -428,7 +428,7 @@
     doc.setFont('helvetica','normal');
     doc.text('Guaraní', pw - M - 90, cy);
 
-    // ========== TABLA ESTILO STARSOFT ==========
+    // ========== TABLA ESTILO STARSOFT CON COLUMNAS CUADRADAS ==========
     y += clienteH + 10;
 
     const tableData = items.map(it => {
@@ -441,17 +441,14 @@
       const precioFinal = Number(it.precio);
       const cantidad = Number(it.cantidad || 1);
       
-      // CRÍTICO: Formatear números correctamente SIN caracteres extraños
+      // Formatear números correctamente
       const formatter = new Intl.NumberFormat('es-PY', { 
         minimumFractionDigits: 0,
         maximumFractionDigits: 0,
         useGrouping: true
       });
       
-      // Precio unitario simple
       const precioStr = formatter.format(precioFinal);
-      
-      // Subtotal con coma al final
       const subtotalNum = precioFinal * cantidad;
       const subtotalStr = formatter.format(subtotalNum) + ',';
       
@@ -459,43 +456,52 @@
         String(cantidad),
         tituloDisplay,
         precioStr,
-        '', // Descuento vacío
-        '0.0', // Exentas
-        '0.0', // 5%
-        subtotalStr // 10%
+        '',
+        '0.0',
+        '0.0',
+        subtotalStr
       ];
     });
 
+    // ========== ANCHOS PERFECTAMENTE CUADRADOS ==========
+    // Total disponible: 595pt - 60pt (márgenes) = 535pt
+    // Distribución: 50 + 175 + 85 + 70 + 55 + 45 + 55 = 535pt ✓
+    
     doc.autoTable({
       head: [['Cantida', 'Descripción', 'Precio unitario', 'Descuento', 'Exentas', '5%', '10%']],
       body: tableData,
       startY: y,
       margin: { left: M, right: M },
+      tableWidth: 'auto',  // Permite que las columnas usen cellWidth exactos
       styles: {
         fontSize: 9,
         cellPadding: 5,
         textColor: C_TXT,
         lineColor: C_BORDER,
         lineWidth: 1,
-        overflow: 'linebreak',
+        overflow: 'linebreak',  // Permite wrap en textos largos
         halign: 'left',
-        font: 'helvetica'
+        font: 'helvetica',
+        minCellHeight: 20,
+        valign: 'middle'
       },
       headStyles: {
         fillColor: C_HEADER_BG,
         textColor: C_TXT,
         fontStyle: 'bold',
         halign: 'center',
-        fontSize: 9
+        fontSize: 9,
+        minCellHeight: 20,
+        valign: 'middle'
       },
       columnStyles: {
-        0: { halign: 'center', cellWidth: 45 },      // Cantida
-        1: { halign: 'left', cellWidth: 160 },       // Descripción
-        2: { halign: 'right', cellWidth: 85 },       // Precio unitario
-        3: { halign: 'center', cellWidth: 65 },      // Descuento
-        4: { halign: 'right', cellWidth: 55 },       // Exentas
-        5: { halign: 'right', cellWidth: 45 },       // 5%
-        6: { halign: 'right', cellWidth: 100 }       // 10%
+        0: { halign: 'center', cellWidth: 50 },    // Cantida: 50pt
+        1: { halign: 'left', cellWidth: 175 },     // Descripción: 175pt
+        2: { halign: 'right', cellWidth: 85 },     // Precio unitario: 85pt
+        3: { halign: 'center', cellWidth: 70 },    // Descuento: 70pt
+        4: { halign: 'right', cellWidth: 55 },     // Exentas: 55pt
+        5: { halign: 'right', cellWidth: 45 },     // 5%: 45pt
+        6: { halign: 'right', cellWidth: 55 }      // 10%: 55pt (CORREGIDO)
       },
       theme: 'grid'
     });
@@ -503,7 +509,7 @@
     // ========== TOTALES DENTRO DE LA TABLA ==========
     y = doc.lastAutoTable.finalY;
     
-    // Función mejorada para convertir números a texto
+    // Función para convertir números a texto
     function numeroATexto(num) {
       if (num === 0) return 'CERO';
       if (num >= 1000000) return 'UN MILLON O MAS';
@@ -554,6 +560,7 @@
       body: totalsData,
       startY: y,
       margin: { left: M, right: M },
+      tableWidth: 'auto',  // Usar mismo sistema
       styles: {
         fontSize: 9,
         cellPadding: 5,
@@ -562,16 +569,17 @@
         lineWidth: 1,
         overflow: 'linebreak',
         valign: 'middle',
-        font: 'helvetica'
+        font: 'helvetica',
+        minCellHeight: 20
       },
       columnStyles: {
-        0: { fontStyle: 'bold', cellWidth: 100, halign: 'left' },     // Label
-        1: { cellWidth: 100, halign: 'left' },                        // 5% o texto
-        2: { halign: 'right', cellWidth: 55 },                        // 0,00
-        3: { cellWidth: 50, halign: 'left' },                         // 10%
-        4: { halign: 'right', cellWidth: 65 },                        // Valor IVA
-        5: { halign: 'right', fontStyle: 'bold', cellWidth: 75 },     // TOTAL IVA
-        6: { halign: 'right', fontStyle: 'bold', cellWidth: 100 }     // Valor final
+        0: { fontStyle: 'bold', cellWidth: 110, halign: 'left' },   // Label
+        1: { cellWidth: 130, halign: 'left' },                      // Texto/5%
+        2: { halign: 'right', cellWidth: 60 },                      // 0,00
+        3: { cellWidth: 50, halign: 'left' },                       // 10%
+        4: { halign: 'right', cellWidth: 70 },                      // Valor IVA
+        5: { halign: 'right', fontStyle: 'bold', cellWidth: 60 },   // TOTAL IVA
+        6: { halign: 'right', fontStyle: 'bold', cellWidth: 55 }    // Valor final (CORREGIDO: 55pt)
       },
       theme: 'grid'
     });
