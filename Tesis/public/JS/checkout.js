@@ -1,4 +1,4 @@
-// JS/checkout.js
+// JS/checkout.js - VERSIÓN MEJORADA CON PROMOS Y FORMATEO
 (function () {
   // --------- DOM ---------
   const form = document.getElementById('checkout-form');
@@ -14,7 +14,7 @@
   const fmtGs = (n) => new Intl.NumberFormat('es-PY').format(Number(n || 0)) + ' Gs';
   const QS = new URLSearchParams(location.search);
 
-  // Claves de sessionStorage (dual para compatibilidad)
+  // Claves de sessionStorage
   const SNAP_FACTURA = 'pedido-simulado';
   const SNAP_CHECKOUT_PRIMARY = 'checkout_snapshot';
   const SNAP_CHECKOUT_FALLBACK = 'checkout';
@@ -42,13 +42,12 @@
     catch { return []; }
   }
 
-  // Datos del checkout (items + total) con prioridad a snapshot y a URL
+  // Datos del checkout con soporte de promos
   function getCheckoutData() {
     const snap = readCheckoutSnapshot();
-    const isLocalUrl  = QS.has('monto');    // flujo local
-    const isRemoteUrl = hasValidPedido(QS); // flujo con pedido remoto
+    const isLocalUrl  = QS.has('monto');
+    const isRemoteUrl = hasValidPedido(QS);
 
-    // Local por URL y snapshot consistente
     if (isLocalUrl && snap?.source === 'local') {
       const items = Array.isArray(snap.items) ? snap.items : [];
       const total = Number(snap.total || 0) || items.reduce((a, p) =>
@@ -56,12 +55,10 @@
       return { items, total, source: 'local' };
     }
 
-    // Remoto por URL y snapshot consistente
     if (isRemoteUrl && snap?.source === 'remote' && snap?.pedidoId === QS.get('pedido')) {
       return { items: [], total: NaN, source: 'remote', pedidoId: snap.pedidoId };
     }
 
-    // Fallback legacy: localStorage
     const items = getCartLocal();
     const total = items.reduce((a, p) => a + Number(p.precio) * Number(p.cantidad || 1), 0);
     return { items, total, source: 'legacy' };
@@ -81,7 +78,7 @@
   const normalizeCard = (num) => (num || '').replace(/\D/g, '').slice(0, 19);
   const formatCardInput = (v) => normalizeCard(v).replace(/(\d{4})(?=\d)/g, '$1 ').trim();
 
-  // --------- Snapshot de factura (para descargar PDF luego) ---------
+  // --------- Snapshot de factura ---------
   function collectClienteFromForm() {
     return {
       ruc:      document.getElementById('ruc')?.value || '',
@@ -142,12 +139,30 @@
     });
   }
 
+  // ========== FORMATEO DE EFECTIVO CON SEPARADORES ==========
+  if (efectivoMonto) {
+    efectivoMonto.addEventListener('input', (e) => {
+      const raw = e.target.value.replace(/\D/g, ''); // Solo números
+      if (raw === '') {
+        e.target.value = '';
+        e.target.dataset.rawValue = '0';
+        return;
+      }
+      const num = parseInt(raw, 10);
+      e.target.value = new Intl.NumberFormat('es-PY').format(num);
+      e.target.dataset.rawValue = String(num); // Guardar valor numérico
+    });
+    
+    // Placeholder formateado
+    efectivoMonto.placeholder = '100.000';
+  }
+
   // --------- Envío del formulario ---------
   form?.addEventListener('submit', (e) => {
     e.preventDefault();
 
     const metodo = document.querySelector('input[name="metodo"]:checked')?.value;
-    const { total, source } = getCheckoutData();
+    const { total, source, items } = getCheckoutData();
 
     if (source !== 'remote' && (!isFinite(total) || total <= 0)) {
       return;
@@ -188,10 +203,17 @@
     }
 
     if (metodo === 'efectivo') {
-      const cash = Number(efectivoMonto?.value || 0);
-      if (isNaN(cash) || cash <= 0) { alert('Ingresá el monto con el que vas a pagar.'); return; }
+      // Obtener valor numérico desde dataset
+      const cashRaw = efectivoMonto?.dataset.rawValue || efectivoMonto?.value.replace(/\D/g, '');
+      const cash = Number(cashRaw || 0);
+      
+      if (isNaN(cash) || cash <= 0) { 
+        alert('Ingresá el monto con el que vas a pagar.'); 
+        return; 
+      }
       if (source !== 'remote' && cash < total) {
-        alert(`El monto (${fmtGs(cash)}) no alcanza. Total: ${fmtGs(total)}.`); return;
+        alert(`El monto (${fmtGs(cash)}) no alcanza. Total: ${fmtGs(total)}.`); 
+        return;
       }
       const change = source !== 'remote' ? cash - total : 0;
       alert(`Pedido confirmado. ${source !== 'remote' ? `Vuelto: ${fmtGs(change)}. ` : ''}¡Gracias!`);
@@ -204,31 +226,25 @@
 
   // --------- Éxito + Factura ---------
   function finalizeSuccess(metodo, extra = {}) {
-      const snap = saveFacturaSnapshot({ metodo, extra });
+    const snap = saveFacturaSnapshot({ metodo, extra });
 
-      // 1) Intentar vaciar carrito (remoto/local) vía CartAPI si está disponible
-      Promise.resolve()
-        .then(() => window.CartAPI?.empty?.())
-        .catch(() => {})  // si no existe empty() o falla, seguimos
-        .finally(() => {
-          // 2) Asegurar limpieza local por las dudas
-          try { localStorage.removeItem('productos-en-carrito'); } catch {}
+    Promise.resolve()
+      .then(() => window.CartAPI?.empty?.())
+      .catch(() => {})
+      .finally(() => {
+        try { localStorage.removeItem('productos-en-carrito'); } catch {}
 
-          // 3) Mostrar pantalla de éxito
-          form.classList.add('disabled');
-          success.classList.remove('disabled');
-          success.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        form.classList.add('disabled');
+        success.classList.remove('disabled');
+        success.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-          // 4) Botón de factura
-          if (btnFactura) btnFactura.onclick = () => generateInvoicePDF(snap || loadFacturaSnapshot());
-          
-          // 5) Opcional: refrescar badge si tu CartAPI lo expone
-          try { window.CartAPI?.refreshBadge?.(); } catch {}
-        });
-    }
+        if (btnFactura) btnFactura.onclick = () => generateInvoicePDF(snap || loadFacturaSnapshot());
+        
+        try { window.CartAPI?.refreshBadge?.(); } catch {}
+      });
+  }
 
-
-  // --------- Helpers imagen a dataURL (logo/QR) ---------
+  // --------- Helpers imagen a dataURL ---------
   async function toDataURL(src) {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -245,7 +261,7 @@
     });
   }
 
-  // --------- FACTURA PDF ---------
+  // ========== FACTURA PDF MEJORADA CON PROMOS ==========
   async function generateInvoicePDF(snapshot) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
@@ -253,14 +269,15 @@
     const pw = doc.internal.pageSize.getWidth();
     const ph = doc.internal.pageSize.getHeight();
 
-    // Paleta y márgenes
+    // Paleta
     const M = 54;
     const C_TXT  = [30, 30, 30];
     const C_MUT  = [110, 110, 110];
     const C_LINE = [170, 170, 170];
     const C_HEAD = [111, 92, 56];
+    const C_PROMO = [230, 57, 70];
 
-    // Empresa (ajustá a tu marca)
+    // Empresa
     const EMP = {
       nombre: 'Paniquiños',
       actividad: ' Panaderia ',
@@ -271,23 +288,41 @@
       inicio: '20/10/2021',
       logo: 'https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinos.png'
     };
-    const QR_SRC  = 'https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/QrGenerico.jpg';
+    const QR_SRC = 'https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/QrGenerico.jpg';
 
-    // Snapshot / carrito
+    // Snapshot
     const snap = snapshot || loadFacturaSnapshot() || {};
-    const metodo  = snap.metodo || 'contado';
+    const metodo = snap.metodo || 'contado';
     const cliente = snap.cliente || collectClienteFromForm();
-    const data    = getCheckoutData();
-    const items   = (snap.items && snap.items.length ? snap.items : data.items) || [];
+    const data = getCheckoutData();
+    const items = (snap.items && snap.items.length ? snap.items : data.items) || [];
     const totalUse = Number(snap.total ?? data.total ?? 0);
 
-    // Cálculos
-    const iva10   = Math.round(totalUse / 11);
+    // Calcular totales con y sin promos
+    let totalSinDescuento = 0;
+    let totalConDescuento = totalUse;
+    const tienePromos = items.some(it => it.tienePromo);
+
+    if (tienePromos) {
+      items.forEach(it => {
+        const precioOriginal = Number(it.precioOriginal || it.precio);
+        const precioFinal = it.tienePromo ? Number(it.precio) : precioOriginal;
+        const cantidad = Number(it.cantidad || 1);
+        
+        totalSinDescuento += precioOriginal * cantidad;
+        totalConDescuento += (precioFinal - precioOriginal) * cantidad;
+      });
+    }
+
+    const ahorroTotal = tienePromos ? (totalSinDescuento - totalConDescuento) : 0;
+
+    // Cálculos IVA
+    const iva10 = Math.round(totalUse / 11);
     const subBase = totalUse - iva10;
-    const fecha   = snap.fechaISO ? new Date(snap.fechaISO) : new Date();
+    const fecha = snap.fechaISO ? new Date(snap.fechaISO) : new Date();
     const nroFactura = `001-001-${String(Math.floor(Math.random()*1_000_000)).padStart(6,'0')}`;
 
-    // ===== Encabezado en caja =====
+    // ===== Encabezado =====
     const hbX = 28, hbY = 28, hbW = pw - 56, hbH = 150;
     const pad = 16;
     doc.setDrawColor(...C_LINE).setLineWidth(2).roundedRect(hbX, hbY, hbW, hbH, 10, 10);
@@ -296,8 +331,8 @@
     const logoW = 100, logoH = 100;
     const rightW = 270;
     const rightX = hbX + hbW - pad - rightW;
-    const leftX  = hbX + pad + logoW + gap;
-    const leftW  = rightX - gap - leftX;
+    const leftX = hbX + pad + logoW + gap;
+    const leftW = rightX - gap - leftX;
 
     try {
       const logoData = await toDataURL(EMP.logo);
@@ -306,7 +341,7 @@
 
     const FS_TITLE = 16, FS_LABEL = 11, FS_TEXT = 11, LH = 14;
 
-    // Columna izquierda (título + datos empresa)
+    // Columna izquierda
     let yL = hbY + pad + 6;
     doc.setFont('helvetica','bold').setFontSize(FS_TITLE).setTextColor(...C_TXT);
     const titleLines = doc.splitTextToSize('KuDE de FACTURA ELECTRÓNICA', leftW);
@@ -320,7 +355,7 @@
       yL += lines.length * LH;
     }
 
-    // Columna derecha (datos RUC/Timbrado/Inicio/Nro)
+    // Columna derecha
     let yR = hbY + pad + 6;
     doc.setFont('helvetica','bold').setFontSize(FS_LABEL).setTextColor(...C_TXT);
     doc.text(`RUC : ${EMP.ruc}`, rightX, yR);
@@ -351,27 +386,58 @@
     doc.text('Cliente', cliX + 14, cliY + 24);
 
     doc.setFont('helvetica','normal').setFontSize(FS_TEXT).setTextColor(...C_MUT);
-    doc.text(`RUC/CI: ${cliente.ruc || '-'}`,        cliX + 14,     cliY + 46);
-    doc.text(`Razón Social: ${cliente.razon || '-'}`,cliX + cliW/2, cliY + 46);
-    doc.text(`Tel: ${cliente.tel || '-'}`,           cliX + 14,     cliY + 66);
-    doc.text(`Mail: ${cliente.mail || '-'}`,         cliX + cliW/2, cliY + 66);
+    doc.text(`RUC/CI: ${cliente.ruc || '-'}`, cliX + 14, cliY + 46);
+    doc.text(`Razón Social: ${cliente.razon || '-'}`, cliX + cliW/2, cliY + 46);
+    doc.text(`Tel: ${cliente.tel || '-'}`, cliX + 14, cliY + 66);
+    doc.text(`Mail: ${cliente.mail || '-'}`, cliX + cliW/2, cliY + 66);
+
+    // ===== BADGE DE PROMO =====
+    if (tienePromos && ahorroTotal > 0) {
+      const badgeY = cliY + cliH + 14;
+      doc.setFillColor(...C_PROMO);
+      doc.roundedRect(cliX, badgeY, cliW, 32, 8, 8, 'F');
+      
+      doc.setFont('helvetica','bold').setFontSize(12).setTextColor(255, 255, 255);
+      doc.text('🎉 COMPRA CON DESCUENTO', cliX + 14, badgeY + 20);
+      doc.text(`Ahorraste: ${fmtGs(ahorroTotal)}`, cliX + cliW - 14, badgeY + 20, { align: 'right' });
+    }
 
     // ===== Tabla =====
-    const tableItems = (items.length ? items : [{ titulo:'Servicio/Producto', cantidad:1, precio: totalUse }]);
-    const body = tableItems.map(it => [
-      it.titulo || 'Item',
-      String(it.cantidad || 1),
-      new Intl.NumberFormat('es-PY').format(Number(it.precio || 0)) + ' Gs',
-      new Intl.NumberFormat('es-PY').format(Number(it.precio || 0) * Number(it.cantidad || 1)) + ' Gs'
-    ]);
+    const tableItems = items.length ? items : [{ titulo:'Servicio/Producto', cantidad:1, precio: totalUse }];
+    const body = tableItems.map(it => {
+      const titulo = it.titulo || 'Item';
+      const tienePromo = it.tienePromo;
+      const descuento = tienePromo ? Math.round(it.descuentoPorcentaje || 0) : 0;
+      
+      const tituloConBadge = tienePromo ? `${titulo} (${descuento}% OFF)` : titulo;
+      
+      const precioOriginal = Number(it.precioOriginal || it.precio);
+      const precioFinal = tienePromo ? Number(it.precio) : precioOriginal;
+      const precioStr = tienePromo 
+        ? `${new Intl.NumberFormat('es-PY').format(precioOriginal)} → ${new Intl.NumberFormat('es-PY').format(precioFinal)} Gs`
+        : `${new Intl.NumberFormat('es-PY').format(precioFinal)} Gs`;
+      
+      return [
+        tituloConBadge,
+        String(it.cantidad || 1),
+        precioStr,
+        new Intl.NumberFormat('es-PY').format(precioFinal * Number(it.cantidad || 1)) + ' Gs'
+      ];
+    });
+
+    const tableStartY = tienePromos ? cliY + cliH + 60 : cliY + cliH + 18;
 
     doc.autoTable({
       head: [['Descripción','Cant.','Precio','Subtotal']],
       body,
-      startY: cliY + cliH + 18,
+      startY: tableStartY,
       styles: { fontSize: 10, cellPadding: 6, textColor: C_TXT },
       headStyles: { fillColor: C_HEAD, textColor: 255 },
-      columnStyles: { 1: { halign:'center', cellWidth: 70 }, 2: { halign:'right', cellWidth: 90 }, 3: { halign:'right', cellWidth: 110 } },
+      columnStyles: { 
+        1: { halign:'center', cellWidth: 70 }, 
+        2: { halign:'right', cellWidth: 110 }, 
+        3: { halign:'right', cellWidth: 110 } 
+      },
       tableLineColor: [210,210,210],
       tableLineWidth: 0.5,
       theme: 'grid'
@@ -383,13 +449,13 @@
 
     doc.setFont('helvetica','bold').setFontSize(11).setTextColor(...C_TXT);
     doc.text('SUBTOTAL (base)', tx, yTot);
-    doc.text('IVA 10%',         tx, yTot + 18);
+    doc.text('IVA 10%', tx, yTot + 18);
     doc.setFont('helvetica','bold').setFontSize(13);
-    doc.text('TOTAL',           tx, yTot + 36);
+    doc.text('TOTAL', tx, yTot + 36);
 
     doc.setFont('helvetica','normal').setFontSize(11).setTextColor(...C_TXT);
-    doc.text(new Intl.NumberFormat('es-PY').format(subBase) + ' Gs', vx, yTot,       { align:'right' });
-    doc.text(new Intl.NumberFormat('es-PY').format(iva10)   + ' Gs', vx, yTot + 18, { align:'right' });
+    doc.text(new Intl.NumberFormat('es-PY').format(subBase) + ' Gs', vx, yTot, { align:'right' });
+    doc.text(new Intl.NumberFormat('es-PY').format(iva10) + ' Gs', vx, yTot + 18, { align:'right' });
     doc.setFont('helvetica','bold').setFontSize(13);
     doc.text(new Intl.NumberFormat('es-PY').format(totalUse)+ ' Gs', vx, yTot + 36, { align:'right' });
 
@@ -417,7 +483,12 @@
       const noteX = qrX + qrSize + 22, noteY = qrY + 18;
       doc.text('Este documento es una representación gráfica de una factura (simulada).', noteX, noteY);
       doc.text('Uso demostrativo. No válida como comprobante fiscal.', noteX, noteY + 16);
-      doc.text('Paniquiños ©', noteX, noteY + 32);
+      if (tienePromos) {
+        doc.setTextColor(...C_PROMO);
+        doc.text(`✓ Compra con descuentos aplicados`, noteX, noteY + 32);
+      }
+      doc.setTextColor(...C_MUT);
+      doc.text('Paniquiños ©', noteX, noteY + (tienePromos ? 48 : 32));
     } catch {}
 
     doc.save(`Factura_Paniquinos_${nroFactura}.pdf`);
