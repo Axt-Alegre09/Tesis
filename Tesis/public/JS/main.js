@@ -185,10 +185,10 @@ async function fetchProductosCatalogo() {
   }));
 }
 
-// 2) Populares para portada
+// 2) Populares para portada con promos
 async function fetchPopularesPortada(limit = 12) {
   const { data, error } = await supabase
-    .from("populares_para_portada")
+    .from("productos_con_promos")
     .select("*")
     .limit(limit);
 
@@ -201,8 +201,15 @@ async function fetchPopularesPortada(limit = 12) {
     id: p.id,
     nombre: p.nombre,
     titulo: p.nombre,
-    imagen: toImg(p.url_imagen || p.imagen),
-    precio: p.precio,
+    imagen: toImg(p.imagen),
+    precio: parseFloat(p.precio_original),
+    precioConPromo: parseFloat(p.precio_con_promo),
+    tienePromo: p.tiene_promo,
+    descuentoPorcentaje: parseFloat(p.descuento_porcentaje || 0),
+    ahorroGs: parseFloat(p.ahorro_gs || 0),
+    promoNombre: p.promo_nombre,
+    promoFin: p.promo_fin,
+    categoria: { id: slug(p.categoria_nombre || ""), nombre: p.categoria_nombre },
   }));
 }
 
