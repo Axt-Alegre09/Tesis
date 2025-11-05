@@ -129,8 +129,9 @@ main{
   flex-direction: column;
   background: #fff;
   border-radius: 1rem;
-  overflow: hidden;
+  overflow: visible; 
   box-shadow: 0 2px 8px rgba(0,0,0,.06);
+  position: relative;
 }
 .producto-imagen{
   width: 100%;
@@ -138,7 +139,8 @@ main{
   object-fit: cover;
   object-position: center;
   height: var(--card-img-h);
-  border-radius: 0;
+  border-radius: 1rem 1rem 0 0;
+  overflow: hidden;              
 }
 @supports (aspect-ratio: 1){
   .producto-imagen{ height: auto; aspect-ratio: 1 / 1; }
@@ -489,7 +491,7 @@ main{
   .user-chip .user-name{ display: none; }
   .user-chip{ padding: .3rem .5rem; }
 
-  /* Main más al borde, sin tanto “aire” */
+  /* Main más al borde, sin tanto "aire" */
   main{ margin: .5rem; padding: .6rem; }
 
   /* Grid 2 columnas bien apretado */
@@ -498,12 +500,11 @@ main{
     gap: .55rem;
   }
 
-  /* Tarjeta compacta */
+  /* Tarjeta compacta - SIN overflow: hidden para no cortar badges */
   :root{ --card-img-h: 160px; }
   .producto{
     border-radius: .9rem;
     box-shadow: 0 2px 7px rgba(0,0,0,.06);
-    overflow: hidden;
     border: 1px solid rgba(0,0,0,.05);
   }
   .producto-imagen{
@@ -517,7 +518,7 @@ main{
     border-radius: 0 0 .9rem .9rem;
   }
 
-  /* Título en 2 líneas máximo (evita que “salte”) */
+  /* Título en 2 líneas máximo (evita que "salte") */
   .producto-titulo{
     font-size: .95rem; line-height: 1.15;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
@@ -685,5 +686,112 @@ main{
   to {
     transform: translateX(100%);
     opacity: 0;
+  }
+}
+
+/* ==================== ESTILOS DE PROMOS PARA CATÁLOGO ==================== */
+
+/* Badge de descuento flotante */
+.promo-badge {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 3;
+  background: linear-gradient(135deg, #e63946 0%, #d62828 100%);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 4px 12px rgba(230, 57, 70, 0.4);
+  animation: pulsePromo 2s ease-in-out infinite;
+}
+
+@keyframes pulsePromo {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.promo-badge i {
+  font-size: 0.9rem;
+}
+
+/* Contenedor de precios con promo */
+.precios-con-promo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0;
+}
+
+/* Precio original tachado */
+.precio-original {
+  text-decoration: line-through;
+  color: var(--clr-gris, #999);
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+/* Precio con descuento (más destacado) */
+.precios-con-promo .producto-precio {
+  color: #e63946;
+  font-size: 1.15rem;
+  margin: 0;
+}
+
+/* Texto de ahorro */
+.ahorro-promo {
+  color: #10b981;
+  font-size: 0.8rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ahorro-promo::before {
+  content: '🎉';
+  font-size: 0.9rem;
+}
+
+/* Animación para productos con promo */
+.producto:has(.promo-badge) {
+  border: 2px solid rgba(230, 57, 70, 0.2);
+}
+
+.producto:has(.promo-badge):hover {
+  border-color: rgba(230, 57, 70, 0.4);
+  box-shadow: 0 8px 20px rgba(230, 57, 70, 0.15);
+}
+
+/* Responsive para promos */
+@media (max-width: 768px) {
+  .promo-badge {
+    top: 10px;
+    left: 10px;
+    padding: 5px 10px;
+    font-size: 0.75rem;
+  }
+  
+  .precios-con-promo .producto-precio {
+    font-size: 1rem;
+  }
+  
+  .precio-original {
+    font-size: 0.8rem;
+  }
+  
+  .ahorro-promo {
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .promo-badge {
+    padding: 4px 8px;
+    font-size: 0.7rem;
   }
 }
