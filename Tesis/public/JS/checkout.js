@@ -439,18 +439,21 @@
       
       const precioOrig = Number(it.precioOriginal || it.precio);
       const precioFinal = Number(it.precio);
+      const cantidad = Number(it.cantidad || 1);
+      
+      // Formato de precio con separador de miles
       const precioStr = tienePromo 
-        ? `${new Intl.NumberFormat('es-PY').format(precioOrig)} → ${new Intl.NumberFormat('es-PY').format(precioFinal)}`
+        ? new Intl.NumberFormat('es-PY').format(precioOrig) + ' → ' + new Intl.NumberFormat('es-PY').format(precioFinal)
         : new Intl.NumberFormat('es-PY').format(precioFinal);
       
       return [
-        String(it.cantidad || 1),
+        String(cantidad),
         tituloDisplay,
         precioStr,
         '', // Descuento
         '0.0', // Exentas
         '0.0', // 5%
-        new Intl.NumberFormat('es-PY').format(precioFinal * Number(it.cantidad || 1)) + ','
+        new Intl.NumberFormat('es-PY').format(precioFinal * cantidad) + ','
       ];
     });
 
@@ -464,7 +467,8 @@
         cellPadding: 5,
         textColor: C_TXT,
         lineColor: C_BORDER,
-        lineWidth: 1
+        lineWidth: 1,
+        overflow: 'linebreak'
       },
       headStyles: {
         fillColor: C_HEADER_BG,
@@ -474,12 +478,12 @@
       },
       columnStyles: {
         0: { halign: 'center', cellWidth: 50 },
-        1: { halign: 'left', cellWidth: 'auto' },
-        2: { halign: 'right', cellWidth: 100 },
+        1: { halign: 'left', cellWidth: 200 },
+        2: { halign: 'right', cellWidth: 90 },
         3: { halign: 'center', cellWidth: 70 },
         4: { halign: 'right', cellWidth: 60 },
         5: { halign: 'right', cellWidth: 50 },
-        6: { halign: 'right', cellWidth: 80 }
+        6: { halign: 'right', cellWidth: 85 }
       },
       theme: 'grid'
     });
@@ -487,14 +491,40 @@
     // ========== TOTALES DENTRO DE LA TABLA ==========
     y = doc.lastAutoTable.finalY;
     
-    // Convertir total a letras (simplificado)
-    const totalEnLetras = 'MONTO EN LETRAS';
+    // Convertir número a texto (simplificado para Paraguay)
+    const unidades = ['', 'UN', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE'];
+    const decenas = ['', '', 'VEINTE', 'TREINTA', 'CUARENTA', 'CINCUENTA', 'SESENTA', 'SETENTA', 'OCHENTA', 'NOVENTA'];
+    const centenas = ['', 'CIENTO', 'DOSCIENTOS', 'TRESCIENTOS', 'CUATROCIENTOS', 'QUINIENTOS', 'SEISCIENTOS', 'SETECIENTOS', 'OCHOCIENTOS', 'NOVECIENTOS'];
+    
+    function numeroATexto(num) {
+      if (num === 0) return 'CERO';
+      if (num < 10) return unidades[num];
+      if (num < 100) {
+        const dec = Math.floor(num / 10);
+        const uni = num % 10;
+        return decenas[dec] + (uni ? ' Y ' + unidades[uni] : '');
+      }
+      if (num < 1000) {
+        const cen = Math.floor(num / 100);
+        const resto = num % 100;
+        return (num === 100 ? 'CIEN' : centenas[cen]) + (resto ? ' ' + numeroATexto(resto) : '');
+      }
+      if (num < 1000000) {
+        const miles = Math.floor(num / 1000);
+        const resto = num % 1000;
+        const textoMiles = miles === 1 ? 'MIL' : numeroATexto(miles) + ' MIL';
+        return textoMiles + (resto ? ' ' + numeroATexto(resto) : '');
+      }
+      return 'MONTO MAYOR';
+    }
+    
+    const totalEnLetras = numeroATexto(Math.floor(totalUse)) + ' GUARANÍES';
     
     const totalsData = [
       ['SUBTOTAL:', '', '', '', '', '', new Intl.NumberFormat('es-PY').format(subBase) + ',00'],
       ['TOTAL DE LA', '', '', '', '', '', new Intl.NumberFormat('es-PY').format(totalUse) + ',00'],
       ['TOTAL EN GUARANÍES:', totalEnLetras, '', '', '', '', new Intl.NumberFormat('es-PY').format(totalUse) + ',00'],
-      ['LIQUIDACIÓN IVA:', '5%    0,00', '10%    ' + new Intl.NumberFormat('es-PY').format(iva10), '', '', 'TOTAL IVA', new Intl.NumberFormat('es-PY').format(iva10)]
+      ['LIQUIDACIÓN IVA:', '5%', '0,00', '10%', new Intl.NumberFormat('es-PY').format(iva10), 'TOTAL IVA', new Intl.NumberFormat('es-PY').format(iva10)]
     ];
 
     doc.autoTable({
@@ -506,16 +536,18 @@
         cellPadding: 5,
         textColor: C_TXT,
         lineColor: C_BORDER,
-        lineWidth: 1
+        lineWidth: 1,
+        overflow: 'linebreak',
+        cellWidth: 'wrap'
       },
       columnStyles: {
-        0: { fontStyle: 'bold', cellWidth: 120 },
-        1: { cellWidth: 'auto' },
-        2: { cellWidth: 100 },
-        3: { cellWidth: 70 },
-        4: { cellWidth: 60 },
+        0: { fontStyle: 'bold', cellWidth: 100 },
+        1: { cellWidth: 100 },
+        2: { halign: 'right', cellWidth: 70 },
+        3: { cellWidth: 60 },
+        4: { halign: 'right', cellWidth: 80 },
         5: { halign: 'right', fontStyle: 'bold', cellWidth: 80 },
-        6: { halign: 'right', fontStyle: 'bold', cellWidth: 80 }
+        6: { halign: 'right', fontStyle: 'bold', cellWidth: 85 }
       },
       theme: 'grid'
     });
@@ -530,7 +562,7 @@
     // ========== FOOTER CON CDC ==========
     y = doc.lastAutoTable.finalY + 20;
     
-    const footerBoxH = 140;
+    const footerBoxH = 150;
     doc.setDrawColor(...C_BORDER);
     doc.setLineWidth(1);
     doc.rect(M, y, pw - 2*M, footerBoxH);
@@ -551,23 +583,29 @@
     let cdcY = y + 20;
     
     doc.setFont('helvetica','bold').setFontSize(10).setTextColor(...C_TXT);
-    doc.text('Consulte la validez de esta Factura Electrónica con el número de CDC', cdcX, cdcY);
+    const maxWidth = pw - 2*M - 145;
+    const line1 = doc.splitTextToSize('Consulte la validez de esta Factura Electrónica con el número de CDC', maxWidth);
+    doc.text(line1, cdcX, cdcY);
     
-    cdcY += 14;
+    cdcY += 14 * line1.length;
     doc.setFont('helvetica','normal').setFontSize(9).setTextColor(0, 0, 255);
     doc.textWithLink('https://ekuatia.set.gov.py/consultas/', cdcX, cdcY, { url: 'https://ekuatia.set.gov.py/consultas/' });
     
     cdcY += 20;
-    doc.setFont('helvetica','bold').setFontSize(12).setTextColor(...C_TXT);
-    doc.text(cdc, cdcX, cdcY);
+    doc.setFont('helvetica','bold').setFontSize(11).setTextColor(...C_TXT);
+    // Dividir CDC en grupos más legibles
+    const cdcFormatted = cdc.match(/.{1,10}/g).join(' ');
+    doc.text(cdcFormatted, cdcX, cdcY);
     
     cdcY += 18;
     doc.setFont('helvetica','bold').setFontSize(9);
-    doc.text('ESTE DOCUMENTO ES UNA REPRESENTACIÓN GRÁFICA DE UN DOCUMENTO', cdcX, cdcY);
+    const line2 = doc.splitTextToSize('ESTE DOCUMENTO ES UNA REPRESENTACIÓN GRÁFICA DE UN DOCUMENTO', maxWidth);
+    doc.text(line2, cdcX, cdcY);
     
-    cdcY += 16;
+    cdcY += 14 * line2.length + 4;
     doc.setFont('helvetica','normal').setFontSize(8).setTextColor(...C_GRAY);
-    doc.text('Si su documento electrónico presenta algún error, podrá solicitar la modificación dentro de las 72 horas siguientes de la emisión', M + 15, cdcY);
+    const line3 = doc.splitTextToSize('Si su documento electrónico presenta algún error, podrá solicitar la modificación dentro de las 72 horas siguientes de la emisión', maxWidth);
+    doc.text(line3, cdcX, cdcY);
 
     doc.save(`Factura_${EMP.nombre}_${nroFactura}.pdf`);
   }
