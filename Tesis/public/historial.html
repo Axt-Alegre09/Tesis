@@ -3,55 +3,62 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Historial de pedidos | Paniquiños</title>
+  <title>Historial de Compras | Paniquiños</title>
 
   <link rel="shortcut icon" href="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinosico.ico" type="image/x-icon">
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  
+  <!-- Fuentes -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  
+  <!-- Bootstrap Icons -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet" />
 
+  <!-- Estilos -->
   <link rel="stylesheet" href="CSS/historial.css" />
 </head>
+
 <body class="historial-body">
   <div class="wrapper">
-    <!-- TOPBAR -->
+    <!-- ===== TOPBAR ===== -->
     <header class="topbar">
       <div class="topbar-left">
-        <button class="back-btn" type="button" onclick="window.location.href='index.html'">
+        <button class="back-btn" type="button" onclick="window.location.href='index.html'" aria-label="Volver al inicio">
           <i class="bi bi-arrow-left"></i>
         </button>
         <div class="topbar-title">
-          <h1>Historial de pedidos</h1>
-          <p>Revisá tus compras y descargá tus comprobantes</p>
+          <h1>Historial de Compras</h1>
+          <p>Revisá tus pedidos y descargá tus comprobantes 📄</p>
         </div>
       </div>
 
       <div class="topbar-right">
         <label class="filter-label" for="filtroPeriodo">
-          <i class="bi bi-calendar3"></i> Periodo
+          <i class="bi bi-calendar3"></i> Periodo:
         </label>
-        <select id="filtroPeriodo" class="filter-select">
+        <select id="filtroPeriodo" class="filter-select" aria-label="Filtrar por periodo">
           <option value="30">Últimos 30 días</option>
           <option value="90">Últimos 3 meses</option>
           <option value="365">Último año</option>
-          <option value="all">Todo</option>
+          <option value="all">Todo el historial</option>
         </select>
       </div>
     </header>
 
-    <!-- CONTENIDO PRINCIPAL -->
+    <!-- ===== CONTENIDO PRINCIPAL ===== -->
     <main class="historial-main">
-      <!-- Resumen arriba -->
-      <section id="resumen" class="resumen">
-        <!-- Se completa por JS -->
+      <!-- Resumen de estadísticas -->
+      <section id="resumen" class="resumen" aria-label="Resumen de compras">
+        <!-- Dinámico: Se llena con JS -->
       </section>
 
       <!-- Lista de pedidos -->
-      <section id="pedidosContainer" class="pedidos-grid">
-        <!-- Se completa por JS -->
+      <section id="pedidosContainer" class="pedidos-grid" aria-label="Lista de pedidos">
+        <!-- Dinámico: Se llena con JS -->
       </section>
     </main>
   </div>
 
+  <!-- Script principal -->
   <script type="module" src="JS/historial.js"></script>
 </body>
 </html>
