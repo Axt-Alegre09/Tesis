@@ -1,5 +1,5 @@
 // JS/cart-api.js
-// CartAPI único: sincroniza localStorage o BD según si hay usuario logueado (Supabase).
+// CartAPI CON SOPORTE DE PROMOS
 import { supabase } from "./ScriptLogin.js";
 
 // ---------- Utils ----------
@@ -30,21 +30,35 @@ function _writeLocal(cart) {
   refreshBadge();
 }
 function _totalLocal(cart) {
-  return (cart || []).reduce((a,p) => a + Number(p.precio||0) * Number(p.cantidad||1), 0);
+  return (cart || []).reduce((a,p) => {
+    // Usar precio con promo si existe, sino precio normal
+    const precio = p.tienePromo ? (p.precioConPromo || p.precio) : p.precio;
+    return a + Number(precio||0) * Number(p.cantidad||1);
+  }, 0);
 }
 function _addLocal(prod, qty=1) {
   qty = Math.max(1, Number(qty));
   const cart = _readLocal();
   const id = String(prod.id);
   const i = cart.findIndex(p => String(p.id) === id);
-  if (i >= 0) cart[i].cantidad = Number(cart[i].cantidad||1) + qty;
-  else cart.push({
-    id,
-    titulo: prod.titulo || prod.nombre || "",
-    precio: Number(prod.precio||0),
-    cantidad: qty,
-    imagen: prod.imagen ? toImg(prod.imagen) : null
-  });
+  
+  // Usar precio con promo si existe
+  const precioFinal = prod.tienePromo ? (prod.precioConPromo || prod.precio) : prod.precio;
+  
+  if (i >= 0) {
+    cart[i].cantidad = Number(cart[i].cantidad||1) + qty;
+  } else {
+    cart.push({
+      id,
+      titulo: prod.titulo || prod.nombre || "",
+      precio: Number(precioFinal||0),
+      precioOriginal: Number(prod.precio || prod.precioOriginal || 0),
+      tienePromo: prod.tienePromo || false,
+      descuentoPorcentaje: Number(prod.descuentoPorcentaje || 0),
+      cantidad: qty,
+      imagen: prod.imagen ? toImg(prod.imagen) : null
+    });
+  }
   _writeLocal(cart);
   return true;
 }
@@ -115,19 +129,29 @@ async function _fetchRemoteItems() {
   if (!items || !items.length) return [];
 
   const ids = items.map(i => i.producto_id);
+  
+  // Usar la vista con promos
   const { data: prods, error: errProds } = await supabase
-    .from("v_productos_publicos")
-    .select("id, nombre, precio, imagen")
+    .from("productos_con_promos")
+    .select("*")
     .in("id", ids);
   if (errProds) throw errProds;
 
   const map = new Map(prods.map(p => [p.id, p]));
+  
   return items.map(i => {
     const p = map.get(i.producto_id);
+    const precioFinal = p?.tiene_promo 
+      ? parseFloat(p.precio_con_promo) 
+      : parseFloat(p?.precio_original || 0);
+    
     return {
       id: i.producto_id,
       titulo: p?.nombre || "Producto",
-      precio: Number(p?.precio || 0),
+      precio: precioFinal,
+      precioOriginal: parseFloat(p?.precio_original || 0),
+      tienePromo: p?.tiene_promo || false,
+      descuentoPorcentaje: parseFloat(p?.descuento_porcentaje || 0),
       cantidad: Number(i.cantidad || 1),
       imagen: toImg(p?.imagen || ""),
       _itemId: i.id
@@ -163,7 +187,10 @@ async function getSnapshot() {
   if (uid) {
     try {
       const items = await _fetchRemoteItems();
-      const total = items.reduce((a,p)=> a + Number(p.precio)*Number(p.cantidad||1), 0);
+      const total = items.reduce((a,p)=> {
+        const precio = p.tienePromo ? p.precio : p.precioOriginal;
+        return a + Number(precio) * Number(p.cantidad||1);
+      }, 0);
       return { mode: "remote", items, total };
     } catch {
       // fallback local si falla

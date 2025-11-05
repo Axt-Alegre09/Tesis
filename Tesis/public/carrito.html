@@ -43,11 +43,21 @@
 
       <div id="carrito-acciones" class="carrito-acciones disabled">
         <div class="carrito-acciones-izquierda">
-          <button id="btn-vaciar" class="carrito-acciones-vaciar">Vaciar carrito</button>
+          <button id="btn-vaciar" class="carrito-acciones-vaciar">
+            <i class="bi bi-trash"></i> Vaciar carrito
+          </button>
         </div>
         <div class="carrito-acciones-derecha">
-          <div class="carrito-acciones-total">Total: <p id="total">0 Gs</p></div>
-          <button id="btn-comprar" class="carrito-acciones-comprar">Comprar ahora</button>
+          <div class="carrito-acciones-total">
+            <small>Total a pagar</small>
+            <p id="total">0 Gs</p>
+            <span id="total-ahorro" class="total-ahorro" style="display: none;">
+              🎉 Ahorraste: <span id="ahorro-monto">0 Gs</span>
+            </span>
+          </div>
+          <button id="btn-comprar" class="carrito-acciones-comprar">
+            <i class="bi bi-credit-card"></i> Comprar ahora
+          </button>
         </div>
       </div>
 
@@ -65,6 +75,8 @@
     const totalEl     = document.getElementById("total");
     const btnVaciar   = document.getElementById("btn-vaciar");
     const btnComprar  = document.getElementById("btn-comprar");
+    const totalAhorroEl = document.getElementById("total-ahorro");
+    const ahorroMontoEl = document.getElementById("ahorro-monto");
 
     const IMG_FALLBACK = "https://placehold.co/256x256?text=Imagen";
     const fmtGs = (n) => new Intl.NumberFormat("es-PY").format(Number(n||0)) + " Gs";
@@ -84,7 +96,31 @@
     async function render() {
       const snap = await window.CartAPI.getSnapshot();
       const items = snap.items || [];
+      
+      // Calcular totales
+      let totalSinDescuento = 0;
+      let totalConDescuento = 0;
+      
+      items.forEach(it => {
+        const precioOriginal = Number(it.precioOriginal || it.precio);
+        const precioFinal = it.tienePromo ? Number(it.precio) : precioOriginal;
+        const cantidad = Number(it.cantidad || 1);
+        
+        totalSinDescuento += precioOriginal * cantidad;
+        totalConDescuento += precioFinal * cantidad;
+      });
+
+      const ahorroTotal = totalSinDescuento - totalConDescuento;
+
       totalEl.textContent = fmtGs(snap.total || 0);
+
+      // Mostrar ahorro si hay promos
+      if (ahorroTotal > 0) {
+        ahorroMontoEl.textContent = fmtGs(ahorroTotal);
+        totalAhorroEl.style.display = 'block';
+      } else {
+        totalAhorroEl.style.display = 'none';
+      }
 
       if (!items.length) {
         contProds.innerHTML = "";
@@ -98,6 +134,12 @@
       for (const it of items) {
         const row = document.createElement("div");
         row.className = "carrito-producto";
+        
+        // Agregar clase y data attribute si tiene promo
+        if (it.tienePromo) {
+          row.classList.add("has-promo");
+          row.setAttribute("data-descuento", Math.round(it.descuentoPorcentaje));
+        }
 
         // Remoto usa itemId (id de carrito_items). Hacemos fallback por si vino _itemId o id.
         const idAttrKey = snap.mode === "remote" ? "data-itemid" : "data-id";
@@ -106,9 +148,25 @@
           : it.id;
         const idAttrVal = String(resolvedId);
 
+        // HTML del precio (con o sin promo)
+        let precioHTML;
+        if (it.tienePromo) {
+          precioHTML = `
+            <div class="precio-con-promo">
+              <span class="precio-original-carrito">${fmtGs(it.precioOriginal)}</span>
+              <span class="precio-promo-carrito">${fmtGs(it.precio)}</span>
+            </div>
+          `;
+        } else {
+          precioHTML = `<p>${fmtGs(it.precio)}</p>`;
+        }
+
         row.innerHTML = `
           <img class="carrito-producto-imagen" src="${it.imagen || IMG_FALLBACK}" alt="${it.titulo}">
-          <div class="carrito-producto-titulo"><h6>Título</h6><h4>${it.titulo}</h4></div>
+          <div class="carrito-producto-titulo">
+            <h6>Producto</h6>
+            <h4>${it.titulo}</h4>
+          </div>
           <div class="carrito-producto-cantidad">
             <h6>Cantidad</h6>
             <div class="qty-ctrl">
@@ -117,12 +175,19 @@
               <button class="qty-btn" data-action="inc" ${idAttrKey}="${idAttrVal}" aria-label="Aumentar">+</button>
             </div>
           </div>
-          <div class="carrito-producto-precio"><h6>Precio</h6><p>${fmtGs(it.precio)}</p></div>
-          <div class="carrito-producto-subtotal"><h6>Subtotal</h6><p>${fmtGs(it.precio * (it.cantidad||1))}</p></div>
+          <div class="carrito-producto-precio">
+            <h6>Precio</h6>
+            ${precioHTML}
+          </div>
+          <div class="carrito-producto-subtotal">
+            <h6>Subtotal</h6>
+            <p>${fmtGs(it.precio * (it.cantidad||1))}</p>
+          </div>
           <button class="carrito-producto-eliminar" title="Eliminar" ${idAttrKey}="${idAttrVal}">
             <i class="bi bi-trash"></i>
           </button>
         `;
+        
         row.querySelector(".carrito-producto-imagen")?.addEventListener("error", (e)=> e.currentTarget.src = IMG_FALLBACK);
         contProds.appendChild(row);
       }
@@ -138,6 +203,11 @@
       const idVal = btn.getAttribute(idKey);
 
       if (btn.classList.contains("carrito-producto-eliminar")) {
+        // Animación de salida
+        const row = btn.closest(".carrito-producto");
+        row.style.animation = "slideOut 0.3s ease";
+        await new Promise(r => setTimeout(r, 300));
+        
         await window.CartAPI.remove({ [isRemote ? "itemId" : "id"]: idVal });
         await render();
         await window.CartAPI.refreshBadge?.();
@@ -156,9 +226,11 @@
       }
     });
 
-    // Vaciar carrito
+    // Vaciar carrito con confirmación
     btnVaciar.addEventListener("click", async () => {
-      await window.CartAPI.empty?.();   // si tu CartAPI tiene empty(); si no, se ignora
+      if (!confirm("¿Estás seguro de que quieres vaciar el carrito?")) return;
+      
+      await window.CartAPI.empty?.();
       await render();
       await window.CartAPI.refreshBadge?.();
     });
@@ -167,31 +239,57 @@
     btnComprar.addEventListener("click", async () => {
       const snap = await window.CartAPI.getSnapshot();
       const items = snap.items || [];
-      if (!items.length) { alert("Tu carrito está vacío."); return; }
+      if (!items.length) { 
+        alert("Tu carrito está vacío."); 
+        return; 
+      }
 
       const payload = {
-        // para ?monto= usamos "local" (invitado o fallback)
         source: "local",
         items: items.map(it => ({
           id: it.id,
           titulo: it.titulo,
           precio: Number(it.precio || 0),
-          cantidad: Number(it.cantidad || 1)
+          cantidad: Number(it.cantidad || 1),
+          tienePromo: it.tienePromo || false,
+          descuentoPorcentaje: Number(it.descuentoPorcentaje || 0)
         })),
         total: Number(snap.total || 0),
         ts: Date.now()
       };
 
       sessionStorage.setItem("checkout_snapshot", JSON.stringify(payload));
-      sessionStorage.setItem("checkout", JSON.stringify(payload)); // compatibilidad legacy
+      sessionStorage.setItem("checkout", JSON.stringify(payload));
 
       const url = new URL("./pasarelaPagos.html", window.location.href);
       url.searchParams.set("monto", String(payload.total));
       window.location.assign(url.toString());
     });
 
+    // Animación de entrada adicional
+    document.addEventListener("DOMContentLoaded", () => {
+      document.body.style.opacity = "0";
+      setTimeout(() => {
+        document.body.style.transition = "opacity 0.3s ease";
+        document.body.style.opacity = "1";
+      }, 100);
+    });
+
     await render();
   </script>
+
+  <style>
+    @keyframes slideOut {
+      from { 
+        opacity: 1; 
+        transform: translateX(0); 
+      }
+      to { 
+        opacity: 0; 
+        transform: translateX(100px); 
+      }
+    }
+  </style>
 
 </body>
 </html>
