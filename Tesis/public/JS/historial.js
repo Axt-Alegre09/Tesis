@@ -1,4 +1,4 @@
-// JS/historial.js - VERSIÓN MEJORADA
+// JS/historial.js - VERSIÓN CORREGIDA
 import { supabase } from "./ScriptLogin.js";
 
 const contenedor = document.getElementById("pedidosContainer");
@@ -6,7 +6,6 @@ const resumenBox = document.getElementById("resumen");
 const filtroPeriodo = document.getElementById("filtroPeriodo");
 
 let TODOS_LOS_PEDIDOS = [];
-let FACTURAS_CACHE = new Map(); // Cache de facturas por pedido_id
 
 /* ========== Helpers ========== */
 
@@ -142,10 +141,6 @@ function renderPedidos(pedidosFiltrados) {
             <i class="bi bi-file-earmark-pdf"></i>
             Descargar factura
           </button>
-          <button class="btn-pill btn-ghost btn-repetir" data-id="${p.id}">
-            <i class="bi bi-arrow-repeat"></i>
-            Repetir pedido
-          </button>
         </div>
       </article>
     `;
@@ -156,11 +151,6 @@ function renderPedidos(pedidosFiltrados) {
   document.querySelectorAll(".btn-descargar").forEach((btn) => {
     btn.addEventListener("click", (e) =>
       descargarFactura(e.currentTarget.dataset.id, e.currentTarget)
-    );
-  });
-  document.querySelectorAll(".btn-repetir").forEach((btn) => {
-    btn.addEventListener("click", (e) =>
-      repetirPedido(e.currentTarget.dataset.id, e.currentTarget)
     );
   });
 }
@@ -250,38 +240,79 @@ async function cargarHistorial() {
   aplicarFiltro();
 }
 
-/* ========== Descargar factura (Generación desde sessionStorage) ========== */
+/* ========== Descargar factura ========== */
 
 async function descargarFactura(pedidoId, btnElement) {
+  console.log("🔵 Iniciando descarga de factura para pedido:", pedidoId);
+  
   // Mostrar loading
   btnElement.classList.add("loading");
   btnElement.disabled = true;
   
   try {
-    // Buscar el pedido en nuestro cache
+    // 1. Buscar el pedido
     const pedido = TODOS_LOS_PEDIDOS.find((p) => p.id === pedidoId);
     if (!pedido) {
       throw new Error("Pedido no encontrado");
     }
+    
+    console.log("✅ Pedido encontrado:", pedido);
 
-    // Obtener detalles del pedido (items)
+    // 2. Obtener items del pedido
     const { data: itemsData, error: itemsError } = await supabase
       .from("pedido_items")
-      .select("producto_id, cantidad, precio_unitario, subtotal")
+      .select("producto_id, cantidad, precio_unitario, titulo")
       .eq("pedido_id", pedidoId);
 
-    if (itemsError) throw itemsError;
+    if (itemsError) {
+      console.error("❌ Error al obtener items:", itemsError);
+      throw itemsError;
+    }
+    
+    console.log("✅ Items obtenidos:", itemsData);
 
-    // Obtener información de productos
-    const productosIds = itemsData.map((item) => item.producto_id);
-    const { data: productosData, error: productosError } = await supabase
-      .from("productos")
-      .select("id, titulo, imagen")
-      .in("id", productosIds);
+    // Si no hay items, crear un item genérico
+    let items = [];
+    if (!itemsData || itemsData.length === 0) {
+      console.log("⚠️ No hay items, creando genérico");
+      items = [{
+        titulo: "Pedido sin detalle",
+        precio: pedido.monto_total || 0,
+        cantidad: 1,
+        tienePromo: false
+      }];
+    } else {
+      // Obtener imágenes de productos (opcional)
+      const productosIds = itemsData.map((item) => item.producto_id).filter(Boolean);
+      let productosData = [];
+      
+      if (productosIds.length > 0) {
+        const { data, error } = await supabase
+          .from("productos")
+          .select("id, imagen")
+          .in("id", productosIds);
+        
+        if (!error && data) {
+          productosData = data;
+        }
+      }
 
-    if (productosError) throw productosError;
+      // Construir items
+      items = itemsData.map((item) => {
+        const producto = productosData.find((p) => p.id === item.producto_id);
+        return {
+          titulo: item.titulo || "Producto",
+          imagen: producto?.imagen || "",
+          precio: Number(item.precio_unitario || 0),
+          cantidad: Number(item.cantidad || 1),
+          tienePromo: false,
+        };
+      });
+    }
+    
+    console.log("✅ Items procesados:", items);
 
-    // Obtener datos del cliente
+    // 3. Obtener datos del cliente
     const { data: clienteData, error: clienteError } = await supabase
       .from("clientes_perfil")
       .select("*")
@@ -289,22 +320,12 @@ async function descargarFactura(pedidoId, btnElement) {
       .single();
 
     if (clienteError) {
-      console.warn("No se encontró perfil del cliente:", clienteError);
+      console.warn("⚠️ No se encontró perfil del cliente:", clienteError);
     }
+    
+    console.log("✅ Cliente obtenido:", clienteData);
 
-    // Construir items con información completa
-    const items = itemsData.map((item) => {
-      const producto = productosData.find((p) => p.id === item.producto_id);
-      return {
-        titulo: producto?.titulo || "Producto",
-        imagen: producto?.imagen || "",
-        precio: item.precio_unitario,
-        cantidad: item.cantidad,
-        tienePromo: false, // Por ahora, después podemos agregar lógica de promos
-      };
-    });
-
-    // Crear snapshot de factura
+    // 4. Crear snapshot de factura
     const facturaSnapshot = {
       fechaISO: pedido.creado_en,
       metodo: pedido.metodo_pago || "efectivo",
@@ -327,23 +348,28 @@ async function descargarFactura(pedidoId, btnElement) {
         nro: clienteData?.nro || "",
       },
       items,
-      total: pedido.monto_total,
+      total: Number(pedido.monto_total || 0),
     };
 
-    // Guardar en sessionStorage temporalmente
-    sessionStorage.setItem("pedido-simulado", JSON.stringify(facturaSnapshot));
+    console.log("✅ Snapshot creado:", facturaSnapshot);
 
-    // Llamar a la función de generación de PDF (la misma de checkout.js)
+    // 5. Cargar jsPDF si no está disponible
+    await cargarJsPDF();
+    
+    console.log("✅ jsPDF cargado");
+
+    // 6. Generar PDF
     await generarFacturaPDF(facturaSnapshot);
-
-    // Limpiar sessionStorage
-    sessionStorage.removeItem("pedido-simulado");
+    
+    console.log("✅ PDF generado exitosamente");
 
     // Mostrar mensaje de éxito
     mostrarNotificacion("✓ Factura descargada correctamente", "success");
+    
   } catch (err) {
-    console.error("Error al descargar factura:", err);
-    mostrarNotificacion("✗ No se pudo descargar la factura", "error");
+    console.error("❌ Error completo al descargar factura:", err);
+    console.error("Stack:", err.stack);
+    mostrarNotificacion(`✗ Error: ${err.message || 'No se pudo descargar la factura'}`, "error");
   } finally {
     // Quitar loading
     btnElement.classList.remove("loading");
@@ -351,104 +377,51 @@ async function descargarFactura(pedidoId, btnElement) {
   }
 }
 
-/* ========== Repetir pedido ========== */
+/* ========== Cargar jsPDF dinámicamente ========== */
 
-async function repetirPedido(pedidoId, btnElement) {
-  btnElement.classList.add("loading");
-  btnElement.disabled = true;
-
-  try {
-    // Obtener items del pedido
-    const { data: itemsData, error: itemsError } = await supabase
-      .from("pedido_items")
-      .select("producto_id, cantidad")
-      .eq("pedido_id", pedidoId);
-
-    if (itemsError) throw itemsError;
-
-    // Obtener información completa de productos
-    const productosIds = itemsData.map((item) => item.producto_id);
-    const { data: productosData, error: productosError } = await supabase
-      .from("productos")
-      .select("id, titulo, precio, imagen, categoria")
-      .in("id", productosIds);
-
-    if (productosError) throw productosError;
-
-    // Obtener carrito actual
-    let carritoActual = [];
-    try {
-      carritoActual = JSON.parse(
-        localStorage.getItem("productos-en-carrito") || "[]"
-      );
-    } catch {
-      carritoActual = [];
+async function cargarJsPDF() {
+  return new Promise((resolve, reject) => {
+    // Si ya está cargado, resolver inmediatamente
+    if (window.jspdf) {
+      console.log("✅ jsPDF ya está cargado");
+      resolve();
+      return;
     }
 
-    // Agregar productos al carrito
-    itemsData.forEach((item) => {
-      const producto = productosData.find((p) => p.id === item.producto_id);
-      if (producto) {
-        // Buscar si ya existe en el carrito
-        const existente = carritoActual.find((p) => p.id === producto.id);
-        if (existente) {
-          existente.cantidad += item.cantidad;
-        } else {
-          carritoActual.push({
-            id: producto.id,
-            titulo: producto.titulo,
-            precio: producto.precio,
-            imagen: producto.imagen,
-            categoria: producto.categoria?.nombre || producto.categoria || "",
-            cantidad: item.cantidad,
-          });
-        }
-      }
-    });
+    console.log("🔵 Cargando jsPDF...");
 
-    // Guardar carrito actualizado
-    localStorage.setItem(
-      "productos-en-carrito",
-      JSON.stringify(carritoActual)
-    );
-
-    // Actualizar badge del carrito si existe la función global
-    if (window.CartAPI?.refreshBadge) {
-      window.CartAPI.refreshBadge();
-    }
-
-    mostrarNotificacion(
-      "✓ Productos agregados al carrito correctamente",
-      "success"
-    );
-
-    // Opcional: Ofrecer ir al carrito
-    setTimeout(() => {
-      if (
-        confirm(
-          "Productos agregados al carrito. ¿Querés ir al carrito ahora?"
-        )
-      ) {
-        window.location.href = "carrito.html";
-      }
-    }, 1000);
-  } catch (err) {
-    console.error("Error al repetir pedido:", err);
-    mostrarNotificacion("✗ No se pudo repetir el pedido", "error");
-  } finally {
-    btnElement.classList.remove("loading");
-    btnElement.disabled = false;
-  }
+    // Cargar jsPDF
+    const script1 = document.createElement("script");
+    script1.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+    script1.onload = () => {
+      console.log("✅ jsPDF cargado");
+      
+      // Cargar autotable
+      const script2 = document.createElement("script");
+      script2.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.4/jspdf.plugin.autotable.min.js";
+      script2.onload = () => {
+        console.log("✅ jsPDF autotable cargado");
+        resolve();
+      };
+      script2.onerror = (err) => {
+        console.error("❌ Error al cargar autotable:", err);
+        reject(new Error("No se pudo cargar jsPDF autotable"));
+      };
+      document.head.appendChild(script2);
+    };
+    script1.onerror = (err) => {
+      console.error("❌ Error al cargar jsPDF:", err);
+      reject(new Error("No se pudo cargar jsPDF"));
+    };
+    document.head.appendChild(script1);
+  });
 }
 
-/* ========== Función de generación de PDF (igual a checkout.js) ========== */
+/* ========== Generar PDF ========== */
 
 async function generarFacturaPDF(snapshot) {
-  // Cargar jsPDF si no está cargado
-  if (!window.jspdf) {
-    await cargarJsPDF();
-  }
-
+  console.log("🔵 Generando PDF con snapshot:", snapshot);
+  
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
 
@@ -511,7 +484,9 @@ async function generarFacturaPDF(snapshot) {
   try {
     const logoData = await toDataURL(EMP.logo);
     doc.addImage(logoData, "PNG", M + 15, y + 15, 80, 80);
-  } catch {}
+  } catch (e) {
+    console.warn("⚠️ No se pudo cargar logo:", e);
+  }
 
   // Título centrado
   const centerX = M + 110;
@@ -589,9 +564,9 @@ async function generarFacturaPDF(snapshot) {
   doc.text("Condición de venta:", pw - M - 200, cy);
   doc.setFont("helvetica", "normal");
   const condicion =
-    metodo === "transferencia"
+    metodo === "Transferencia"
       ? "Contado"
-      : metodo === "efectivo"
+      : metodo === "Efectivo"
       ? "Efectivo"
       : "Crédito";
   doc.text(condicion, pw - M - 90, cy);
@@ -618,7 +593,7 @@ async function generarFacturaPDF(snapshot) {
   doc.setFont("helvetica", "normal");
   doc.text("Guaraní", pw - M - 90, cy);
 
-  // ========== TABLA ESTILO STARSOFT CON COLUMNAS CUADRADAS ==========
+  // ========== TABLA ==========
   y += clienteH + 10;
 
   const tableData = items.map((it) => {
@@ -688,7 +663,7 @@ async function generarFacturaPDF(snapshot) {
     theme: "grid",
   });
 
-  // ========== TOTALES DENTRO DE LA TABLA ==========
+  // ========== TOTALES ==========
   y = doc.lastAutoTable.finalY;
 
   function numeroATexto(num) {
@@ -846,7 +821,9 @@ async function generarFacturaPDF(snapshot) {
     doc.setFillColor(50, 115, 220);
     doc.rect(M + 95, y + 105, 20, 10, "F");
     doc.rect(M + 105, y + 95, 10, 20, "F");
-  } catch {}
+  } catch (e) {
+    console.warn("⚠️ No se pudo cargar QR:", e);
+  }
 
   // Texto CDC
   const cdcX = M + 130;
@@ -904,10 +881,11 @@ async function generarFacturaPDF(snapshot) {
   cdcY += 10;
   doc.text("siguientes de la emisión", cdcX, cdcY);
 
+  console.log("✅ Guardando PDF...");
   doc.save(`Factura_${EMP.nombre}_${nroFactura}.pdf`);
 }
 
-/* ========== Helper para cargar imagen como dataURL ========== */
+/* ========== Helper para imagen ========== */
 
 async function toDataURL(src) {
   return new Promise((resolve, reject) => {
@@ -926,31 +904,6 @@ async function toDataURL(src) {
   });
 }
 
-/* ========== Cargar jsPDF dinámicamente ========== */
-
-async function cargarJsPDF() {
-  return new Promise((resolve, reject) => {
-    if (window.jspdf) {
-      resolve();
-      return;
-    }
-
-    const script1 = document.createElement("script");
-    script1.src =
-      "https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js";
-    script1.onload = () => {
-      const script2 = document.createElement("script");
-      script2.src =
-        "https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js";
-      script2.onload = resolve;
-      script2.onerror = reject;
-      document.head.appendChild(script2);
-    };
-    script1.onerror = reject;
-    document.head.appendChild(script1);
-  });
-}
-
 /* ========== Sistema de notificaciones ========== */
 
 function mostrarNotificacion(mensaje, tipo = "info") {
@@ -959,7 +912,7 @@ function mostrarNotificacion(mensaje, tipo = "info") {
   notif.className = `notificacion notif-${tipo}`;
   notif.textContent = mensaje;
 
-  // Estilos inline (o puedes agregar en CSS)
+  // Estilos inline
   Object.assign(notif.style, {
     position: "fixed",
     top: "20px",
@@ -976,14 +929,14 @@ function mostrarNotificacion(mensaje, tipo = "info") {
 
   document.body.appendChild(notif);
 
-  // Remover después de 3 segundos
+  // Remover después de 5 segundos
   setTimeout(() => {
     notif.style.animation = "slideOut 0.3s ease";
     setTimeout(() => notif.remove(), 300);
-  }, 3000);
+  }, 5000);
 }
 
-// Agregar animaciones CSS si no existen
+// Agregar animaciones CSS
 if (!document.querySelector("#notif-animations")) {
   const style = document.createElement("style");
   style.id = "notif-animations";
@@ -1005,7 +958,7 @@ if (!document.querySelector("#notif-animations")) {
       }
       to {
         transform: translateX(400px);
-        opacity: 0;
+        opacity: 0; 
       }
     }
   `;

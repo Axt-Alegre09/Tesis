@@ -1,7 +1,15 @@
 // ==================== ADMIN DASHBOARD JS (MODULAR) ====================
 // Sistema de navegación SPA (Single Page Application)
 
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { initProductos } from './modules/productos.js';
+
+// ========== Supabase ==========
+const SUPABASE_URL = "https://jyygevitfnbwrvxrjexp.supabase.co";
+const SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5eWdldml0Zm5id3J2eHJqZXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2OTQ2OTYsImV4cCI6MjA3MTI3MDY5Nn0.St0IiSZSeELESshctneazCJHXCDBi9wrZ28UkiEDXYo";
+
+const supa = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ========== VISTAS (Templates HTML de cada sección) ==========
 const views = {
@@ -401,11 +409,22 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Logout
-  document.getElementById('logoutBtn')?.addEventListener('click', () => {
-    if (confirm('¿Seguro que querés cerrar sesión?')) {
-      window.location.href = 'loginAdmin.html';
+  // ====== Logout (única parte cambiada de lógica) ======
+  const logoutBtn = document.getElementById('logoutBtn');
+
+  logoutBtn?.addEventListener('click', async () => {
+    const ok = confirm('¿Seguro que querés cerrar sesión?');
+    if (!ok) return;
+
+    try {
+      await supa.auth.signOut();
+      console.log('✅ Sesión Supabase cerrada correctamente');
+    } catch (error) {
+      console.error('❌ Error al cerrar sesión en Supabase:', error);
+      // Igual seguimos con la redirección
     }
+
+    window.location.href = 'loginAdmin.html';
   });
 
   // Cargar vista inicial
