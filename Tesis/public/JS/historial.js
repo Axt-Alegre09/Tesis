@@ -271,12 +271,22 @@ async function descargarFactura(pedidoId, btnElement) {
     
     console.log("✅ Items obtenidos:", itemsData);
 
-    // Si no hay items, crear un item genérico
+    // Si no hay items, crear un item genérico MÁS DETALLADO
     let items = [];
     if (!itemsData || itemsData.length === 0) {
       console.log("⚠️ No hay items, creando genérico");
+      
+      // Crear descripción más detallada
+      let descripcion = "Pedido";
+      if (pedido.metodo_pago) {
+        descripcion += ` - Pago con ${pedido.metodo_pago}`;
+      }
+      if (pedido.notas && !pedido.notas.includes("checkout_crear_pedido")) {
+        descripcion += ` - ${pedido.notas}`;
+      }
+      
       items = [{
-        titulo: "Pedido sin detalle",
+        titulo: descripcion,
         precio: pedido.monto_total || 0,
         cantidad: 1,
         tienePromo: false
@@ -309,8 +319,6 @@ async function descargarFactura(pedidoId, btnElement) {
         };
       });
     }
-    
-    console.log("✅ Items procesados:", items);
 
     // 3. Obtener datos del cliente
     const { data: clienteData, error: clienteError } = await supabase
@@ -958,7 +966,7 @@ if (!document.querySelector("#notif-animations")) {
       }
       to {
         transform: translateX(400px);
-        opacity: 0; 
+        opacity: 0;
       }
     }
   `;
