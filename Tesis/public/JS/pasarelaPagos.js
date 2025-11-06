@@ -219,10 +219,11 @@ function setupFormInterceptor() {
 }
 
 // ============ INICIALIZACIÓN ============
-(function init() {
+function init() {
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   console.log("🔵 Inicializando pasarelaPagos.js");
   console.log("📍 URL:", window.location.pathname);
+  console.log("📄 readyState:", document.readyState);
   
   // Verificar datos del carrito
   const cartData = getCartData();
@@ -231,15 +232,21 @@ function setupFormInterceptor() {
   console.log("  - Total:", fmtPY(cartData?.total || 0));
   
   // Setup interceptor del formulario
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", setupFormInterceptor);
-  } else {
-    setupFormInterceptor();
-  }
+  setupFormInterceptor();
 
   console.log("✅ pasarelaPagos.js listo");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-})();
+}
+
+// Esperar a que el DOM esté completamente cargado
+if (document.readyState === "loading") {
+  console.log("⏳ DOM aún cargando, esperando DOMContentLoaded...");
+  document.addEventListener("DOMContentLoaded", init);
+} else {
+  console.log("✅ DOM ya está listo, ejecutando init...");
+  // Agregar un pequeño delay para asegurar que TODO esté listo
+  setTimeout(init, 100);
+}
 
 // Exponer función para testing manual
 window.testGuardarPedido = guardarPedidoEnBD;
