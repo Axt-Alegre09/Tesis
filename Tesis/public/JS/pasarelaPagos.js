@@ -1,197 +1,120 @@
-// JS/pasarelaPagos.js - VERSIÓN CORREGIDA
-// Asegura que los items se envíen correctamente al RPC
+// JS/pasarelaPagos.js - VERSIÓN FINAL CORREGIDA
+// Compatible con checkout.js existente
 
 import { supabase } from "./ScriptLogin.js";
 
-const $  = (id) => document.getElementById(id);
-const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+console.log("🔵 pasarelaPagos.js - Cargando...");
+
+const $ = (id) => document.getElementById(id);
 const fmtPY = (n) => new Intl.NumberFormat("es-PY").format(Number(n || 0)) + " Gs";
 
-// ---------------- UI: chips del éxito ----------------
-function stylePill(el) {
-  if (!el) return;
-  el.style.display = "inline-block";
-  el.style.padding = ".25rem .6rem";
-  el.style.borderRadius = "999px";
-  el.style.border = "1px solid #cdbf9a";
-  el.style.background = "#f7f3ea";
-  el.style.color = "#5b4a25";
-  el.style.fontSize = ".85rem";
-}
-
-// ---------------- Helpers ----------------
-function toast(msg, type = "info") {
-  let box = document.querySelector("[data-checkout-msg]");
-  if (!box) {
-    box = document.createElement("div");
-    box.dataset.checkoutMsg = "1";
-    box.style.cssText = "border:2px solid #6f5c38;background:#fff;border-radius:12px;padding:14px;margin:10px 0;max-width:980px;font-size:14px";
-    document.body.prepend(box);
-  }
-  const prefix = type === "ok" ? "✅ Listo: " : type === "err" ? "❌ Error: " : type === "warn" ? "⚠️ Atención: " : "";
-  box.innerHTML = `<b>${prefix}</b>${msg}`;
-}
-
-function readSnapshotFromSession() {
+// ============ OBTENER DATOS DEL CARRITO ============
+function getCartData() {
+  // 1. Intentar desde sessionStorage (checkout_snapshot)
   try {
-    const raw = sessionStorage.getItem("checkout_snapshot") ?? sessionStorage.getItem("checkout");
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
-}
-
-function getFormValue(id) { 
-  return ($(id)?.value ?? "").trim(); 
-}
-
-// Paneles de método de pago + total efectivo
-function setupMetodoPagoUI() {
-  const radios = $$(".metodo-radio");
-  const panels = $$(".metodo-panel");
-  const show = (m) => panels.forEach(p => p.classList.toggle("disabled", p.dataset.metodo !== m));
-  radios.forEach(r => {
-    r.addEventListener("change", () => show(r.value));
-    if (r.checked) show(r.value);
-  });
-
-  const snap = readSnapshotFromSession();
-  const efTotal = $("#efectivo-total");
-  if (efTotal && Number(snap?.total || 0) > 0) efTotal.value = fmtPY(snap.total);
-}
-
-function buildPayloadFromUI() {
-  const snap = readSnapshotFromSession() || {};
-  
-  // CRÍTICO: Asegurar que items sea un array válido
-  let items = [];
-  if (Array.isArray(snap.items) && snap.items.length > 0) {
-    items = snap.items;
-  } else {
-    // Fallback: intentar leer del localStorage si no hay snapshot
-    try {
-      const cartLocal = JSON.parse(localStorage.getItem('productos-en-carrito') || '[]');
-      items = cartLocal;
-    } catch {
-      items = [];
+    const snap = JSON.parse(sessionStorage.getItem("checkout_snapshot") || sessionStorage.getItem("checkout") || "null");
+    if (snap && snap.items && snap.items.length > 0) {
+      console.log("✅ Datos desde sessionStorage:", snap);
+      return snap;
     }
+  } catch (e) {
+    console.warn("⚠️ Error leyendo sessionStorage:", e);
   }
 
-  console.log("📦 Items desde snapshot/localStorage:", items);
+  // 2. Intentar desde localStorage
+  try {
+    const cart = JSON.parse(localStorage.getItem("productos-en-carrito") || "[]");
+    if (cart && cart.length > 0) {
+      const total = cart.reduce((a, it) => a + Number(it.precio || 0) * Number(it.cantidad || 1), 0);
+      console.log("✅ Datos desde localStorage:", { items: cart, total });
+      return { items: cart, total, source: "local" };
+    }
+  } catch (e) {
+    console.warn("⚠️ Error leyendo localStorage:", e);
+  }
 
-  // Validar que items tenga datos
-  if (!items || items.length === 0) {
-    console.error("❌ No hay items en el carrito");
+  console.error("❌ No se encontraron datos del carrito");
+  return { items: [], total: 0, source: "none" };
+}
+
+// ============ CONSTRUIR PAYLOAD ============
+function buildPayload(cartData) {
+  if (!cartData || !cartData.items || cartData.items.length === 0) {
     throw new Error("El carrito está vacío");
   }
 
-  // Calcular total
-  const total = Number(
-    snap.total ||
-    items.reduce((a, it) => a + Number(it.precio || 0) * Number(it.cantidad || 1), 0)
-  ) || 0;
+  const items = cartData.items.map(it => ({
+    id: String(it.id || ''),
+    titulo: String(it.titulo || it.nombre || 'Producto'),
+    precio: Number(it.precio || 0),
+    cantidad: Number(it.cantidad || 1)
+  }));
 
-  console.log("💰 Total calculado:", total);
+  const total = Number(cartData.total || items.reduce((a, it) => a + it.precio * it.cantidad, 0));
 
-  const metodo = document.querySelector('input[name="metodo"]:checked')?.value || "transferencia";
+  // Obtener método de pago
+  const metodoInput = document.querySelector('input[name="metodo"]:checked');
+  const metodo = metodoInput ? metodoInput.value : "efectivo";
 
-  // CRÍTICO: Formatear items correctamente
-  const itemsFormateados = items.map(it => {
-    const item = {
-      id: String(it.id || ''),  // Convertir a string por si acaso
-      titulo: String(it.titulo || it.nombre || 'Producto'),
-      precio: Number(it.precio || 0),
-      cantidad: Number(it.cantidad || 1)
-    };
-    console.log("📝 Item formateado:", item);
-    return item;
-  });
+  // Función helper para obtener valores de inputs
+  const getValue = (id) => {
+    const el = $(id);
+    return el ? (el.value || "").trim() : "";
+  };
 
   const payload = {
-    source: snap.source || "local",
-    items: itemsFormateados,
+    source: cartData.source || "local",
+    items,
     total,
-    ruc:        getFormValue("ruc"),
-    razon:      getFormValue("razon"),
-    tel:        getFormValue("tel"),
-    mail:       getFormValue("mail"),
-    contacto:   getFormValue("contacto"),
-    ciudad:     getFormValue("ciudad"),
-    barrio:     getFormValue("barrio"),
-    depto:      getFormValue("depto"),
-    postal:     getFormValue("postal"),
-    calle1:     getFormValue("calle1"),
-    calle2:     getFormValue("calle2"),
-    nro:        getFormValue("nro"),
-    hora_desde: getFormValue("hora-desde"),
-    hora_hasta: getFormValue("hora-hasta"),
+    ruc: getValue("ruc"),
+    razon: getValue("razon"),
+    tel: getValue("tel"),
+    mail: getValue("mail"),
+    contacto: getValue("contacto"),
+    ciudad: getValue("ciudad"),
+    barrio: getValue("barrio"),
+    depto: getValue("depto"),
+    postal: getValue("postal"),
+    calle1: getValue("calle1"),
+    calle2: getValue("calle2"),
+    nro: getValue("nro"),
+    hora_desde: getValue("hora-desde"),
+    hora_hasta: getValue("hora-hasta"),
     metodo_pago: metodo
   };
 
-  console.log("🚀 Payload completo a enviar:", JSON.stringify(payload, null, 2));
+  console.log("🚀 Payload construido:");
+  console.log("  - Items:", items.length);
+  console.log("  - Total:", fmtPY(total));
+  console.log("  - Método:", metodo);
+  console.log("  - Payload completo:", JSON.stringify(payload, null, 2));
 
   return payload;
 }
 
-function showSuccess(total, meta = {}) {
-  $("#checkout-form")?.classList.add("disabled");
-  $("#checkout-success")?.classList.remove("disabled");
-
-  const pedidoId = meta.pedido_id || window.__pedido_ok__?.pedido_id || "";
-  const pedidoShort = pedidoId ? pedidoId.slice(0, 8) : "—";
-
-  const pillPedido = $("#pill-pedido");
-  const pillTotal  = $("#pill-total");
-  const pillMetodo = $("#pill-metodo");
-
-  if (pillPedido) { pillPedido.textContent = `Pedido: ${pedidoShort}`; stylePill(pillPedido); }
-  if (pillTotal)  { pillTotal.textContent  = `Total: ${fmtPY(total)}`;  stylePill(pillTotal);  }
-  if (pillMetodo && meta.metodo_pago) {
-    pillMetodo.textContent = `Pago: ${meta.metodo_pago}`;
-    stylePill(pillMetodo);
-  }
-
-  try { window.CartAPI?.refreshBadge?.(); } catch {}
-  
-  // Scroll suave al éxito
-  $("#checkout-success")?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-// ---------------- Submit (capturing para evitar dobles envíos) ----------------
-async function onSubmitCapture(ev) {
-  ev.preventDefault();
-  ev.stopImmediatePropagation();
-
-  console.log("🔵 Iniciando proceso de pago...");
-
-  const btn = $("#checkout-form button[type='submit']");
-  btn?.setAttribute("disabled", "true");
+// ============ GUARDAR PEDIDO EN BD ============
+async function guardarPedidoEnBD() {
+  console.log("🔵 Iniciando guardarPedidoEnBD...");
 
   try {
     // 1. Verificar usuario
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { 
-      toast("Debes iniciar sesión para pagar.", "err"); 
-      btn?.removeAttribute("disabled"); 
-      return; 
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      console.error("❌ No hay usuario autenticado");
+      throw new Error("Debes iniciar sesión");
     }
     console.log("✅ Usuario autenticado:", user.id);
 
-    // 2. Construir payload
-    let payload;
-    try {
-      payload = buildPayloadFromUI();
-    } catch (err) {
-      toast(err.message || "Error al construir el pedido", "err");
-      btn?.removeAttribute("disabled");
-      return;
+    // 2. Obtener datos del carrito
+    const cartData = getCartData();
+    if (!cartData || !cartData.items || cartData.items.length === 0) {
+      console.error("❌ Carrito vacío");
+      throw new Error("El carrito está vacío");
     }
+    console.log("✅ Carrito con", cartData.items.length, "items");
 
-    // 3. Validar items
-    if (!payload.items?.length) {
-      toast("Tu carrito está vacío o no se pudo leer el snapshot.", "err");
-      btn?.removeAttribute("disabled");
-      return;
-    }
-    console.log("✅ Payload construido con", payload.items.length, "items");
+    // 3. Construir payload
+    const payload = buildPayload(cartData);
 
     // 4. Llamar al RPC
     console.log("🔵 Llamando a crear_pedido_desde_checkout...");
@@ -207,48 +130,117 @@ async function onSubmitCapture(ev) {
 
     console.log("✅ Respuesta del RPC:", data);
 
-    const { pedido_id, snapshot_id } = (data || [])[0] || {};
+    const result = Array.isArray(data) ? data[0] : data;
+    const pedidoId = result?.pedido_id;
     
-    if (!pedido_id) {
-      throw new Error("No se recibió el ID del pedido");
+    if (!pedidoId) {
+      console.error("❌ No se recibió pedido_id");
+      throw new Error("No se pudo crear el pedido");
     }
 
-    console.log("✅ Pedido creado:", pedido_id);
-    window.__pedido_ok__ = { pedido_id, snapshot_id };
+    console.log("✅ Pedido creado exitosamente:", pedidoId);
 
-    // 5. Limpieza
-    try { 
-      await window.CartAPI?.empty?.(); 
-      console.log("✅ Carrito vaciado");
+    // 5. Guardar en window para acceso global
+    window.__pedido_creado__ = {
+      pedido_id: pedidoId,
+      snapshot_id: result?.snapshot_id,
+      total: payload.total,
+      metodo: payload.metodo_pago
+    };
+
+    // 6. Limpiar carrito
+    try {
+      if (window.CartAPI && window.CartAPI.empty) {
+        await window.CartAPI.empty();
+        console.log("✅ Carrito vaciado via CartAPI");
+      }
     } catch (e) {
-      console.warn("⚠️ Error al vaciar carrito:", e);
+      console.warn("⚠️ Error al vaciar CartAPI:", e);
     }
-    
-    sessionStorage.removeItem("checkout_snapshot");
-    sessionStorage.removeItem("checkout");
-    localStorage.removeItem("productos-en-carrito");
-    console.log("✅ Storage limpiado");
 
-    // 6. Mostrar éxito
-    toast(`Pedido confirmado. Total: ${fmtPY(payload.total)} — Método: ${payload.metodo_pago}`, "ok");
-    showSuccess(payload.total, { pedido_id, metodo_pago: payload.metodo_pago });
+    // Limpiar storage
+    try {
+      localStorage.removeItem("productos-en-carrito");
+      sessionStorage.removeItem("checkout_snapshot");
+      sessionStorage.removeItem("checkout");
+      console.log("✅ Storage limpiado");
+    } catch (e) {
+      console.warn("⚠️ Error al limpiar storage:", e);
+    }
+
+    return { success: true, pedido_id: pedidoId };
 
   } catch (err) {
-    console.error("❌ Error completo:", err);
+    console.error("❌ Error en guardarPedidoEnBD:", err);
     console.error("Stack:", err.stack);
-    toast(err?.message || err?.error_description || "No se pudo confirmar la compra.", "err");
-    btn?.removeAttribute("disabled");
+    return { success: false, error: err.message };
   }
 }
 
-(function init() {
-  console.log("🔵 Inicializando pasarelaPagos.js");
-  setupMetodoPagoUI();
+// ============ INTERCEPTAR SUBMIT ============
+function setupFormInterceptor() {
   const form = $("#checkout-form");
-  if (form) {
-    form.addEventListener("submit", onSubmitCapture, { capture: true });
-    console.log("✅ Event listener de submit registrado");
-  } else {
-    console.error("❌ No se encontró el formulario #checkout-form");
+  
+  if (!form) {
+    console.error("❌ No se encontró #checkout-form");
+    return;
   }
+
+  console.log("✅ Formulario encontrado, configurando interceptor...");
+
+  // Guardar el handler original de checkout.js
+  const originalSubmit = form.onsubmit;
+
+  // Nuevo handler que ejecuta ANTES
+  form.addEventListener("submit", async function(e) {
+    console.log("🔵 Submit interceptado por pasarelaPagos.js");
+
+    // Verificar que haya datos
+    const cartData = getCartData();
+    if (!cartData || !cartData.items || cartData.items.length === 0) {
+      console.warn("⚠️ No hay items en el carrito, saltando guardado en BD");
+      return; // Dejar que checkout.js maneje
+    }
+
+    // Guardar en BD de forma asíncrona (no blocking)
+    guardarPedidoEnBD().then(result => {
+      if (result.success) {
+        console.log("✅ Pedido guardado en BD:", result.pedido_id);
+      } else {
+        console.error("❌ Error al guardar pedido:", result.error);
+      }
+    });
+
+    // NO prevenir el evento - dejar que checkout.js continúe
+    // El formulario seguirá su flujo normal
+  }, { capture: true, once: false });
+
+  console.log("✅ Interceptor configurado");
+}
+
+// ============ INICIALIZACIÓN ============
+(function init() {
+  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+  console.log("🔵 Inicializando pasarelaPagos.js");
+  console.log("📍 URL:", window.location.pathname);
+  
+  // Verificar datos del carrito
+  const cartData = getCartData();
+  console.log("🛒 Carrito:");
+  console.log("  - Items:", cartData?.items?.length || 0);
+  console.log("  - Total:", fmtPY(cartData?.total || 0));
+  
+  // Setup interceptor del formulario
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", setupFormInterceptor);
+  } else {
+    setupFormInterceptor();
+  }
+
+  console.log("✅ pasarelaPagos.js listo");
+  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 })();
+
+// Exponer función para testing manual
+window.testGuardarPedido = guardarPedidoEnBD;
+console.log("💡 Tip: Ejecuta window.testGuardarPedido() para probar manualmente");
