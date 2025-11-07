@@ -1,21 +1,23 @@
-// JS/pasarelaPagos.js - VERSIÓN CON ESPERA AL DOM
+// JS/pasarelaPagos.js - VERSIÓN CORREGIDA SIN DUPLICADOS
 
 (async function() {
   console.log("🔵 pasarelaPagos.js - Iniciando...");
 
-  // ============ ESPERAR AL DOM ============
+  // Esperar al DOM
   if (document.readyState === 'loading') {
-    await new Promise(resolve => {
+    await new Promise(function(resolve) {
       document.addEventListener('DOMContentLoaded', resolve, { once: true });
     });
   }
   console.log("✅ DOM cargado");
 
-  // ============ ESPERAR SUPABASE ============
+  // Esperar Supabase
   let supabase;
   let intentos = 0;
   while (!window.supabase && intentos < 50) {
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise(function(resolve) {
+      setTimeout(resolve, 100);
+    });
     intentos++;
   }
 
@@ -27,8 +29,13 @@
   supabase = window.supabase;
   console.log("✅ Supabase cargado");
 
-  const $ = (id) => document.getElementById(id);
-  const fmtPY = (n) => new Intl.NumberFormat("es-PY").format(Number(n || 0)) + " Gs";
+  const $ = function(id) {
+    return document.getElementById(id);
+  };
+  
+  const fmtPY = function(n) {
+    return new Intl.NumberFormat("es-PY").format(Number(n || 0)) + " Gs";
+  };
 
   // ============ DATOS DEL CARRITO ============
   function getCartData() {
@@ -38,22 +45,26 @@
         sessionStorage.getItem("checkout") || 
         "null"
       );
-      if (snap?.items?.length > 0) {
+      if (snap && snap.items && snap.items.length > 0) {
         console.log("✅ Datos desde sessionStorage");
         return snap;
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn("Error leyendo sessionStorage");
+    }
 
     try {
       const cart = JSON.parse(localStorage.getItem("productos-en-carrito") || "[]");
       if (cart.length > 0) {
-        const total = cart.reduce((a, it) => 
-          a + Number(it.precio || 0) * Number(it.cantidad || 1), 0
-        );
+        const total = cart.reduce(function(a, it) {
+          return a + Number(it.precio || 0) * Number(it.cantidad || 1);
+        }, 0);
         console.log("✅ Datos desde localStorage");
-        return { items: cart, total, source: "local" };
+        return { items: cart, total: total, source: "local" };
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn("Error leyendo localStorage");
+    }
 
     console.error("❌ Carrito vacío");
     return { items: [], total: 0, source: "none" };
@@ -61,34 +72,38 @@
 
   // ============ CONSTRUIR PAYLOAD ============
   function buildPayload(cartData) {
-    if (!cartData?.items?.length) {
+    if (!cartData || !cartData.items || cartData.items.length === 0) {
       throw new Error("El carrito está vacío");
     }
 
-    const items = cartData.items.map(it => ({
-      id: String(it.id || ''),
-      titulo: String(it.titulo || it.nombre || 'Producto'),
-      precio: Number(it.precio || 0),
-      cantidad: Number(it.cantidad || 1)
-    }));
+    const items = cartData.items.map(function(it) {
+      return {
+        id: String(it.id || ''),
+        titulo: String(it.titulo || it.nombre || 'Producto'),
+        precio: Number(it.precio || 0),
+        cantidad: Number(it.cantidad || 1)
+      };
+    });
 
     const total = Number(
       cartData.total || 
-      items.reduce((a, it) => a + it.precio * it.cantidad, 0)
+      items.reduce(function(a, it) {
+        return a + it.precio * it.cantidad;
+      }, 0)
     );
 
     const metodoInput = document.querySelector('input[name="metodo"]:checked');
-    const metodo = metodoInput?.value || "efectivo";
+    const metodo = metodoInput ? metodoInput.value : "efectivo";
 
-    const getValue = (id) => {
+    const getValue = function(id) {
       const el = $(id);
       return el ? (el.value || "").trim() : "";
     };
 
     return {
       source: cartData.source || "local",
-      items,
-      total,
+      items: items,
+      total: total,
       ruc: getValue("ruc"),
       razon: getValue("razon"),
       tel: getValue("tel"),
@@ -112,15 +127,17 @@
     console.log("🔵 Guardando pedido en BD...");
 
     try {
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError || !userData?.user) {
+      const userData = await supabase.auth.getUser();
+      
+      if (userData.error || !userData.data || !userData.data.user) {
         throw new Error("Usuario no autenticado");
       }
-      const user = userData.user;
+      
+      const user = userData.data.user;
       console.log("✅ Usuario:", user.id);
 
       const cartData = getCartData();
-      if (!cartData?.items?.length) {
+      if (!cartData || !cartData.items || cartData.items.length === 0) {
         throw new Error("Carrito vacío");
       }
       console.log("✅ Carrito:", cartData.items.length, "items");
@@ -128,15 +145,17 @@
       const payload = buildPayload(cartData);
       console.log("🚀 Payload construido");
 
-      const { data, error } = await supabase.rpc("crear_pedido_desde_checkout", {
+      const rpcResult = await supabase.rpc("crear_pedido_desde_checkout", {
         p_usuario: user.id,
         p_checkout: payload
       });
 
-      if (error) throw error;
+      if (rpcResult.error) {
+        throw rpcResult.error;
+      }
 
-      const result = Array.isArray(data) ? data[0] : data;
-      const pedidoId = result?.pedido_id;
+      const result = Array.isArray(rpcResult.data) ? rpcResult.data[0] : rpcResult.data;
+      const pedidoId = result ? result.pedido_id : null;
       
       if (!pedidoId) {
         throw new Error("No se recibió pedido_id");
@@ -146,14 +165,14 @@
 
       window.__pedido_creado__ = {
         pedido_id: pedidoId,
-        snapshot_id: result?.snapshot_id,
+        snapshot_id: result.snapshot_id,
         total: payload.total,
         metodo: payload.metodo_pago
       };
 
       // Limpiar carrito
       try {
-        if (window.CartAPI?.empty) {
+        if (window.CartAPI && window.CartAPI.empty) {
           await window.CartAPI.empty();
         }
         localStorage.removeItem("productos-en-carrito");
@@ -172,95 +191,84 @@
     }
   }
 
-  // ============ INTERCEPTOR FUERTE ============
+  // ============ INTERCEPTOR ============
   function setupInterceptor() {
     const form = $("#checkout-form");
     
     if (!form) {
-      console.error("❌ Formulario #checkout-form no encontrado");
-      console.log("🔍 Elementos en página:", document.querySelectorAll('form').length, "forms");
+      console.error("❌ Formulario no encontrado");
       return;
     }
 
-    console.log("✅ Formulario encontrado:", form.id);
+    console.log("✅ Formulario encontrado");
 
-    // 🔥 GUARDAR HANDLER ORIGINAL
-    const originalOnSubmit = form.onsubmit;
+    // Guardar el handler original
+    const checkoutOriginal = form.onsubmit;
     
-    // 🔥 REMOVER TODOS LOS LISTENERS EXISTENTES (clonar el form)
-    const newForm = form.cloneNode(true);
-    form.parentNode.replaceChild(newForm, form);
-    
-    // 🔥 ASIGNAR NUEVO HANDLER AL FORM CLONADO
-    newForm.onsubmit = async function(e) {
+    // Reemplazar completamente
+    form.onsubmit = async function(evento) {
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-      console.log("🔵 SUBMIT INTERCEPTADO POR PASARELA");
+      console.log("🔵 SUBMIT INTERCEPTADO");
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
-      e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
+      evento.preventDefault();
+      evento.stopPropagation();
 
       const cartData = getCartData();
-      if (!cartData?.items?.length) {
-        console.warn("⚠️ Carrito vacío");
+      if (!cartData || !cartData.items || cartData.items.length === 0) {
         alert("El carrito está vacío");
         return false;
       }
 
-      console.log("🔵 Guardando en BD...");
+      console.log("🔵 Guardando en BD primero...");
 
-      const result = await guardarPedidoEnBD();
+      const resultado = await guardarPedidoEnBD();
 
-      if (!result.success) {
-        alert("❌ Error: " + result.error);
+      if (!resultado.success) {
+        alert("Error al guardar el pedido: " + resultado.error);
         return false;
       }
 
-      console.log("✅ Pedido guardado:", result.pedido_id);
+      console.log("✅ Pedido guardado exitosamente");
       console.log("🔵 Ejecutando checkout.js...");
 
-      // 🔥 EJECUTAR EL HANDLER ORIGINAL DE CHECKOUT.JS
-      if (originalOnSubmit) {
-        const fakeEvent = new Event('submit', { bubbles: false, cancelable: true });
-        return originalOnSubmit.call(newForm, fakeEvent);
+      // Ejecutar handler original
+      if (checkoutOriginal) {
+        return checkoutOriginal.call(form, evento);
       }
-
-      // Si no hay handler original, mostrar éxito manualmente
-      alert("✅ Pedido creado con éxito!");
-      window.location.reload();
 
       return false;
     };
 
-    console.log("✅ Interceptor configurado exitosamente");
+    console.log("✅ Interceptor configurado");
   }
 
   // ============ INIT ============
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   console.log("🔵 Inicializando pasarelaPagos.js");
   
-  // Esperar a que el formulario exista
+  // REUSAR la variable intentos ya declarada arriba
   let form = $("#checkout-form");
-  let intentos = 0;
+  intentos = 0; // Resetear el contador
   
-  while (!form && intentos < 100) {
-    await new Promise(resolve => setTimeout(resolve, 50));
+  while (!form && intentos < 50) {
+    await new Promise(function(resolve) {
+      setTimeout(resolve, 100);
+    });
     form = $("#checkout-form");
     intentos++;
   }
 
   if (!form) {
-    console.error("❌ Formulario no encontrado después de", intentos * 50, "ms");
-    console.log("🔍 Forms en página:", document.querySelectorAll('form'));
+    console.error("❌ Formulario no encontrado después de esperar");
     return;
   }
 
-  console.log("✅ Formulario encontrado después de", intentos * 50, "ms");
+  console.log("✅ Formulario encontrado");
 
   const cartData = getCartData();
-  console.log("🛒 Items:", cartData?.items?.length || 0);
-  console.log("💰 Total:", fmtPY(cartData?.total || 0));
+  console.log("🛒 Items:", cartData.items ? cartData.items.length : 0);
+  console.log("💰 Total:", fmtPY(cartData.total || 0));
   
   setupInterceptor();
 
