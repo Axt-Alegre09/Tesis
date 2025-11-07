@@ -1,9 +1,17 @@
-// JS/pasarelaPagos.js - VERSIÓN CON INTERCEPTOR BLOQUEANTE
+// JS/pasarelaPagos.js - VERSIÓN CON ESPERA AL DOM
 
 (async function() {
   console.log("🔵 pasarelaPagos.js - Iniciando...");
 
-  // Esperar Supabase
+  // ============ ESPERAR AL DOM ============
+  if (document.readyState === 'loading') {
+    await new Promise(resolve => {
+      document.addEventListener('DOMContentLoaded', resolve, { once: true });
+    });
+  }
+  console.log("✅ DOM cargado");
+
+  // ============ ESPERAR SUPABASE ============
   let supabase;
   let intentos = 0;
   while (!window.supabase && intentos < 50) {
@@ -118,7 +126,7 @@
       console.log("✅ Carrito:", cartData.items.length, "items");
 
       const payload = buildPayload(cartData);
-      console.log("🚀 Payload:", payload);
+      console.log("🚀 Payload construido");
 
       const { data, error } = await supabase.rpc("crear_pedido_desde_checkout", {
         p_usuario: user.id,
@@ -159,7 +167,7 @@
       return { success: true, pedido_id: pedidoId };
 
     } catch (err) {
-      console.error("❌ Error:", err);
+      console.error("❌ Error:", err.message);
       return { success: false, error: err.message };
     }
   }
@@ -169,93 +177,95 @@
     const form = $("#checkout-form");
     
     if (!form) {
-      console.error("❌ Formulario no encontrado");
+      console.error("❌ Formulario #checkout-form no encontrado");
+      console.log("🔍 Elementos en página:", document.querySelectorAll('form').length, "forms");
       return;
     }
 
-    console.log("✅ Configurando interceptor...");
+    console.log("✅ Formulario encontrado:", form.id);
 
-    // 🔥 GUARDAR EL HANDLER ORIGINAL
-    const originalHandler = form.onsubmit;
+    // 🔥 GUARDAR HANDLER ORIGINAL
+    const originalOnSubmit = form.onsubmit;
+    
+    // 🔥 REMOVER TODOS LOS LISTENERS EXISTENTES (clonar el form)
+    const newForm = form.cloneNode(true);
+    form.parentNode.replaceChild(newForm, form);
+    
+    // 🔥 ASIGNAR NUEVO HANDLER AL FORM CLONADO
+    newForm.onsubmit = async function(e) {
+      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+      console.log("🔵 SUBMIT INTERCEPTADO POR PASARELA");
+      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
-    // 🔥 REEMPLAZAR COMPLETAMENTE
-    form.onsubmit = async function(e) {
-      console.log("🔵 ═══════════════════════════════");
-      console.log("🔵 SUBMIT INTERCEPTADO");
-      console.log("🔵 ═══════════════════════════════");
-
-      // NO prevenir todavía, solo verificar
-      const cartData = getCartData();
-      if (!cartData?.items?.length) {
-        console.warn("⚠️ Carrito vacío, dejando pasar a checkout.js");
-        if (originalHandler) {
-          return originalHandler.call(form, e);
-        }
-        return;
-      }
-
-      // 🔥 PREVENIR Y GUARDAR EN BD PRIMERO
       e.preventDefault();
       e.stopPropagation();
+      e.stopImmediatePropagation();
 
-      console.log("🔵 Guardando en BD antes de continuar...");
+      const cartData = getCartData();
+      if (!cartData?.items?.length) {
+        console.warn("⚠️ Carrito vacío");
+        alert("El carrito está vacío");
+        return false;
+      }
+
+      console.log("🔵 Guardando en BD...");
 
       const result = await guardarPedidoEnBD();
 
       if (!result.success) {
-        alert("Error al guardar el pedido: " + result.error);
+        alert("❌ Error: " + result.error);
         return false;
       }
 
-      console.log("✅ Pedido guardado exitosamente");
+      console.log("✅ Pedido guardado:", result.pedido_id);
       console.log("🔵 Ejecutando checkout.js...");
 
-      // 🔥 AHORA SÍ, EJECUTAR CHECKOUT.JS
-      if (originalHandler) {
-        // Crear un nuevo evento para pasarle
-        const newEvent = new Event('submit', {
-          bubbles: true,
-          cancelable: true
-        });
-        return originalHandler.call(form, newEvent);
+      // 🔥 EJECUTAR EL HANDLER ORIGINAL DE CHECKOUT.JS
+      if (originalOnSubmit) {
+        const fakeEvent = new Event('submit', { bubbles: false, cancelable: true });
+        return originalOnSubmit.call(newForm, fakeEvent);
       }
+
+      // Si no hay handler original, mostrar éxito manualmente
+      alert("✅ Pedido creado con éxito!");
+      window.location.reload();
 
       return false;
     };
 
-    console.log("✅ Interceptor configurado");
+    console.log("✅ Interceptor configurado exitosamente");
   }
 
   // ============ INIT ============
-  async function init() {
-    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    console.log("🔵 Inicializando pasarelaPagos.js");
-    
-    let form = $("#checkout-form");
-    let intentos = 0;
-    
-    while (!form && intentos < 50) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-      form = $("#checkout-form");
-      intentos++;
-    }
-
-    if (!form) {
-      console.error("❌ Formulario no encontrado");
-      return;
-    }
-
-    const cartData = getCartData();
-    console.log("🛒 Items:", cartData?.items?.length || 0);
-    console.log("💰 Total:", fmtPY(cartData?.total || 0));
-    
-    setupInterceptor();
-
-    console.log("✅ pasarelaPagos.js LISTO");
-    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+  console.log("🔵 Inicializando pasarelaPagos.js");
+  
+  // Esperar a que el formulario exista
+  let form = $("#checkout-form");
+  let intentos = 0;
+  
+  while (!form && intentos < 100) {
+    await new Promise(resolve => setTimeout(resolve, 50));
+    form = $("#checkout-form");
+    intentos++;
   }
 
-  await init();
+  if (!form) {
+    console.error("❌ Formulario no encontrado después de", intentos * 50, "ms");
+    console.log("🔍 Forms en página:", document.querySelectorAll('form'));
+    return;
+  }
+
+  console.log("✅ Formulario encontrado después de", intentos * 50, "ms");
+
+  const cartData = getCartData();
+  console.log("🛒 Items:", cartData?.items?.length || 0);
+  console.log("💰 Total:", fmtPY(cartData?.total || 0));
+  
+  setupInterceptor();
+
+  console.log("✅ pasarelaPagos.js LISTO");
+  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
   window.testGuardarPedido = guardarPedidoEnBD;
   console.log("💡 window.testGuardarPedido() disponible");
