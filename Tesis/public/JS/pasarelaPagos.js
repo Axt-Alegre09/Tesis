@@ -1,10 +1,9 @@
-// JS/pasarelaPagos.js - VERSIÓN SIN MÓDULOS
-// Compatible con checkout.js - Se ejecuta DESPUÉS de todos los scripts
+// JS/pasarelaPagos.js - VERSIÓN CON INTERCEPTOR BLOQUEANTE
 
 (async function() {
-  console.log("🔵 pasarelaPagos.js - Iniciando (sin módulos)...");
+  console.log("🔵 pasarelaPagos.js - Iniciando...");
 
-  // Esperar a que supabase esté disponible
+  // Esperar Supabase
   let supabase;
   let intentos = 0;
   while (!window.supabase && intentos < 50) {
@@ -13,7 +12,7 @@
   }
 
   if (!window.supabase) {
-    console.error("❌ Supabase no está disponible");
+    console.error("❌ Supabase no disponible");
     return;
   }
 
@@ -23,44 +22,38 @@
   const $ = (id) => document.getElementById(id);
   const fmtPY = (n) => new Intl.NumberFormat("es-PY").format(Number(n || 0)) + " Gs";
 
-  // ============ OBTENER DATOS DEL CARRITO ============
+  // ============ DATOS DEL CARRITO ============
   function getCartData() {
-    // 1. Intentar desde sessionStorage
     try {
       const snap = JSON.parse(
         sessionStorage.getItem("checkout_snapshot") || 
         sessionStorage.getItem("checkout") || 
         "null"
       );
-      if (snap && snap.items && snap.items.length > 0) {
-        console.log("✅ Datos desde sessionStorage:", snap);
+      if (snap?.items?.length > 0) {
+        console.log("✅ Datos desde sessionStorage");
         return snap;
       }
-    } catch (e) {
-      console.warn("⚠️ Error leyendo sessionStorage:", e);
-    }
+    } catch (e) {}
 
-    // 2. Intentar desde localStorage
     try {
       const cart = JSON.parse(localStorage.getItem("productos-en-carrito") || "[]");
-      if (cart && cart.length > 0) {
+      if (cart.length > 0) {
         const total = cart.reduce((a, it) => 
           a + Number(it.precio || 0) * Number(it.cantidad || 1), 0
         );
-        console.log("✅ Datos desde localStorage:", { items: cart, total });
+        console.log("✅ Datos desde localStorage");
         return { items: cart, total, source: "local" };
       }
-    } catch (e) {
-      console.warn("⚠️ Error leyendo localStorage:", e);
-    }
+    } catch (e) {}
 
-    console.error("❌ No se encontraron datos del carrito");
+    console.error("❌ Carrito vacío");
     return { items: [], total: 0, source: "none" };
   }
 
   // ============ CONSTRUIR PAYLOAD ============
   function buildPayload(cartData) {
-    if (!cartData || !cartData.items || cartData.items.length === 0) {
+    if (!cartData?.items?.length) {
       throw new Error("El carrito está vacío");
     }
 
@@ -77,14 +70,14 @@
     );
 
     const metodoInput = document.querySelector('input[name="metodo"]:checked');
-    const metodo = metodoInput ? metodoInput.value : "efectivo";
+    const metodo = metodoInput?.value || "efectivo";
 
     const getValue = (id) => {
       const el = $(id);
       return el ? (el.value || "").trim() : "";
     };
 
-    const payload = {
+    return {
       source: cartData.source || "local",
       items,
       total,
@@ -104,67 +97,45 @@
       hora_hasta: getValue("hora-hasta"),
       metodo_pago: metodo
     };
-
-    console.log("🚀 Payload construido:");
-    console.log("  - Items:", items.length);
-    console.log("  - Total:", fmtPY(total));
-    console.log("  - Método:", metodo);
-
-    return payload;
   }
 
-  // ============ GUARDAR PEDIDO EN BD ============
+  // ============ GUARDAR EN BD ============
   async function guardarPedidoEnBD() {
-    console.log("🔵 Iniciando guardarPedidoEnBD...");
+    console.log("🔵 Guardando pedido en BD...");
 
     try {
-      // 1. Verificar usuario
       const { data: userData, error: userError } = await supabase.auth.getUser();
       if (userError || !userData?.user) {
-        console.error("❌ No hay usuario autenticado");
-        throw new Error("Debes iniciar sesión");
+        throw new Error("Usuario no autenticado");
       }
       const user = userData.user;
-      console.log("✅ Usuario autenticado:", user.id);
+      console.log("✅ Usuario:", user.id);
 
-      // 2. Obtener datos del carrito
       const cartData = getCartData();
-      if (!cartData || !cartData.items || cartData.items.length === 0) {
-        console.error("❌ Carrito vacío");
-        throw new Error("El carrito está vacío");
+      if (!cartData?.items?.length) {
+        throw new Error("Carrito vacío");
       }
-      console.log("✅ Carrito con", cartData.items.length, "items");
+      console.log("✅ Carrito:", cartData.items.length, "items");
 
-      // 3. Construir payload
       const payload = buildPayload(cartData);
+      console.log("🚀 Payload:", payload);
 
-      // 4. Llamar al RPC
-      console.log("🔵 Llamando a crear_pedido_desde_checkout...");
-      console.log("📦 Payload:", JSON.stringify(payload, null, 2));
-      
       const { data, error } = await supabase.rpc("crear_pedido_desde_checkout", {
         p_usuario: user.id,
         p_checkout: payload
       });
 
-      if (error) {
-        console.error("❌ Error del RPC:", error);
-        throw error;
-      }
-
-      console.log("✅ Respuesta del RPC:", data);
+      if (error) throw error;
 
       const result = Array.isArray(data) ? data[0] : data;
       const pedidoId = result?.pedido_id;
       
       if (!pedidoId) {
-        console.error("❌ No se recibió pedido_id");
-        throw new Error("No se pudo crear el pedido");
+        throw new Error("No se recibió pedido_id");
       }
 
-      console.log("✅ Pedido creado exitosamente:", pedidoId);
+      console.log("✅ Pedido creado:", pedidoId);
 
-      // 5. Guardar en window
       window.__pedido_creado__ = {
         pedido_id: pedidoId,
         snapshot_id: result?.snapshot_id,
@@ -172,78 +143,94 @@
         metodo: payload.metodo_pago
       };
 
-      // 6. Limpiar carrito
+      // Limpiar carrito
       try {
-        if (window.CartAPI && window.CartAPI.empty) {
+        if (window.CartAPI?.empty) {
           await window.CartAPI.empty();
-          console.log("✅ Carrito vaciado via CartAPI");
         }
-      } catch (e) {
-        console.warn("⚠️ Error al vaciar CartAPI:", e);
-      }
-
-      try {
         localStorage.removeItem("productos-en-carrito");
         sessionStorage.removeItem("checkout_snapshot");
         sessionStorage.removeItem("checkout");
-        console.log("✅ Storage limpiado");
+        console.log("✅ Carrito limpiado");
       } catch (e) {
-        console.warn("⚠️ Error al limpiar storage:", e);
+        console.warn("⚠️ Error limpiando:", e);
       }
 
       return { success: true, pedido_id: pedidoId };
 
     } catch (err) {
-      console.error("❌ Error en guardarPedidoEnBD:", err);
-      console.error("Stack:", err.stack);
+      console.error("❌ Error:", err);
       return { success: false, error: err.message };
     }
   }
 
-  // ============ INTERCEPTAR SUBMIT ============
-  function setupFormInterceptor() {
+  // ============ INTERCEPTOR FUERTE ============
+  function setupInterceptor() {
     const form = $("#checkout-form");
     
     if (!form) {
-      console.error("❌ No se encontró #checkout-form");
+      console.error("❌ Formulario no encontrado");
       return;
     }
 
-    console.log("✅ Formulario encontrado");
+    console.log("✅ Configurando interceptor...");
 
-    // Interceptar ANTES del submit
-    form.addEventListener("submit", async function(e) {
-      console.log("🔵 Submit interceptado por pasarelaPagos.js");
+    // 🔥 GUARDAR EL HANDLER ORIGINAL
+    const originalHandler = form.onsubmit;
 
-      // Verificar datos
+    // 🔥 REEMPLAZAR COMPLETAMENTE
+    form.onsubmit = async function(e) {
+      console.log("🔵 ═══════════════════════════════");
+      console.log("🔵 SUBMIT INTERCEPTADO");
+      console.log("🔵 ═══════════════════════════════");
+
+      // NO prevenir todavía, solo verificar
       const cartData = getCartData();
-      if (!cartData || !cartData.items || cartData.items.length === 0) {
-        console.warn("⚠️ No hay items, saltando guardado");
+      if (!cartData?.items?.length) {
+        console.warn("⚠️ Carrito vacío, dejando pasar a checkout.js");
+        if (originalHandler) {
+          return originalHandler.call(form, e);
+        }
         return;
       }
 
-      // Guardar en BD (asíncrono, no bloquea)
-      guardarPedidoEnBD().then(result => {
-        if (result.success) {
-          console.log("✅ Pedido guardado:", result.pedido_id);
-        } else {
-          console.error("❌ Error guardando:", result.error);
-        }
-      });
+      // 🔥 PREVENIR Y GUARDAR EN BD PRIMERO
+      e.preventDefault();
+      e.stopPropagation();
 
-      // NO prevenir - dejar que checkout.js maneje
-    }, { capture: true });
+      console.log("🔵 Guardando en BD antes de continuar...");
+
+      const result = await guardarPedidoEnBD();
+
+      if (!result.success) {
+        alert("Error al guardar el pedido: " + result.error);
+        return false;
+      }
+
+      console.log("✅ Pedido guardado exitosamente");
+      console.log("🔵 Ejecutando checkout.js...");
+
+      // 🔥 AHORA SÍ, EJECUTAR CHECKOUT.JS
+      if (originalHandler) {
+        // Crear un nuevo evento para pasarle
+        const newEvent = new Event('submit', {
+          bubbles: true,
+          cancelable: true
+        });
+        return originalHandler.call(form, newEvent);
+      }
+
+      return false;
+    };
 
     console.log("✅ Interceptor configurado");
   }
 
-  // ============ INICIALIZACIÓN ============
+  // ============ INIT ============
   async function init() {
     console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     console.log("🔵 Inicializando pasarelaPagos.js");
-    console.log("📍 URL:", window.location.pathname);
     
-    // Esperar a que el formulario exista
     let form = $("#checkout-form");
     let intentos = 0;
     
@@ -254,30 +241,23 @@
     }
 
     if (!form) {
-      console.error("❌ Formulario no encontrado después de esperar");
+      console.error("❌ Formulario no encontrado");
       return;
     }
 
-    console.log("✅ Formulario encontrado");
-
-    // Verificar carrito
     const cartData = getCartData();
-    console.log("🛒 Carrito:");
-    console.log("  - Items:", cartData?.items?.length || 0);
-    console.log("  - Total:", fmtPY(cartData?.total || 0));
+    console.log("🛒 Items:", cartData?.items?.length || 0);
+    console.log("💰 Total:", fmtPY(cartData?.total || 0));
     
-    // Setup interceptor
-    setupFormInterceptor();
+    setupInterceptor();
 
-    console.log("✅ pasarelaPagos.js listo");
+    console.log("✅ pasarelaPagos.js LISTO");
     console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   }
 
-  // Ejecutar init
-  init();
+  await init();
 
-  // Exponer para testing
   window.testGuardarPedido = guardarPedidoEnBD;
-  console.log("💡 Tip: window.testGuardarPedido() para testing");
+  console.log("💡 window.testGuardarPedido() disponible");
 
 })();
