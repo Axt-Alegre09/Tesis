@@ -1,51 +1,77 @@
-// JS/metodos-pago.js - VERSIÓN SIMPLE Y FUNCIONAL
+// JS/metodos-pago.js
 
+// Importar Supabase
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
+// Configuración de Supabase - KEY ACTUALIZADA
 const SUPABASE_URL = 'https://jyygevitfnbwrvxrjexp.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5eWdldml0Zm5id3J2eHJqZXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2OTQ2OTYsImV4cCI6MjA3MTI3MDY5Nn0.St0IiSZSeELESshctneazCJHXCDBi9wrZ28UkiEDXYo';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// ... resto del código igual
+
+// Variables globales
 let usuarioActual = null;
 let tarjetaEditando = null;
 
-// ========== AUTENTICACIÓN ==========
+// Verificar autenticación PRIMERO
 async function verificarAutenticacion() {
   try {
     const { data: { session }, error } = await supabase.auth.getSession();
     
-    if (error || !session) {
+    if (error) {
+      console.error('Error al verificar sesión:', error);
+      window.location.href = 'login.html';
+      return false;
+    }
+    
+    if (!session) {
+      console.log('No hay sesión activa');
       window.location.href = 'login.html';
       return false;
     }
 
     usuarioActual = session.user;
+    console.log('Usuario autenticado:', usuarioActual.email);
     return true;
 
   } catch (error) {
+    console.error('Error en verificación:', error);
     window.location.href = 'login.html';
     return false;
   }
 }
 
-// ========== INICIALIZACIÓN ==========
+// Inicialización
 document.addEventListener('DOMContentLoaded', async () => {
+  console.log('Iniciando aplicación...');
+  
+  // Primero verificar autenticación
   const autenticado = await verificarAutenticacion();
-  if (!autenticado) return;
+  
+  if (!autenticado) {
+    return; // Detener si no está autenticado
+  }
 
-  generarAnios();
-  inicializarEventos();
-  inicializarAnimacionTarjeta();
+  // Si está autenticado, continuar
   await cargarTarjetas();
+  inicializarEventos();
+  generarAnios();
+  inicializarAnimacionTarjeta();
 });
 
-// ========== CARGAR TARJETAS ==========
+// Cargar tarjetas del usuario
 async function cargarTarjetas() {
   const listaTarjetas = document.getElementById('lista-tarjetas');
   
-  if (!usuarioActual) return;
+  if (!usuarioActual) {
+    console.error('No hay usuario actual');
+    return;
+  }
 
+  console.log('Cargando tarjetas para usuario:', usuarioActual.id);
+  
   try {
     const { data: tarjetas, error } = await supabase
       .from('metodos_pago')
@@ -54,12 +80,19 @@ async function cargarTarjetas() {
       .order('es_predeterminada', { ascending: false })
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error de Supabase:', error);
+      throw error;
+    }
+
+    console.log('Tarjetas cargadas:', tarjetas);
 
     if (!tarjetas || tarjetas.length === 0) {
       listaTarjetas.innerHTML = `
         <div class="empty-state">
-          <p style="color: #999;">No tenés tarjetas guardadas</p>
+          <i class="bi bi-credit-card" style="font-size: 3rem; color: #999; margin-bottom: 1rem;"></i>
+          <p style="font-size: 1.1rem; margin-bottom: 0.5rem;">No tenés tarjetas guardadas</p>
+          <p class="text-muted">Agregá una tarjeta para pagar más rápido</p>
         </div>
       `;
       return;
@@ -67,44 +100,67 @@ async function cargarTarjetas() {
 
     listaTarjetas.innerHTML = tarjetas.map(tarjeta => crearTarjetaHTML(tarjeta)).join('');
     
-    // Agregar event listeners a botones
+    // Agregar eventos a los botones
     document.querySelectorAll('.btn-editar-tarjeta').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        const id = e.currentTarget.dataset.id;
+        const id = e.target.closest('.btn-editar-tarjeta').dataset.id;
         editarTarjeta(id);
       });
     });
 
     document.querySelectorAll('.btn-eliminar-tarjeta').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        const id = e.currentTarget.dataset.id;
+        const id = e.target.closest('.btn-eliminar-tarjeta').dataset.id;
         eliminarTarjeta(id);
+      });
+    });
+
+    document.querySelectorAll('.btn-predeterminar').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const id = e.target.closest('.btn-predeterminar').dataset.id;
+        establecerPredeterminada(id);
       });
     });
 
   } catch (error) {
     console.error('Error al cargar tarjetas:', error);
-    listaTarjetas.innerHTML = `<div class="empty-state"><p>Error al cargar</p></div>`;
+    listaTarjetas.innerHTML = `
+      <div class="alert alert-danger">
+        <i class="bi bi-exclamation-triangle"></i>
+        Error al cargar las tarjetas: ${error.message}
+      </div>
+    `;
   }
 }
 
-// ========== CREAR HTML TARJETA ==========
+// Crear HTML de una tarjeta
 function crearTarjetaHTML(tarjeta) {
+  const tipoBadge = obtenerTipoTarjeta(tarjeta.numero_tarjeta);
   const ultimos4 = tarjeta.numero_tarjeta.slice(-4);
   
   return `
     <div class="tarjeta-item ${tarjeta.es_predeterminada ? 'predeterminada' : ''}">
-      <div class="tarjeta-numero">•••• •••• •••• ${ultimos4}</div>
       <div class="tarjeta-info">
-        <div class="tarjeta-nombre">${tarjeta.nombre_titular}</div>
-        <div class="tarjeta-exp">${tarjeta.mes_vencimiento}/${tarjeta.anio_vencimiento}</div>
+        <div class="tarjeta-header">
+          <span class="tarjeta-tipo ${tipoBadge.clase}">${tipoBadge.nombre}</span>
+          ${tarjeta.es_predeterminada ? '<span class="badge-predeterminada"><i class="bi bi-star-fill"></i> Predeterminada</span>' : ''}
+        </div>
+        <div class="tarjeta-numero">•••• •••• •••• ${ultimos4}</div>
+        <div class="tarjeta-detalles">
+          <span><i class="bi bi-person"></i> ${tarjeta.nombre_titular}</span>
+          <span><i class="bi bi-calendar"></i> ${tarjeta.mes_vencimiento}/${tarjeta.anio_vencimiento}</span>
+        </div>
       </div>
-      ${tarjeta.es_predeterminada ? '<div class="tarjeta-badge">PREDETERMINADA</div>' : ''}
-      <div class="tarjeta-actions">
-        <button class="tarjeta-btn btn-editar-tarjeta" data-id="${tarjeta.id}" title="Editar">
+      <div class="tarjeta-acciones">
+        ${!tarjeta.es_predeterminada ? `
+          <button class="btn-icon btn-predeterminar" data-id="${tarjeta.id}" title="Establecer como predeterminada">
+            <i class="bi bi-star"></i>
+          </button>
+        ` : ''}
+        <button class="btn-icon btn-editar-tarjeta" data-id="${tarjeta.id}" title="Editar">
           <i class="bi bi-pencil"></i>
         </button>
-        <button class="tarjeta-btn btn-eliminar-tarjeta" data-id="${tarjeta.id}" title="Eliminar">
+        <button class="btn-icon btn-eliminar-tarjeta" data-id="${tarjeta.id}" title="Eliminar">
           <i class="bi bi-trash"></i>
         </button>
       </div>
@@ -112,20 +168,41 @@ function crearTarjetaHTML(tarjeta) {
   `;
 }
 
-// ========== EVENTOS ==========
+// Obtener tipo de tarjeta según el número
+function obtenerTipoTarjeta(numero) {
+  const primerDigito = numero.charAt(0);
+  const primerosDosDigitos = numero.substring(0, 2);
+  
+  if (primerDigito === '4') {
+    return { nombre: 'Visa', clase: 'visa' };
+  } else if (['51', '52', '53', '54', '55'].includes(primerosDosDigitos)) {
+    return { nombre: 'Mastercard', clase: 'mastercard' };
+  } else if (['34', '37'].includes(primerosDosDigitos)) {
+    return { nombre: 'American Express', clase: 'amex' };
+  } else {
+    return { nombre: 'Tarjeta', clase: 'otra' };
+  }
+}
+
+// Inicializar eventos
 function inicializarEventos() {
+  // Abrir modal para agregar tarjeta
   document.getElementById('btn-agregar').addEventListener('click', abrirModal);
+  
+  // Cerrar modal
   document.getElementById('modal-close').addEventListener('click', cerrarModal);
   document.getElementById('btn-cancelar').addEventListener('click', cerrarModal);
   
+  // Cerrar al hacer clic fuera del modal
   document.getElementById('modal-tarjeta').addEventListener('click', (e) => {
     if (e.target.id === 'modal-tarjeta') cerrarModal();
   });
 
+  // Enviar formulario
   document.getElementById('form-tarjeta').addEventListener('submit', guardarTarjeta);
 }
 
-// ========== MODAL ==========
+// Abrir modal
 function abrirModal() {
   tarjetaEditando = null;
   document.querySelector('.modal-title').textContent = 'Agregar tarjeta';
@@ -135,6 +212,7 @@ function abrirModal() {
   resetearTarjetaAnimada();
 }
 
+// Cerrar modal
 function cerrarModal() {
   document.getElementById('modal-tarjeta').setAttribute('hidden', '');
   document.body.style.overflow = '';
@@ -143,7 +221,7 @@ function cerrarModal() {
   resetearTarjetaAnimada();
 }
 
-// ========== EDITAR TARJETA ==========
+// Editar tarjeta
 async function editarTarjeta(id) {
   try {
     const { data: tarjeta, error } = await supabase
@@ -156,11 +234,12 @@ async function editarTarjeta(id) {
 
     tarjetaEditando = tarjeta;
     
+    // Llenar formulario
     document.getElementById('input-numero').value = formatearNumeroTarjeta(tarjeta.numero_tarjeta);
     document.getElementById('input-nombre').value = tarjeta.nombre_titular;
     document.getElementById('input-mes').value = tarjeta.mes_vencimiento;
     document.getElementById('input-anio').value = tarjeta.anio_vencimiento;
-    document.getElementById('input-cvv').value = '';
+    document.getElementById('input-cvv').value = ''; // Por seguridad
     document.getElementById('input-predeterminado').checked = tarjeta.es_predeterminada;
 
     document.querySelector('.modal-title').textContent = 'Editar tarjeta';
@@ -170,11 +249,12 @@ async function editarTarjeta(id) {
     actualizarVistaPrevia();
 
   } catch (error) {
+    console.error('Error al cargar tarjeta:', error);
     alert('Error al cargar la tarjeta');
   }
 }
 
-// ========== GUARDAR TARJETA ==========
+// Guardar tarjeta
 async function guardarTarjeta(e) {
   e.preventDefault();
 
@@ -185,13 +265,14 @@ async function guardarTarjeta(e) {
   const cvv = document.getElementById('input-cvv').value;
   const esPredeterminada = document.getElementById('input-predeterminado').checked;
 
+  // Validaciones
   if (!validarNumeroTarjeta(numero)) {
     alert('Número de tarjeta inválido');
     return;
   }
 
   if (!validarCVV(cvv)) {
-    alert('CVV inválido');
+    alert('CVV inválido (debe ser de 3 o 4 dígitos)');
     return;
   }
 
@@ -201,6 +282,7 @@ async function guardarTarjeta(e) {
   }
 
   try {
+    // Si se marca como predeterminada, desmarcar las demás
     if (esPredeterminada) {
       await supabase
         .from('metodos_pago')
@@ -218,47 +300,79 @@ async function guardarTarjeta(e) {
       es_predeterminada: esPredeterminada
     };
 
+    let resultado;
+
     if (tarjetaEditando) {
-      await supabase
+      resultado = await supabase
         .from('metodos_pago')
         .update(datosTarjeta)
         .eq('id', tarjetaEditando.id);
     } else {
-      await supabase
+      resultado = await supabase
         .from('metodos_pago')
         .insert([datosTarjeta]);
     }
 
+    if (resultado.error) throw resultado.error;
+
     cerrarModal();
     await cargarTarjetas();
-    alert('Tarjeta guardada exitosamente');
+    mostrarMensaje('Tarjeta guardada exitosamente', 'success');
 
   } catch (error) {
-    alert('Error al guardar la tarjeta');
+    console.error('Error al guardar tarjeta:', error);
+    alert('Error al guardar la tarjeta: ' + error.message);
   }
 }
 
-// ========== ELIMINAR TARJETA ==========
+// Eliminar tarjeta
 async function eliminarTarjeta(id) {
   if (!confirm('¿Estás seguro de que querés eliminar esta tarjeta?')) {
     return;
   }
 
   try {
-    await supabase
+    const { error } = await supabase
       .from('metodos_pago')
       .delete()
       .eq('id', id);
 
+    if (error) throw error;
+
     await cargarTarjetas();
-    alert('Tarjeta eliminada exitosamente');
+    mostrarMensaje('Tarjeta eliminada exitosamente', 'success');
 
   } catch (error) {
+    console.error('Error al eliminar tarjeta:', error);
     alert('Error al eliminar la tarjeta');
   }
 }
 
-// ========== VALIDACIONES ==========
+// Establecer como predeterminada
+async function establecerPredeterminada(id) {
+  try {
+    await supabase
+      .from('metodos_pago')
+      .update({ es_predeterminada: false })
+      .eq('usuario_id', usuarioActual.id);
+
+    const { error } = await supabase
+      .from('metodos_pago')
+      .update({ es_predeterminada: true })
+      .eq('id', id);
+
+    if (error) throw error;
+
+    await cargarTarjetas();
+    mostrarMensaje('Tarjeta predeterminada actualizada', 'success');
+
+  } catch (error) {
+    console.error('Error al establecer predeterminada:', error);
+    alert('Error al actualizar la tarjeta predeterminada');
+  }
+}
+
+// Validaciones
 function validarNumeroTarjeta(numero) {
   if (!/^\d{13,19}$/.test(numero)) return false;
   
@@ -296,7 +410,6 @@ function validarFechaVencimiento(mes, anio) {
   return true;
 }
 
-// ========== FORMATEO ==========
 function formatearNumeroTarjeta(numero) {
   return numero.replace(/(\d{4})/g, '$1 ').trim();
 }
@@ -315,7 +428,6 @@ function generarAnios() {
   }
 }
 
-// ========== ANIMACIÓN TARJETA ==========
 function inicializarAnimacionTarjeta() {
   const inputNumero = document.getElementById('input-numero');
   const inputNombre = document.getElementById('input-nombre');
@@ -334,8 +446,8 @@ function inicializarAnimacionTarjeta() {
   inputMes.addEventListener('change', actualizarVistaPrevia);
   inputAnio.addEventListener('change', actualizarVistaPrevia);
 
-  inputCvv.addEventListener('focus', () => tarjeta.classList.add('flip'));
-  inputCvv.addEventListener('blur', () => tarjeta.classList.remove('flip'));
+  inputCvv.addEventListener('focus', () => tarjeta.classList.add('flipped'));
+  inputCvv.addEventListener('blur', () => tarjeta.classList.remove('flipped'));
   inputCvv.addEventListener('input', (e) => {
     let valor = e.target.value.replace(/\D/g, '').substring(0, 4);
     e.target.value = valor;
@@ -367,5 +479,19 @@ function resetearTarjetaAnimada() {
   document.getElementById('card-display-name').textContent = 'TU NOMBRE';
   document.getElementById('card-display-exp').textContent = 'MM/AA';
   document.getElementById('card-display-cvv').textContent = '***';
-  document.getElementById('credit-card').classList.remove('flip');
+  document.getElementById('credit-card').classList.remove('flipped');
+}
+
+function mostrarMensaje(texto, tipo = 'info') {
+  const alerta = document.createElement('div');
+  alerta.className = `alert alert-${tipo}`;
+  alerta.innerHTML = `<i class="bi bi-check-circle-fill"></i> ${texto}`;
+  alerta.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; padding: 1rem 1.5rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); opacity: 0; transition: opacity 0.3s;';
+  
+  document.body.appendChild(alerta);
+  setTimeout(() => alerta.style.opacity = '1', 100);
+  setTimeout(() => {
+    alerta.style.opacity = '0';
+    setTimeout(() => alerta.remove(), 300);
+  }, 3000);
 }
