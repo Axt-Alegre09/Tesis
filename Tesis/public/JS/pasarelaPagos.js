@@ -291,4 +291,5 @@ document.addEventListener("DOMContentLoaded", () => {
 
   console.log("✅ pasarelaPagos.js LISTO");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+  
 });
