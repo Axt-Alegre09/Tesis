@@ -62,13 +62,26 @@ async function fetchAllPedidos() {
 
     // Extraer IDs de usuarios únicos
     const userIds = [...new Set(pedidos.map(p => p.usuario_id).filter(Boolean))];
-    console.log(`👥 Cargando datos de ${userIds.length} clientes`);
+    console.log(`👥 Cargando datos de ${userIds.length} clientes. IDs:`, userIds);
     
     // Cargar datos del cliente
-    const { data: clientes, error: errorClientes } = await supabase
-      .from("clientes_perfil")
-      .select("*")
-      .in("user_id", userIds);
+    let clientes = [];
+    let errorClientes = null;
+    
+    if (userIds.length > 0) {
+      const result = await supabase
+        .from("clientes_perfil")
+        .select("*")
+        .in("user_id", userIds);
+      
+      clientes = result.data || [];
+      errorClientes = result.error;
+      
+      console.log(`✅ Clientes obtenidos: ${clientes.length}`);
+      if (errorClientes) {
+        console.warn("⚠️ Error en query clientes:", errorClientes.message);
+      }
+    }
     
     if (errorClientes) {
       console.warn("⚠️ Error cargando clientes:", errorClientes.message);
@@ -78,9 +91,12 @@ async function fetchAllPedidos() {
     const clientesMap = {};
     (clientes || []).forEach(c => {
       clientesMap[c.user_id] = c;
+      console.log(`   ✅ Cliente mapeado: ${c.user_id} -> ${c.razon}`);
     });
 
-    console.log(`✅ ${Object.keys(clientesMap).length} clientes mapeados`);
+    console.log(`✅ Total ${Object.keys(clientesMap).length} clientes mapeados`);
+    console.log(`   Clientes esperados: ${userIds.length}`);
+    console.log(`   Clientes encontrados: ${clientes.length}`);
 
     // Combinar datos
     const resultado = pedidos.map(p => {
