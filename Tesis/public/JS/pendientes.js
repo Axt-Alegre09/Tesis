@@ -140,21 +140,32 @@ async function fetchItemsByPedido(pedidoId) {
   
   try {
     console.log("📦 Cargando items para pedido:", pedidoId);
+    console.log("   Tipo de pedidoId:", typeof pedidoId, "Valor:", pedidoId);
     
     // Primero cargar los detalles del pedido
     const { data: detalles, error: errorDetalles } = await supabase
       .from("detalles_pedido")
-      .select("id, cantidad, precio_unitario, producto_id, subtotal")
+      .select("id, cantidad, precio_unitario, producto_id, subtotal, pedido_id")
       .eq("pedido_id", pedidoId)
       .order("id", { ascending: true });
     
     if (errorDetalles) {
-      console.warn("Error cargando detalles:", errorDetalles.message);
+      console.error("❌ Error cargando detalles:", errorDetalles.message, errorDetalles.details);
       return [];
     }
     
+    console.log("📦 Respuesta detalles:", detalles);
+    
     if (!detalles || detalles.length === 0) {
-      console.log("📦 Sin ítems para este pedido");
+      console.warn("⚠️ Sin ítems para este pedido. Detalles:", detalles);
+      
+      // Debug: intentar listar todos los detalles_pedido para ver si hay datos
+      const allDetalles = await supabase
+        .from("detalles_pedido")
+        .select("pedido_id, id, cantidad, precio_unitario");
+      
+      console.log("🔍 DEBUG - Todos los detalles_pedido en BD:", allDetalles.data);
+      
       return [];
     }
     
