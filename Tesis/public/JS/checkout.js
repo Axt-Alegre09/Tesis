@@ -181,10 +181,23 @@
     }
 
     if (metodo === 'tarjeta') {
+      // ✅ VERIFICAR SI HAY TARJETA GUARDADA SELECCIONADA
+      const tarjetaSeleccionada = document.querySelector('input[name="tarjeta-guardada"]:checked');
+      
+      if (tarjetaSeleccionada) {
+        // ✅ Tarjeta guardada seleccionada - Sin validación, solo simular
+        console.log('✅ Tarjeta guardada seleccionada - Procesando...');
+        alert('Pago aprobado. ¡Gracias por tu compra!');
+        finalizeSuccess('tarjeta', { number: 'guardada' });
+        return;
+      }
+
+      // ❌ Si no hay tarjeta guardada, validar campos manuales
       const name = document.getElementById('card-name')?.value?.trim();
       const number = document.getElementById('card-number')?.value || '';
       const exp = document.getElementById('card-exp')?.value?.trim();
       const cvv = document.getElementById('card-cvv')?.value?.trim();
+      
       if (!name) { alert('Ingresá el nombre tal como figura en la tarjeta.'); return; }
 
       const cleaned = normalizeCard(number);
