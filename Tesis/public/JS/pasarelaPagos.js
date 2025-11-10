@@ -1,4 +1,6 @@
-// JS/pasarelaPagos.js - VERSIÓN CORREGIDA CON VALIDACIÓN UUID
+
+// JS/pasarelaPagos.js - VERSIÓN FINAL CON MÓDULOS
+import { supabase } from "./ScriptLogin.js";
 
 (async function() {
   console.log("🔵 pasarelaPagos.js - Iniciando...");
@@ -10,24 +12,7 @@
     });
   }
   console.log("✅ DOM cargado");
-
-  // Esperar Supabase
-  let supabase;
-  let intentos = 0;
-  while (!window.supabase && intentos < 50) {
-    await new Promise(function(resolve) {
-      setTimeout(resolve, 100);
-    });
-    intentos++;
-  }
-
-  if (!window.supabase) {
-    console.error("❌ Supabase no disponible");
-    return;
-  }
-
-  supabase = window.supabase;
-  console.log("✅ Supabase cargado");
+  console.log("✅ Supabase importado correctamente");
 
   const $ = function(id) {
     return document.getElementById(id);
@@ -297,7 +282,7 @@
   console.log("🔵 Inicializando pasarelaPagos.js");
   
   let form = $("#checkout-form");
-  intentos = 0;
+  let intentos = 0;
   
   while (!form && intentos < 50) {
     await new Promise(function(resolve) {
