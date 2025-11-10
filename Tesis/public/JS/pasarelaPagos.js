@@ -260,11 +260,6 @@ function setupFormInterceptor() {
       console.log("✅ PEDIDO GUARDADO EXITOSAMENTE");
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
-      // 7. Redirigir a página de éxito
-      setTimeout(() => {
-        window.location.href = "/";
-      }, 1500);
-
     } catch (err) {
       console.error("❌ Error en submit:", err);
       alert("Error: " + err.message);
