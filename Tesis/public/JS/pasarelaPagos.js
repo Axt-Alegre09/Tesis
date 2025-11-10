@@ -1,4 +1,4 @@
-// JS/pasarelaPagos.js - VERSIÓN CON LOGGING EN buildPayload
+// JS/pasarelaPagos.js - VERSIÓN ORIGINAL + LOGGING EN buildPayload
 import { supabase } from "./ScriptLogin.js";
 
 (async function() {
@@ -12,11 +12,12 @@ import { supabase } from "./ScriptLogin.js";
     return new Intl.NumberFormat("es-PY").format(Number(n || 0)) + " Gs";
   };
 
-  // ============ ESPERAR FORMULARIO ============
+  // ============ ESPERAR FORMULARIO CON MUTATIONOBSERVER ============
   async function esperarFormulario(selector, timeoutMs = 30000) {
     console.log(`⏳ Esperando formulario ${selector}...`);
     
     return new Promise((resolve, reject) => {
+      // 1. Verificar si ya existe
       const elemento = document.querySelector(selector);
       if (elemento) {
         console.log("✅ Formulario encontrado inmediatamente");
@@ -24,6 +25,7 @@ import { supabase } from "./ScriptLogin.js";
         return;
       }
 
+      // 2. Esperar usando MutationObserver
       const observer = new MutationObserver(() => {
         const el = document.querySelector(selector);
         if (el) {
@@ -34,14 +36,16 @@ import { supabase } from "./ScriptLogin.js";
         }
       });
 
+      // Observar cambios en todo el documento
       observer.observe(document.documentElement, {
         childList: true,
         subtree: true
       });
 
+      // 3. Timeout de seguridad
       const timeoutId = setTimeout(() => {
         observer.disconnect();
-        console.error(`❌ Timeout: Formulario ${selector} no apareció`);
+        console.error(`❌ Timeout: Formulario ${selector} no apareció en ${timeoutMs}ms`);
         reject(new Error(`Timeout esperando ${selector}`));
       }, timeoutMs);
     });
@@ -57,8 +61,6 @@ import { supabase } from "./ScriptLogin.js";
       );
       if (snap && snap.items && snap.items.length > 0) {
         console.log("✅ Datos desde sessionStorage");
-        console.log("   Items:", snap.items);
-        console.log("   Total:", snap.total);
         return snap;
       }
     } catch (e) {
@@ -72,8 +74,6 @@ import { supabase } from "./ScriptLogin.js";
           return a + Number(it.precio || 0) * Number(it.cantidad || 1);
         }, 0);
         console.log("✅ Datos desde localStorage");
-        console.log("   Items:", cart);
-        console.log("   Total:", total);
         return { items: cart, total: total, source: "local" };
       }
     } catch (e) {
@@ -87,7 +87,7 @@ import { supabase } from "./ScriptLogin.js";
   // ============ CONSTRUIR PAYLOAD ============
   function buildPayload(cartData) {
     console.log("🔵 buildPayload() - Iniciando...");
-    console.log("   cartData:", cartData);
+    console.log("   cartData recibido:", cartData);
     
     if (!cartData || !cartData.items || cartData.items.length === 0) {
       throw new Error("El carrito está vacío");
@@ -106,23 +106,18 @@ import { supabase } from "./ScriptLogin.js";
       console.log("   Procesando item:", it);
       
       const id = String(it.id || '');
-      const titulo = String(it.titulo || it.nombre || 'Producto');
-      const precio = Number(it.precio || 0);
-      const cantidad = Number(it.cantidad || 1);
-      
-      console.log(`   → ID: ${id}, Título: ${titulo}, Precio: ${precio}, Cantidad: ${cantidad}`);
       
       // Validar que el ID sea UUID válido
       if (!isValidUUID(id)) {
         console.error("❌ ID inválido para producto:", it);
-        throw new Error(`Producto con ID inválido: ${titulo}`);
+        throw new Error(`Producto con ID inválido: ${it.titulo || it.nombre || 'sin nombre'}`);
       }
 
       return {
         id: id,
-        titulo: titulo,
-        precio: precio,
-        cantidad: cantidad
+        titulo: String(it.titulo || it.nombre || 'Producto'),
+        precio: Number(it.precio || 0),
+        cantidad: Number(it.cantidad || 1)
       };
     });
 
@@ -140,7 +135,7 @@ import { supabase } from "./ScriptLogin.js";
     const metodoInput = document.querySelector('input[name="metodo"]:checked');
     const metodo = metodoInput ? metodoInput.value : "efectivo";
 
-    console.log("💳 Método de pago seleccionado:", metodo);
+    console.log("💳 Método de pago:", metodo);
 
     const getValue = function(id) {
       const el = $(id);
@@ -172,13 +167,8 @@ import { supabase } from "./ScriptLogin.js";
     console.log("   Items en payload:", payload.items);
     console.log("   Cantidad de items:", payload.items.length);
     console.log("   Total en payload:", payload.total);
-    console.log("   Datos del cliente:", {
-      ruc: payload.ruc,
-      razon: payload.razon,
-      tel: payload.tel,
-      mail: payload.mail
-    });
-    
+    console.log("   📦 Payload completo:", payload);
+
     return payload;
   }
 
@@ -198,6 +188,7 @@ import { supabase } from "./ScriptLogin.js";
       
       const user = userData.data.user;
       console.log("✅ Usuario:", user.id);
+      console.log("   Email:", user.email);
 
       // 2. Obtener datos del carrito
       const cartData = getCartData();
@@ -205,15 +196,14 @@ import { supabase } from "./ScriptLogin.js";
         throw new Error("Carrito vacío");
       }
       console.log("✅ Carrito:", cartData.items.length, "items");
+      console.log("   Items:", cartData.items);
 
-      // 3. Construir payload (con MUCHO logging)
+      // 3. Construir payload (con validación UUID)
       const payload = buildPayload(cartData);
       console.log("✅ Payload construido");
 
       // 4. Llamar a la función RPC
       console.log("🚀 Llamando a crear_pedido_desde_checkout...");
-      console.log("   Payload items:", payload.items);
-      console.log("   Payload total:", payload.total);
 
       const rpcResult = await supabase.rpc("crear_pedido_desde_checkout", {
         p_usuario: user.id,
@@ -238,8 +228,9 @@ import { supabase } from "./ScriptLogin.js";
 
       console.log("✅ Pedido creado exitosamente");
       console.log("   ID del pedido:", pedidoId);
+      console.log("   Snapshot ID:", result.snapshot_id);
 
-      // 6. Guardar info global
+      // 6. Guardar info global para usar en checkout.js
       window.__pedido_creado__ = {
         pedido_id: pedidoId,
         snapshot_id: result.snapshot_id,
@@ -273,6 +264,7 @@ import { supabase } from "./ScriptLogin.js";
       console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
       console.error("Mensaje:", err.message);
       console.error("Detalles:", err);
+      console.error("Stack:", err.stack);
       
       return { success: false, error: err.message };
     }
@@ -282,8 +274,10 @@ import { supabase } from "./ScriptLogin.js";
   function setupInterceptor(form) {
     console.log("✅ Configurando interceptor en el formulario");
 
+    // Guardar el handler original
     const checkoutOriginal = form.onsubmit;
     
+    // Reemplazar completamente
     form.onsubmit = async function(evento) {
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
       console.log("🔵 SUBMIT INTERCEPTADO");
@@ -292,6 +286,7 @@ import { supabase } from "./ScriptLogin.js";
       evento.preventDefault();
       evento.stopPropagation();
 
+      // Verificar carrito antes de proceder
       const cartData = getCartData();
       if (!cartData || !cartData.items || cartData.items.length === 0) {
         alert("El carrito está vacío");
@@ -311,6 +306,7 @@ import { supabase } from "./ScriptLogin.js";
       console.log("✅ Pedido guardado exitosamente");
       console.log("🔵 Ejecutando checkout.js...");
 
+      // Ejecutar handler original
       if (checkoutOriginal) {
         return checkoutOriginal.call(form, evento);
       }
@@ -326,6 +322,7 @@ import { supabase } from "./ScriptLogin.js";
     console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     console.log("🔵 Inicializando pasarelaPagos.js");
     
+    // Esperar a que aparezca el formulario (hasta 30 segundos)
     const form = await esperarFormulario("#checkout-form", 30000);
     
     if (!form) {
@@ -343,6 +340,7 @@ import { supabase } from "./ScriptLogin.js";
     console.log("✅ pasarelaPagos.js LISTO");
     console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
+    // Exponer función para debug
     window.testGuardarPedido = guardarPedidoEnBD;
     console.log("💡 window.testGuardarPedido() disponible para testing");
 
