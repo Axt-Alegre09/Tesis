@@ -1,9 +1,7 @@
-// JS/reset-password.js
+// JS/resetPassword.js - VERSIÓN MEJORADA
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-/* ==========================================
-   CONFIGURACIÓN
-   ========================================== */
 const supabase = createClient(
   "https://jyygevitfnbwrvxrjexp.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5eWdldml0Zm5id3J2eHJqZXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2OTQ2OTYsImV4cCI6MjA3MTI3MDY5Nn0.St0IiSZSeELESshctneazCJHXCDBi9wrZ28UkiEDXYo"
@@ -14,69 +12,49 @@ const CONFIG = {
   LOGIN_URL: "login.html",
 };
 
-/* ==========================================
-   UTILIDADES
-   ========================================== */
+/* ========= UTILIDADES ========= */
 
-function showAlert(message, type = "info") {
-  const container = document.getElementById("alertContainer");
-  if (!container) return;
-
-  const alertDiv = document.createElement("div");
-  alertDiv.className = `alert alert-${type}`;
-  alertDiv.innerHTML = `
-    <i class="bi bi-${type === "success" ? "check-circle" : type === "danger" ? "exclamation-circle" : "info-circle"}"></i>
-    <span>${message}</span>
+function showMsg(text, type = "info") {
+  const box = document.getElementById("msg");
+  if (!box) return;
+  
+  const icons = {
+    info: "info-circle",
+    success: "check-circle",
+    danger: "exclamation-circle",
+    warning: "exclamation-triangle"
+  };
+  
+  box.innerHTML = `
+    <div class="alert alert-${type}" role="alert">
+      <i class="bi bi-${icons[type] || icons.info}"></i>
+      <span>${text}</span>
+    </div>
   `;
-
-  container.innerHTML = "";
-  container.appendChild(alertDiv);
-
-  if (type !== "danger" && type !== "warning") {
-    setTimeout(() => {
-      alertDiv.style.animation = "slideIn 0.3s ease reverse";
-      setTimeout(() => alertDiv.remove(), 300);
-    }, 5000);
-  }
 }
 
-function clearAlert() {
-  const container = document.getElementById("alertContainer");
-  if (container) container.innerHTML = "";
+function clearMsg() {
+  const box = document.getElementById("msg");
+  if (box) box.innerHTML = "";
 }
 
-function showFieldError(fieldId, message) {
-  const errorEl = document.getElementById(fieldId);
-  if (errorEl) {
-    errorEl.innerHTML = message ? `<i class="bi bi-exclamation-circle"></i> ${message}` : "";
-  }
-}
-
-function clearErrors() {
-  showFieldError("newPasswordError", "");
-  showFieldError("confirmPasswordError", "");
-}
-
-function setButtonLoading(button, isLoading) {
-  if (!button) return;
+function setButtonLoading(isLoading) {
+  const btn = document.getElementById("submitBtn");
+  if (!btn) return;
+  
   if (isLoading) {
-    button.disabled = true;
-    const originalText = button.innerHTML;
-    button.innerHTML = `<span class="spinner"></span> Actualizando...`;
-    button.dataset.originalText = originalText;
+    btn.disabled = true;
+    btn.dataset.originalText = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner"></span> Actualizando...';
   } else {
-    button.disabled = false;
-    button.innerHTML = button.dataset.originalText || button.innerHTML;
+    btn.disabled = false;
+    btn.innerHTML = btn.dataset.originalText || btn.innerHTML;
   }
-}
-
-function navigate(path) {
-  window.location.href = new URL(path, window.location.href).href;
 }
 
 function showLoading(show = true) {
   const loading = document.getElementById("loadingState");
-  const form = document.getElementById("resetPasswordForm");
+  const form = document.getElementById("resetForm");
   
   if (show) {
     loading?.classList.remove("hidden");
@@ -87,9 +65,11 @@ function showLoading(show = true) {
   }
 }
 
-/* ==========================================
-   VALIDACIONES
-   ========================================== */
+function navigate(path) {
+  window.location.href = new URL(path, window.location.href).href;
+}
+
+/* ========= VALIDACIONES ========= */
 
 function validatePassword(password) {
   return password.length >= CONFIG.PASSWORD_MIN_LENGTH;
@@ -100,46 +80,40 @@ function validatePasswordMatch(password, confirmPassword) {
 }
 
 function validateForm() {
-  clearErrors();
-  let isValid = true;
-
-  const password = document.getElementById("newPassword").value;
+  clearMsg();
+  
+  const newPassword = document.getElementById("newPassword").value;
   const confirmPassword = document.getElementById("confirmPassword").value;
-
-  if (!password) {
-    showFieldError("newPasswordError", "La contraseña es requerida");
-    isValid = false;
-  } else if (!validatePassword(password)) {
-    showFieldError("newPasswordError", `Mínimo ${CONFIG.PASSWORD_MIN_LENGTH} caracteres`);
-    isValid = false;
+  
+  // Validar primera contraseña
+  if (!newPassword) {
+    showMsg("❌ Por favor ingresa una contraseña", "danger");
+    return false;
   }
-
+  
+  if (!validatePassword(newPassword)) {
+    showMsg(`❌ La contraseña debe tener mínimo ${CONFIG.PASSWORD_MIN_LENGTH} caracteres`, "danger");
+    return false;
+  }
+  
+  // Validar confirmación
   if (!confirmPassword) {
-    showFieldError("confirmPasswordError", "Confirma tu contraseña");
-    isValid = false;
-  } else if (!validatePasswordMatch(password, confirmPassword)) {
-    showFieldError("confirmPasswordError", "Las contraseñas no coinciden");
-    isValid = false;
+    showMsg("❌ Por favor confirma tu contraseña", "danger");
+    return false;
   }
-
-  return isValid;
+  
+  if (!validatePasswordMatch(newPassword, confirmPassword)) {
+    showMsg("❌ Las contraseñas no coinciden", "danger");
+    return false;
+  }
+  
+  return true;
 }
 
-/* ==========================================
-   AUTENTICACIÓN
-   ========================================== */
+/* ========= AUTENTICACIÓN ========= */
 
 /**
- * Obtener token de reset desde URL
- */
-function getResetToken() {
-  const hash = window.location.hash.substring(1);
-  const params = new URLSearchParams(hash);
-  return params.get("access_token");
-}
-
-/**
- * Verificar si la sesión es de reset
+ * Verificar sesión de reset
  */
 async function verifyResetSession() {
   try {
@@ -174,122 +148,115 @@ async function updatePassword(newPassword) {
 }
 
 /**
- * Manejar submit del formulario
+ * Manejar submit del reset
  */
-async function handleResetPassword(e) {
+async function handleResetSubmit(e) {
   e.preventDefault();
-
+  
   if (!validateForm()) return;
 
-  const resetButton = document.getElementById("resetSubmit");
-  setButtonLoading(resetButton, true);
-  clearAlert();
+  setButtonLoading(true);
 
   try {
     const newPassword = document.getElementById("newPassword").value;
-
+    
     const success = await updatePassword(newPassword);
 
     if (!success) {
-      showAlert(
-        "❌ No se pudo actualizar la contraseña",
-        "danger"
-      );
-      setButtonLoading(resetButton, false);
+      showMsg("❌ No se pudo actualizar la contraseña", "danger");
+      setButtonLoading(false);
       return;
     }
 
-    showAlert(
-      "✅ ¡Contraseña actualizada! Redirigiendo al login...",
-      "success"
-    );
+    showMsg("✅ ¡Contraseña actualizada! Redirigiendo al login...", "success");
 
     // Cerrar sesión y redirigir
-    setTimeout(() => {
-      supabase.auth.signOut().then(() => {
-        navigate(CONFIG.LOGIN_URL);
-      });
+    setTimeout(async () => {
+      await supabase.auth.signOut();
+      navigate(CONFIG.LOGIN_URL);
     }, 2000);
   } catch (error) {
-    console.error("[handleResetPassword]", error);
+    console.error("[handleResetSubmit]", error);
     
     if (error.message.includes("token")) {
-      showAlert(
-        "⚠️ El enlace de recuperación ha expirado. Solicita uno nuevo.",
-        "danger"
-      );
+      showMsg("⚠️ El enlace de recuperación ha expirado", "danger");
     } else {
-      showAlert(
-        `❌ ${error.message || "Error al actualizar la contraseña"}`,
-        "danger"
-      );
+      showMsg(`❌ ${error.message || "Error al actualizar la contraseña"}`, "danger");
     }
 
-    setButtonLoading(resetButton, false);
+    setButtonLoading(false);
   }
 }
 
-/* ==========================================
-   UI INTERACTIONS
-   ========================================== */
+/* ========= TOGGLE DE CONTRASEÑA ========= */
 
 /**
- * Toggle password visibility
+ * Setup de toggles
  */
 function setupPasswordToggles() {
-  const toggles = [
-    {
-      buttonId: "toggleNewPassword",
-      inputId: "newPassword",
-    },
-    {
-      buttonId: "toggleConfirmPassword",
-      inputId: "confirmPassword",
-    },
-  ];
-
-  toggles.forEach(({ buttonId, inputId }) => {
-    const button = document.getElementById(buttonId);
-    const input = document.getElementById(inputId);
-
-    if (!button || !input) return;
-
-    button.addEventListener("click", (e) => {
-      e.preventDefault();
-      const isPassword = input.type === "password";
-      input.type = isPassword ? "text" : "password";
-      button.innerHTML = `<i class="bi bi-${isPassword ? "eye-slash" : "eye"}"></i>`;
-    });
+  const inputs = document.querySelectorAll('input[type="password"]');
+  
+  inputs.forEach((input) => {
+    const container = input.parentElement;
+    
+    if (!container.querySelector(".password-toggle")) {
+      const toggleBtn = document.createElement("button");
+      toggleBtn.type = "button";
+      toggleBtn.className = "password-toggle";
+      toggleBtn.innerHTML = '<i class="bi bi-eye"></i>';
+      
+      container.style.position = "relative";
+      container.appendChild(toggleBtn);
+      
+      toggleBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        const isPassword = input.type === "password";
+        input.type = isPassword ? "text" : "password";
+        toggleBtn.innerHTML = `<i class="bi bi-${isPassword ? "eye-slash" : "eye"}"></i>`;
+      });
+    }
   });
 }
 
-/* ==========================================
-   INICIALIZACIÓN
-   ========================================== */
+/* ========= INICIALIZACIÓN ========= */
 
-/**
- * Auto-init
- */
 (async function init() {
   try {
+    showLoading(true);
+
     // Verificar sesión de reset
     const isValid = await verifyResetSession();
 
     if (!isValid) {
       showLoading(false);
-      showAlert(
-        "⚠️ El enlace de recuperación no es válido o ha expirado. Por favor, solicita uno nuevo.",
-        "warning"
-      );
+      showMsg("⚠️ El enlace de recuperación no es válido o ha expirado", "warning");
 
       // Mostrar botón para volver
-      const form = document.getElementById("resetPasswordForm");
+      const form = document.getElementById("resetForm");
       if (form) {
         form.innerHTML = `
-          <a href="${CONFIG.LOGIN_URL}" class="btn btn-primary" style="text-decoration: none; display: flex; justify-content: center;">
+          <div>
+            <h1>Enlace Expirado</h1>
+            <p>Por favor, solicita un nuevo enlace de recuperación</p>
+          </div>
+          <a href="${CONFIG.LOGIN_URL}" style="
+            padding: 12px 16px;
+            background: linear-gradient(135deg, #3c2e1a 0%, #2a1f12 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+          ">
             <i class="bi bi-arrow-left"></i> Volver al Login
           </a>
         `;
+        form.classList.remove("hidden");
       }
       return;
     }
@@ -300,14 +267,15 @@ function setupPasswordToggles() {
     // Setup
     setupPasswordToggles();
 
-    const form = document.getElementById("resetPasswordForm");
+    // Listener del formulario
+    const form = document.getElementById("resetForm");
     if (form) {
-      form.addEventListener("submit", handleResetPassword);
+      form.addEventListener("submit", handleResetSubmit);
     }
   } catch (error) {
     console.error("[init]", error);
     showLoading(false);
-    showAlert("❌ Error al cargar la página", "danger");
+    showMsg("❌ Error al cargar la página", "danger");
   }
 })();
 
