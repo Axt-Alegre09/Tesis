@@ -217,6 +217,12 @@ import { supabase } from "./ScriptLogin.js";
 
       console.log("✅ RPC ejecutado exitosamente");
       console.log("   Respuesta:", rpcResult.data);
+      
+      // LOG DEL DEBUG_MSG COMPLETO
+      if (rpcResult.data && rpcResult.data[0]) {
+        console.log("🔍 DEBUG_MSG COMPLETO:");
+        console.log("   " + (rpcResult.data[0].debug_msg || "SIN DEBUG_MSG"));
+      }
 
       // 5. Extraer IDs del resultado
       const result = Array.isArray(rpcResult.data) ? rpcResult.data[0] : rpcResult.data;
