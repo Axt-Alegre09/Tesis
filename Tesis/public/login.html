@@ -3,103 +3,225 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Panel de acceso a Paniquiños" />
   <title>Paniquiños — Acceso</title>
 
   <link rel="shortcut icon" href="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinosico.ico" type="image/x-icon" />
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet" />
-  <link rel="stylesheet" href="CSS/stylesPrueba.css"/>
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Devonshire&family=Poppins:wght@100;200;300;400;500;600;700;800;900&display=swap');
-
-    /* Botón flotante ADMIN */
-    .admin-entry{
-      position: fixed; right: 22px; top: 18px; z-index: 50;
-      display: flex; flex-direction: column; align-items: center; gap: 2px;
-      width: 56px; height: 56px; border-radius: 999px;
-      border: 2px solid #3c2e1a; background: #fff; color: #3c2e1a;
-      text-decoration: none; font-weight: 800;
-      box-shadow: 0 12px 28px rgba(0,0,0,.18);
-      transition: transform .15s ease, background .15s ease;
-    }
-    .admin-entry .icon{ font-size: 22px; line-height: 0; }
-    .admin-entry small{ font-size: 10px; letter-spacing: .3px; margin-top: -2px; }
-    .admin-entry:hover{ background: #f2eadf; transform: translateY(-1px); }
-    @media (max-width: 480px){
-      .admin-entry{ width: 50px; height: 50px; right: 14px; top: 12px; }
-      .admin-entry .icon{ font-size: 20px; }
-    }
-  </style>
+  <link rel="stylesheet" href="CSS/auth-styles.css" />
 </head>
 <body>
-  <!-- Contenedor de alertas -->
-  <div id="msg" aria-live="polite" role="region"></div>
-
-  <!-- Acceso rápido a login de Administrador -->
-  <a class="admin-entry" href="loginAdmin.html" aria-label="Acceso de administrador">
-    <span class="icon"><i class="bi bi-person-gear"></i></span>
-    <small>ADMIN</small>
-  </a>
-
-  <div class="wrapper" id="authWrapper">
-    <!-- Login -->
-    <div class="form-box login">
-      <form id="loginForm" novalidate>
-        <h1>Acceso</h1>
-
-        <div class="input-box">
-          <input id="loginEmail" name="email" type="email" placeholder="Correo" required autocomplete="email" />
-          <i class="bi bi-person-circle" aria-hidden="true"></i>
-        </div>
-
-        <div class="input-box">
-          <input id="loginPassword" name="password" type="password" placeholder="Contraseña" required autocomplete="current-password" />
-          <i class="bi bi-lock-fill" aria-hidden="true"></i>
-        </div>
-
-        <div class="forgot-link">
-          <a href="#" id="forgotLink">¿Olvidaste tu contraseña?</a>
-        </div>
-
-        <button type="submit" class="btn" id="loginSubmit">Ingresar</button>
-      </form>
-    </div>
-
-    <!-- Registro -->
-    <div class="form-box register">
-      <form id="registerForm" novalidate>
-        <h1>Registrarse</h1>
-
-        <div class="input-box">
-          <input id="registerEmail" name="email" type="email" placeholder="Correo" required autocomplete="email" />
-          <i class="bi bi-envelope-fill" aria-hidden="true"></i>
-        </div>
-
-        <div class="input-box">
-          <input id="registerPassword" name="password" type="password" placeholder="Contraseña" required autocomplete="new-password" />
-          <i class="bi bi-lock-fill" aria-hidden="true"></i>
-        </div>
-
-        <button type="submit" class="btn" id="registerSubmit">Registrarse</button>
-      </form>
-    </div>
-
-    <!-- Panel de alternancia -->
-    <div class="toggle-box">
-      <div class="toggle-panel toggle-left">
-        <h1>¡Bienvenido de nuevo!</h1>
-        <p>¿No tienes una cuenta?</p>
-        <button class="btn register-btn" type="button">Registrarme</button>
+  <div class="auth-wrapper">
+    <!-- Contenedor principal -->
+    <div class="auth-container">
+      <!-- Panel izquierdo (decorativo) -->
+      <div class="auth-panel-left">
+        <h2>Bienvenido a Paniquiños</h2>
+        <p>Gestiona tu negocio de forma profesional y eficiente.</p>
+        
+        <ul class="feature-list">
+          <li>
+            <i class="bi bi-check-lg"></i>
+            <span>Panel intuitivo y fácil de usar</span>
+          </li>
+          <li>
+            <i class="bi bi-check-lg"></i>
+            <span>Reportes detallados en tiempo real</span>
+          </li>
+          <li>
+            <i class="bi bi-check-lg"></i>
+            <span>Seguridad de nivel empresarial</span>
+          </li>
+          <li>
+            <i class="bi bi-check-lg"></i>
+            <span>Soporte técnico disponible</span>
+          </li>
+        </ul>
       </div>
-      <div class="toggle-panel toggle-right">
-        <h1>¡Hola, Bienvenido!</h1>
-        <p>¿Ya tienes una cuenta?</p>
-        <button class="btn login-btn" type="button">Iniciar Sesión</button>
+
+      <!-- Panel derecho (formulario) -->
+      <div class="auth-panel-right">
+        <div id="alertContainer"></div>
+
+        <!-- FORMULARIO LOGIN -->
+        <div id="loginSection">
+          <h1>Inicia Sesión</h1>
+          <p class="subtitle">Accede a tu cuenta</p>
+
+          <form id="loginForm" class="auth-form" novalidate>
+            <div class="form-group">
+              <label for="loginEmail">Correo Electrónico</label>
+              <input 
+                type="email" 
+                id="loginEmail" 
+                name="email"
+                placeholder="tu@correo.com" 
+                required 
+                autocomplete="email"
+              />
+              <i class="bi bi-envelope input-icon"></i>
+              <div class="text-error" id="loginEmailError"></div>
+            </div>
+
+            <div class="form-group">
+              <label for="loginPassword">Contraseña</label>
+              <div style="position: relative;">
+                <input 
+                  type="password" 
+                  id="loginPassword" 
+                  name="password"
+                  placeholder="••••••••" 
+                  required 
+                  autocomplete="current-password"
+                />
+                <i class="bi bi-lock input-icon"></i>
+                <button type="button" class="password-toggle" id="loginTogglePassword" aria-label="Mostrar/ocultar contraseña">
+                  <i class="bi bi-eye"></i>
+                </button>
+              </div>
+              <div class="text-error" id="loginPasswordError"></div>
+            </div>
+
+            <div class="form-helper">
+              <label class="remember-me">
+                <input type="checkbox" id="rememberMe" />
+                <span>Recuérdame</span>
+              </label>
+              <a href="#" id="forgotLink">¿Olvidaste tu contraseña?</a>
+            </div>
+
+            <button type="submit" class="btn btn-primary" id="loginSubmit">
+              <span>Ingresar</span>
+            </button>
+
+            <div class="form-toggle">
+              ¿No tienes cuenta? 
+              <a href="#" id="showRegisterLink">Regístrate aquí</a>
+            </div>
+          </form>
+        </div>
+
+        <!-- FORMULARIO REGISTRO -->
+        <div id="registerSection" class="hidden">
+          <h1>Crear Cuenta</h1>
+          <p class="subtitle">Únete a Paniquiños hoy</p>
+
+          <form id="registerForm" class="auth-form" novalidate>
+            <div class="form-group">
+              <label for="registerName">Nombre Completo</label>
+              <input 
+                type="text" 
+                id="registerName" 
+                name="name"
+                placeholder="Juan Pérez" 
+                required
+              />
+              <i class="bi bi-person input-icon"></i>
+              <div class="text-error" id="registerNameError"></div>
+            </div>
+
+            <div class="form-group">
+              <label for="registerEmail">Correo Electrónico</label>
+              <input 
+                type="email" 
+                id="registerEmail" 
+                name="email"
+                placeholder="tu@correo.com" 
+                required 
+                autocomplete="email"
+              />
+              <i class="bi bi-envelope input-icon"></i>
+              <div class="text-error" id="registerEmailError"></div>
+            </div>
+
+            <div class="form-group">
+              <label for="registerPassword">Contraseña</label>
+              <div style="position: relative;">
+                <input 
+                  type="password" 
+                  id="registerPassword" 
+                  name="password"
+                  placeholder="Mínimo 8 caracteres" 
+                  required 
+                  autocomplete="new-password"
+                />
+                <i class="bi bi-lock input-icon"></i>
+                <button type="button" class="password-toggle" id="registerTogglePassword" aria-label="Mostrar/ocultar contraseña">
+                  <i class="bi bi-eye"></i>
+                </button>
+              </div>
+              <div class="text-error" id="registerPasswordError"></div>
+            </div>
+
+            <div class="form-group">
+              <label for="registerConfirmPassword">Confirmar Contraseña</label>
+              <div style="position: relative;">
+                <input 
+                  type="password" 
+                  id="registerConfirmPassword" 
+                  name="confirmPassword"
+                  placeholder="Confirma tu contraseña" 
+                  required 
+                  autocomplete="new-password"
+                />
+                <i class="bi bi-lock input-icon"></i>
+                <button type="button" class="password-toggle" id="registerToggleConfirmPassword" aria-label="Mostrar/ocultar contraseña">
+                  <i class="bi bi-eye"></i>
+                </button>
+              </div>
+              <div class="text-error" id="registerConfirmPasswordError"></div>
+            </div>
+
+            <label class="remember-me" style="margin-bottom: 24px;">
+              <input type="checkbox" id="acceptTerms" required />
+              <span>Acepto los términos y condiciones</span>
+            </label>
+
+            <button type="submit" class="btn btn-primary" id="registerSubmit">
+              <span>Crear Cuenta</span>
+            </button>
+
+            <div class="form-toggle">
+              ¿Ya tienes cuenta? 
+              <a href="#" id="showLoginLink">Inicia sesión</a>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- Lógica -->
-  <script type="module" src="JS/ScriptLogin.js"></script>
+  <!-- MODAL: Recuperación de contraseña -->
+  <div class="modal-overlay" id="resetPasswordModal">
+    <div class="modal-content">
+      <h3>Recuperar Contraseña</h3>
+      <p>Te enviaremos un correo con instrucciones para resetear tu contraseña.</p>
+
+      <form id="resetPasswordForm" novalidate>
+        <div class="form-group">
+          <label for="resetEmail">Correo Electrónico</label>
+          <input 
+            type="email" 
+            id="resetEmail" 
+            placeholder="tu@correo.com" 
+            required
+          />
+          <i class="bi bi-envelope input-icon"></i>
+          <div class="text-error" id="resetEmailError"></div>
+        </div>
+
+        <div class="modal-buttons">
+          <button type="button" class="btn btn-close-modal" id="closeResetModal">
+            Cancelar
+          </button>
+          <button type="submit" class="btn btn-primary" id="resetSubmit">
+            Enviar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script type="module" src="JS/auth.js"></script>
 </body>
 </html>
