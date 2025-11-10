@@ -1,18 +1,8 @@
-
-// JS/pasarelaPagos.js - VERSIÓN FINAL CON MÓDULOS
+// JS/pasarelaPagos.js - VERSIÓN DEFINITIVA CON MUTATIONOBSERVER
 import { supabase } from "./ScriptLogin.js";
 
 (async function() {
   console.log("🔵 pasarelaPagos.js - Iniciando...");
-
-  // Esperar al DOM
-  if (document.readyState === 'loading') {
-    await new Promise(function(resolve) {
-      document.addEventListener('DOMContentLoaded', resolve, { once: true });
-    });
-  }
-  console.log("✅ DOM cargado");
-  console.log("✅ Supabase importado correctamente");
 
   const $ = function(id) {
     return document.getElementById(id);
@@ -21,6 +11,45 @@ import { supabase } from "./ScriptLogin.js";
   const fmtPY = function(n) {
     return new Intl.NumberFormat("es-PY").format(Number(n || 0)) + " Gs";
   };
+
+  // ============ ESPERAR FORMULARIO CON MUTATIONOBSERVER ============
+  async function esperarFormulario(selector, timeoutMs = 30000) {
+    console.log(`⏳ Esperando formulario ${selector}...`);
+    
+    return new Promise((resolve, reject) => {
+      // 1. Verificar si ya existe
+      const elemento = document.querySelector(selector);
+      if (elemento) {
+        console.log("✅ Formulario encontrado inmediatamente");
+        resolve(elemento);
+        return;
+      }
+
+      // 2. Esperar usando MutationObserver
+      const observer = new MutationObserver(() => {
+        const el = document.querySelector(selector);
+        if (el) {
+          console.log("✅ Formulario detectado por MutationObserver");
+          observer.disconnect();
+          clearTimeout(timeoutId);
+          resolve(el);
+        }
+      });
+
+      // Observar cambios en todo el documento
+      observer.observe(document.documentElement, {
+        childList: true,
+        subtree: true
+      });
+
+      // 3. Timeout de seguridad
+      const timeoutId = setTimeout(() => {
+        observer.disconnect();
+        console.error(`❌ Timeout: Formulario ${selector} no apareció en ${timeoutMs}ms`);
+        reject(new Error(`Timeout esperando ${selector}`));
+      }, timeoutMs);
+    });
+  }
 
   // ============ DATOS DEL CARRITO ============
   function getCartData() {
@@ -156,7 +185,6 @@ import { supabase } from "./ScriptLogin.js";
 
       // 4. Llamar a la función RPC
       console.log("🚀 Llamando a crear_pedido_desde_checkout...");
-      console.log("   Payload completo:", JSON.stringify(payload, null, 2));
 
       const rpcResult = await supabase.rpc("crear_pedido_desde_checkout", {
         p_usuario: user.id,
@@ -224,15 +252,8 @@ import { supabase } from "./ScriptLogin.js";
   }
 
   // ============ INTERCEPTOR ============
-  function setupInterceptor() {
-    const form = $("#checkout-form");
-    
-    if (!form) {
-      console.error("❌ Formulario no encontrado");
-      return;
-    }
-
-    console.log("✅ Formulario encontrado");
+  function setupInterceptor(form) {
+    console.log("✅ Configurando interceptor en el formulario");
 
     // Guardar el handler original
     const checkoutOriginal = form.onsubmit;
@@ -274,42 +295,42 @@ import { supabase } from "./ScriptLogin.js";
       return false;
     };
 
-    console.log("✅ Interceptor configurado");
+    console.log("✅ Interceptor configurado correctamente");
   }
 
   // ============ INIT ============
-  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-  console.log("🔵 Inicializando pasarelaPagos.js");
-  
-  let form = $("#checkout-form");
-  let intentos = 0;
-  
-  while (!form && intentos < 50) {
-    await new Promise(function(resolve) {
-      setTimeout(resolve, 100);
-    });
-    form = $("#checkout-form");
-    intentos++;
+  try {
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    console.log("🔵 Inicializando pasarelaPagos.js");
+    
+    // Esperar a que aparezca el formulario (hasta 30 segundos)
+    const form = await esperarFormulario("#checkout-form", 30000);
+    
+    if (!form) {
+      throw new Error("No se pudo encontrar el formulario");
+    }
+
+    console.log("✅ Formulario encontrado");
+
+    const cartData = getCartData();
+    console.log("🛒 Items:", cartData.items ? cartData.items.length : 0);
+    console.log("💰 Total:", fmtPY(cartData.total || 0));
+    
+    setupInterceptor(form);
+
+    console.log("✅ pasarelaPagos.js LISTO");
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+    // Exponer función para debug
+    window.testGuardarPedido = guardarPedidoEnBD;
+    console.log("💡 window.testGuardarPedido() disponible para testing");
+
+  } catch (error) {
+    console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    console.error("❌ ERROR FATAL en pasarelaPagos.js");
+    console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    console.error("Mensaje:", error.message);
+    console.error("Stack:", error.stack);
   }
-
-  if (!form) {
-    console.error("❌ Formulario no encontrado después de esperar");
-    return;
-  }
-
-  console.log("✅ Formulario encontrado");
-
-  const cartData = getCartData();
-  console.log("🛒 Items:", cartData.items ? cartData.items.length : 0);
-  console.log("💰 Total:", fmtPY(cartData.total || 0));
-  
-  setupInterceptor();
-
-  console.log("✅ pasarelaPagos.js LISTO");
-  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-
-  // Exponer función para debug
-  window.testGuardarPedido = guardarPedidoEnBD;
-  console.log("💡 window.testGuardarPedido() disponible para testing");
 
 })();
