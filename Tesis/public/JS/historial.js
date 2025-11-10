@@ -187,6 +187,10 @@ function aplicarFiltro() {
 /* ========== Llamadas Supabase ========== */
 
 async function cargarHistorial() {
+  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+  console.log("🔵 Cargando historial de pedidos...");
+  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
   contenedor.innerHTML = `
     <div class="state-box">
       <i class="bi bi-arrow-clockwise"></i>
@@ -195,55 +199,76 @@ async function cargarHistorial() {
   `;
   resumenBox.innerHTML = "";
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  
-  if (!user) {
-    contenedor.innerHTML = `
-      <div class="state-box">
-        <i class="bi bi-person-x"></i>
-        <p>Debes iniciar sesión para ver tu historial</p>
-        <small>Iniciá sesión y volvé a esta pantalla</small>
-      </div>
-    `;
-    return;
-  }
+  try {
+    // 1. Verificar usuario
+    const {
+      data: { user },
+      error: userError
+    } = await supabase.auth.getUser();
+    
+    if (userError) throw userError;
+    
+    if (!user) {
+      contenedor.innerHTML = `
+        <div class="state-box">
+          <i class="bi bi-person-x"></i>
+          <p>Debes iniciar sesión para ver tu historial</p>
+          <small>Iniciá sesión y volvé a esta pantalla</small>
+        </div>
+      `;
+      return;
+    }
 
-  const { data, error } = await supabase
-    .from("pedidos")
-    .select(
-      "id, usuario_id, estado, estado_pago, metodo_pago, monto_total, notas, creado_en, actualizado_en, paga_con"
-    )
-    .eq("usuario_id", user.id)
-    .order("creado_en", { ascending: false });
+    console.log("✅ Usuario autenticado:", user.id);
 
-  if (error) {
-    console.error("Error al cargar pedidos:", error);
+    // 2. Cargar pedidos
+    const { data, error, count } = await supabase
+      .from("pedidos")
+      .select(
+        "id, usuario_id, estado, estado_pago, metodo_pago, monto_total, notas, creado_en, actualizado_en, paga_con",
+        { count: 'exact' }
+      )
+      .eq("usuario_id", user.id)
+      .order("creado_en", { ascending: false });
+
+    if (error) {
+      console.error("❌ Error al cargar pedidos:", error);
+      throw error;
+    }
+
+    console.log("✅ Pedidos cargados:", data?.length || 0);
+    console.log("   Total en BD:", count);
+
+    if (!data || !data.length) {
+      console.log("ℹ️ No hay pedidos para este usuario");
+      TODOS_LOS_PEDIDOS = [];
+      aplicarFiltro();
+      return;
+    }
+
+    TODOS_LOS_PEDIDOS = data;
+    console.log("✅ Pedidos guardados en memoria");
+    aplicarFiltro();
+
+  } catch (err) {
+    console.error("❌ Error completo:", err);
     contenedor.innerHTML = `
       <div class="state-box">
         <i class="bi bi-exclamation-triangle"></i>
         <p>Error al cargar tus pedidos</p>
-        <small>Intentá de nuevo en unos minutos</small>
+        <small>${err.message || 'Error desconocido'}</small>
       </div>
     `;
-    return;
   }
-
-  if (!data || !data.length) {
-    TODOS_LOS_PEDIDOS = [];
-    aplicarFiltro();
-    return;
-  }
-
-  TODOS_LOS_PEDIDOS = data;
-  aplicarFiltro();
 }
 
 /* ========== Descargar factura ========== */
 
 async function descargarFactura(pedidoId, btnElement) {
-  console.log("🔵 Iniciando descarga de factura para pedido:", pedidoId);
+  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+  console.log("🔵 Iniciando descarga de factura");
+  console.log("   Pedido ID:", pedidoId);
+  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   
   // Mostrar loading
   btnElement.classList.add("loading");
@@ -253,7 +278,7 @@ async function descargarFactura(pedidoId, btnElement) {
     // 1. Buscar el pedido
     const pedido = TODOS_LOS_PEDIDOS.find((p) => p.id === pedidoId);
     if (!pedido) {
-      throw new Error("Pedido no encontrado");
+      throw new Error("Pedido no encontrado en memoria");
     }
     
     console.log("✅ Pedido encontrado:", pedido);
@@ -269,19 +294,18 @@ async function descargarFactura(pedidoId, btnElement) {
       throw itemsError;
     }
     
-    console.log("✅ Items obtenidos:", itemsData);
+    console.log("✅ Items obtenidos:", itemsData?.length || 0);
 
-    // Si no hay items, crear un item genérico MÁS DETALLADO
+    // Si no hay items, crear un item genérico
     let items = [];
     if (!itemsData || itemsData.length === 0) {
       console.log("⚠️ No hay items, creando genérico");
       
-      // Crear descripción más detallada
       let descripcion = "Pedido";
       if (pedido.metodo_pago) {
         descripcion += ` - Pago con ${pedido.metodo_pago}`;
       }
-      if (pedido.notas && !pedido.notas.includes("checkout_crear_pedido")) {
+      if (pedido.notas && !pedido.notas.includes("checkout")) {
         descripcion += ` - ${pedido.notas}`;
       }
       
@@ -304,6 +328,7 @@ async function descargarFactura(pedidoId, btnElement) {
         
         if (!error && data) {
           productosData = data;
+          console.log("✅ Imágenes de productos obtenidas:", productosData.length);
         }
       }
 
@@ -320,6 +345,8 @@ async function descargarFactura(pedidoId, btnElement) {
       });
     }
 
+    console.log("✅ Items procesados:", items.length);
+
     // 3. Obtener datos del cliente
     const { data: clienteData, error: clienteError } = await supabase
       .from("clientes_perfil")
@@ -329,9 +356,9 @@ async function descargarFactura(pedidoId, btnElement) {
 
     if (clienteError) {
       console.warn("⚠️ No se encontró perfil del cliente:", clienteError);
+    } else {
+      console.log("✅ Cliente obtenido:", clienteData?.razon);
     }
-    
-    console.log("✅ Cliente obtenido:", clienteData);
 
     // 4. Crear snapshot de factura
     const facturaSnapshot = {
@@ -359,7 +386,7 @@ async function descargarFactura(pedidoId, btnElement) {
       total: Number(pedido.monto_total || 0),
     };
 
-    console.log("✅ Snapshot creado:", facturaSnapshot);
+    console.log("✅ Snapshot creado");
 
     // 5. Cargar jsPDF si no está disponible
     await cargarJsPDF();
@@ -370,13 +397,17 @@ async function descargarFactura(pedidoId, btnElement) {
     await generarFacturaPDF(facturaSnapshot);
     
     console.log("✅ PDF generado exitosamente");
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
     // Mostrar mensaje de éxito
     mostrarNotificacion("✓ Factura descargada correctamente", "success");
     
   } catch (err) {
-    console.error("❌ Error completo al descargar factura:", err);
-    console.error("Stack:", err.stack);
+    console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    console.error("❌ Error al descargar factura");
+    console.error("   Mensaje:", err.message);
+    console.error("   Stack:", err.stack);
+    console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     mostrarNotificacion(`✗ Error: ${err.message || 'No se pudo descargar la factura'}`, "error");
   } finally {
     // Quitar loading

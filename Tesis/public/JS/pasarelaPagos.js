@@ -1,4 +1,4 @@
-// JS/pasarelaPagos.js - VERSIÓN CORREGIDA SIN DUPLICADOS
+// JS/pasarelaPagos.js - VERSIÓN CORREGIDA CON VALIDACIÓN UUID
 
 (async function() {
   console.log("🔵 pasarelaPagos.js - Iniciando...");
@@ -76,9 +76,23 @@
       throw new Error("El carrito está vacío");
     }
 
+    // Validar formato UUID
+    function isValidUUID(str) {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      return uuidRegex.test(str);
+    }
+
     const items = cartData.items.map(function(it) {
+      const id = String(it.id || '');
+      
+      // Validar que el ID sea UUID válido
+      if (!isValidUUID(id)) {
+        console.error("❌ ID inválido para producto:", it);
+        throw new Error(`Producto con ID inválido: ${it.titulo || it.nombre || 'sin nombre'}`);
+      }
+
       return {
-        id: String(it.id || ''),
+        id: id,
         titulo: String(it.titulo || it.nombre || 'Producto'),
         precio: Number(it.precio || 0),
         cantidad: Number(it.cantidad || 1)
@@ -100,33 +114,39 @@
       return el ? (el.value || "").trim() : "";
     };
 
-    return {
+    const payload = {
       source: cartData.source || "local",
       items: items,
       total: total,
-      ruc: getValue("ruc"),
-      razon: getValue("razon"),
-      tel: getValue("tel"),
-      mail: getValue("mail"),
-      contacto: getValue("contacto"),
-      ciudad: getValue("ciudad"),
-      barrio: getValue("barrio"),
-      depto: getValue("depto"),
-      postal: getValue("postal"),
-      calle1: getValue("calle1"),
-      calle2: getValue("calle2"),
-      nro: getValue("nro"),
-      hora_desde: getValue("hora-desde"),
-      hora_hasta: getValue("hora-hasta"),
+      ruc: getValue("ruc") || "Sin RUC",
+      razon: getValue("razon") || "Cliente",
+      tel: getValue("tel") || "Sin teléfono",
+      mail: getValue("mail") || "sin@email.com",
+      contacto: getValue("contacto") || "Sin contacto",
+      ciudad: getValue("ciudad") || "Sin ciudad",
+      barrio: getValue("barrio") || "Sin barrio",
+      depto: getValue("depto") || "Sin depto",
+      postal: getValue("postal") || "Sin postal",
+      calle1: getValue("calle1") || "Sin calle",
+      calle2: getValue("calle2") || "",
+      nro: getValue("nro") || "S/N",
+      hora_desde: getValue("hora-desde") || "09:00",
+      hora_hasta: getValue("hora-hasta") || "18:00",
       metodo_pago: metodo
     };
+
+    console.log("📦 Payload construido:", payload);
+    return payload;
   }
 
   // ============ GUARDAR EN BD ============
   async function guardarPedidoEnBD() {
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     console.log("🔵 Guardando pedido en BD...");
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
     try {
+      // 1. Verificar usuario
       const userData = await supabase.auth.getUser();
       
       if (userData.error || !userData.data || !userData.data.user) {
@@ -135,15 +155,23 @@
       
       const user = userData.data.user;
       console.log("✅ Usuario:", user.id);
+      console.log("   Email:", user.email);
 
+      // 2. Obtener datos del carrito
       const cartData = getCartData();
       if (!cartData || !cartData.items || cartData.items.length === 0) {
         throw new Error("Carrito vacío");
       }
       console.log("✅ Carrito:", cartData.items.length, "items");
+      console.log("   Items:", cartData.items);
 
+      // 3. Construir payload (con validación UUID)
       const payload = buildPayload(cartData);
-      console.log("🚀 Payload construido");
+      console.log("✅ Payload construido");
+
+      // 4. Llamar a la función RPC
+      console.log("🚀 Llamando a crear_pedido_desde_checkout...");
+      console.log("   Payload completo:", JSON.stringify(payload, null, 2));
 
       const rpcResult = await supabase.rpc("crear_pedido_desde_checkout", {
         p_usuario: user.id,
@@ -151,18 +179,26 @@
       });
 
       if (rpcResult.error) {
+        console.error("❌ Error RPC:", rpcResult.error);
         throw rpcResult.error;
       }
 
+      console.log("✅ RPC ejecutado exitosamente");
+      console.log("   Respuesta:", rpcResult.data);
+
+      // 5. Extraer IDs del resultado
       const result = Array.isArray(rpcResult.data) ? rpcResult.data[0] : rpcResult.data;
       const pedidoId = result ? result.pedido_id : null;
       
       if (!pedidoId) {
-        throw new Error("No se recibió pedido_id");
+        throw new Error("No se recibió pedido_id del servidor");
       }
 
-      console.log("✅ Pedido creado:", pedidoId);
+      console.log("✅ Pedido creado exitosamente");
+      console.log("   ID del pedido:", pedidoId);
+      console.log("   Snapshot ID:", result.snapshot_id);
 
+      // 6. Guardar info global para usar en checkout.js
       window.__pedido_creado__ = {
         pedido_id: pedidoId,
         snapshot_id: result.snapshot_id,
@@ -170,7 +206,8 @@
         metodo: payload.metodo_pago
       };
 
-      // Limpiar carrito
+      // 7. Limpiar carrito
+      console.log("🧹 Limpiando carrito...");
       try {
         if (window.CartAPI && window.CartAPI.empty) {
           await window.CartAPI.empty();
@@ -183,10 +220,20 @@
         console.warn("⚠️ Error limpiando:", e);
       }
 
+      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+      console.log("✅ PEDIDO GUARDADO EXITOSAMENTE");
+      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
       return { success: true, pedido_id: pedidoId };
 
     } catch (err) {
-      console.error("❌ Error:", err.message);
+      console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+      console.error("❌ ERROR AL GUARDAR PEDIDO");
+      console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+      console.error("Mensaje:", err.message);
+      console.error("Detalles:", err);
+      console.error("Stack:", err.stack);
+      
       return { success: false, error: err.message };
     }
   }
@@ -214,6 +261,7 @@
       evento.preventDefault();
       evento.stopPropagation();
 
+      // Verificar carrito antes de proceder
       const cartData = getCartData();
       if (!cartData || !cartData.items || cartData.items.length === 0) {
         alert("El carrito está vacío");
@@ -226,6 +274,7 @@
 
       if (!resultado.success) {
         alert("Error al guardar el pedido: " + resultado.error);
+        console.error("❌ No se pudo guardar el pedido");
         return false;
       }
 
@@ -247,9 +296,8 @@
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   console.log("🔵 Inicializando pasarelaPagos.js");
   
-  // REUSAR la variable intentos ya declarada arriba
   let form = $("#checkout-form");
-  intentos = 0; // Resetear el contador
+  intentos = 0;
   
   while (!form && intentos < 50) {
     await new Promise(function(resolve) {
@@ -275,7 +323,8 @@
   console.log("✅ pasarelaPagos.js LISTO");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
+  // Exponer función para debug
   window.testGuardarPedido = guardarPedidoEnBD;
-  console.log("💡 window.testGuardarPedido() disponible");
+  console.log("💡 window.testGuardarPedido() disponible para testing");
 
 })();
