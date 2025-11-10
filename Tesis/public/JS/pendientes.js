@@ -1,4 +1,4 @@
-// JS/pendientes.js - VERSIÓN CORREGIDA
+// JS/pendientes.js - VERSIÓN FINAL CORREGIDA
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 /* ========= Supabase ========= */
@@ -60,52 +60,50 @@ async function fetchAllPedidos() {
           estado,
           estado_pago,
           metodo_pago,
-          total_real,
+          monto_total,
+          notas,
           creado_en,
-          clientes_perfil!pedidos_cliente_id_fkey (
-            id,
-            email,
-            nombre,
-            razon,
-            ruc,
-            tel,
-            mail,
-            contacto,
-            ciudad,
-            barrio,
-            depto,
-            postal,
-            calle1,
-            calle2,
-            nro
-          )
+          usuario_id
         `)
         .order("creado_en", { ascending: false });
       
       if (result.error) throw result.error;
       
-      data = (result.data || []).map(p => ({
-        pedido_id: p.id,
-        pedido_nro: p.pedido_nro,
-        estado: p.estado,
-        estado_pago: p.estado_pago,
-        metodo_pago: p.metodo_pago,
-        total_real: p.total_real,
-        creado_en: p.creado_en,
-        razon: p.clientes_perfil?.[0]?.razon || p.clientes_perfil?.razon || "",
-        mail: p.clientes_perfil?.[0]?.mail || p.clientes_perfil?.mail || "",
-        email: p.clientes_perfil?.[0]?.email || p.clientes_perfil?.email || "",
-        ruc: p.clientes_perfil?.[0]?.ruc || p.clientes_perfil?.ruc || "",
-        tel: p.clientes_perfil?.[0]?.tel || p.clientes_perfil?.tel || "",
-        contacto: p.clientes_perfil?.[0]?.contacto || p.clientes_perfil?.contacto || "",
-        ciudad: p.clientes_perfil?.[0]?.ciudad || p.clientes_perfil?.ciudad || "",
-        barrio: p.clientes_perfil?.[0]?.barrio || p.clientes_perfil?.barrio || "",
-        depto: p.clientes_perfil?.[0]?.depto || p.clientes_perfil?.depto || "",
-        postal: p.clientes_perfil?.[0]?.postal || p.clientes_perfil?.postal || "",
-        calle1: p.clientes_perfil?.[0]?.calle1 || p.clientes_perfil?.calle1 || "",
-        calle2: p.clientes_perfil?.[0]?.calle2 || p.clientes_perfil?.calle2 || "",
-        nro: p.clientes_perfil?.[0]?.nro || p.clientes_perfil?.nro || ""
-      }));
+      // Luego cargar los datos del cliente desde clientes_perfil
+      const clientesResult = await supabase
+        .from("clientes_perfil")
+        .select("*");
+      
+      const clientesMap = {};
+      (clientesResult.data || []).forEach(c => {
+        clientesMap[c.user_id] = c;
+      });
+      
+      data = (result.data || []).map(p => {
+        const cliente = clientesMap[p.usuario_id] || {};
+        return {
+          pedido_id: p.id,
+          pedido_nro: p.pedido_nro,
+          estado: p.estado,
+          estado_pago: p.estado_pago,
+          metodo_pago: p.metodo_pago,
+          monto_total: p.monto_total,
+          creado_en: p.creado_en,
+          razon: cliente.razon || "",
+          mail: cliente.mail || "",
+          email: cliente.email || "",
+          ruc: cliente.ruc || "",
+          tel: cliente.tel || "",
+          contacto: cliente.contacto || "",
+          ciudad: cliente.ciudad || "",
+          barrio: cliente.barrio || "",
+          depto: cliente.depto || "",
+          postal: cliente.postal || "",
+          calle1: cliente.calle1 || "",
+          calle2: cliente.calle2 || "",
+          nro: cliente.nro || ""
+        };
+      });
     }
     
     console.log(`✅ ${data?.length || 0} pedidos cargados`);
@@ -146,7 +144,7 @@ async function fetchItemsByPedido(pedidoId) {
     // Primero cargar los detalles del pedido
     const { data: detalles, error: errorDetalles } = await supabase
       .from("detalles_pedido")
-      .select("id, cantidad, precio_unitario, producto_id")
+      .select("id, cantidad, precio_unitario, producto_id, subtotal")
       .eq("pedido_id", pedidoId)
       .order("id", { ascending: true });
     
@@ -160,15 +158,20 @@ async function fetchItemsByPedido(pedidoId) {
       return [];
     }
     
+    console.log(`✅ ${detalles.length} detalles encontrados`);
+    
     // Luego cargar los productos por separado
     const productIds = detalles.map(d => d.producto_id).filter(Boolean);
     
-    if (productIds.length === 0) return detalles.map(d => ({
-      nombre: "(producto sin ID)",
-      imagen: null,
-      cantidad: Number(d.cantidad || 1),
-      precio: Number(d.precio_unitario || 0)
-    }));
+    if (productIds.length === 0) {
+      return detalles.map(d => ({
+        nombre: "(producto sin ID)",
+        imagen: null,
+        cantidad: Number(d.cantidad || 1),
+        precio: Number(d.precio_unitario || 0),
+        subtotal: Number(d.subtotal || 0)
+      }));
+    }
     
     const { data: productos, error: errorProductos } = await supabase
       .from("productos")
@@ -181,7 +184,8 @@ async function fetchItemsByPedido(pedidoId) {
         nombre: "(error cargando producto)",
         imagen: null,
         cantidad: Number(d.cantidad || 1),
-        precio: Number(d.precio_unitario || 0)
+        precio: Number(d.precio_unitario || 0),
+        subtotal: Number(d.subtotal || 0)
       }));
     }
     
@@ -191,15 +195,19 @@ async function fetchItemsByPedido(pedidoId) {
       productMap[p.id] = p;
     });
     
-    return detalles.map(d => {
+    const items = detalles.map(d => {
       const prod = productMap[d.producto_id];
       return {
         nombre: prod?.nombre || "(producto desconocido)",
         imagen: prod?.imagen || null,
         cantidad: Number(d.cantidad || 1),
-        precio: Number(d.precio_unitario || 0)
+        precio: Number(d.precio_unitario || 0),
+        subtotal: Number(d.subtotal || 0)
       };
     });
+    
+    console.log(`✅ ${items.length} items procesados correctamente`);
+    return items;
   } catch (err) {
     console.error("Error en fetchItemsByPedido:", err);
     return [];
@@ -328,7 +336,7 @@ function renderPedidos() {
 function createCardPedido(p) {
   const estado = ESTADOS_PEDIDO[p.estado] || ESTADOS_PEDIDO.pendiente;
   const pago = ESTADOS_PAGO[p.estado_pago] || ESTADOS_PAGO.pendiente;
-  const total = fmtGs(Number(p.total_real || 0));
+  const total = fmtGs(Number(p.monto_total || 0));
   const fecha = fmtFecha(p.creado_en);
   
   return `
@@ -419,10 +427,6 @@ function createCardPedido(p) {
           <div id="items-${p.pedido_id}" class="items-loading">
             <p>Cargando ítems...</p>
           </div>
-          <div class="card-total">
-            <span class="total-label">Total:</span>
-            <span class="total-value">${total}</span>
-          </div>
         </div>
         
         <div class="card-section">
@@ -435,6 +439,10 @@ function createCardPedido(p) {
             <div class="info-item">
               <label>Fecha:</label>
               <span>${fecha}</span>
+            </div>
+            <div class="info-item">
+              <label>Total:</label>
+              <span style="font-weight: 600; font-size: 1.1em; color: #059669;">${total}</span>
             </div>
           </div>
         </div>
@@ -495,7 +503,7 @@ function openModal(pedido) {
         <label for="modalMetodo">Método de Pago:</label>
         <select id="modalMetodo" data-pedido-id="${pedido.pedido_id}">
           ${METODOS_PAGO.map(m => 
-            `<option value="${m}" ${pedido.metodo_pago === m ? "selected" : ""}>${m}</option>`
+            `<option value="${m}" ${(pedido.metodo_pago || "").toLowerCase() === m.toLowerCase() ? "selected" : ""}>${m}</option>`
           ).join("")}
         </select>
       </div>
@@ -587,37 +595,44 @@ async function loadItemsForCard(pedidoId) {
   const container = $(`#items-${pedidoId}`);
   if (!container) return;
   
-  const items = await fetchItemsByPedido(pedidoId);
-  
-  if (items.length === 0) {
-    container.innerHTML = `<p class="items-empty">Sin ítems en este pedido</p>`;
-    return;
-  }
-  
-  const total = items.reduce((sum, item) => sum + (item.cantidad * item.precio), 0);
-  
-  container.innerHTML = `
-    <table class="items-table">
-      <thead>
-        <tr>
-          <th>Producto</th>
-          <th>Cantidad</th>
-          <th>Precio Unit.</th>
-          <th>Subtotal</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${items.map(item => `
+  try {
+    const items = await fetchItemsByPedido(pedidoId);
+    
+    if (items.length === 0) {
+      container.innerHTML = `<p class="items-empty">Sin ítems en este pedido</p>`;
+      return;
+    }
+    
+    const total = items.reduce((sum, item) => sum + (item.cantidad * item.precio), 0);
+    
+    container.innerHTML = `
+      <table class="items-table">
+        <thead>
           <tr>
-            <td>${item.nombre}</td>
-            <td>${item.cantidad}</td>
-            <td>${fmtGs(item.precio)}</td>
-            <td><strong>${fmtGs(item.cantidad * item.precio)}</strong></td>
+            <th>Producto</th>
+            <th>Cantidad</th>
+            <th>Precio Unit.</th>
+            <th>Subtotal</th>
           </tr>
-        `).join("")}
-      </tbody>
-    </table>
-  `;
+        </thead>
+        <tbody>
+          ${items.map(item => `
+            <tr>
+              <td>${item.nombre}</td>
+              <td style="text-align: center;">${item.cantidad}</td>
+              <td style="text-align: right;">${fmtGs(item.precio)}</td>
+              <td style="text-align: right;"><strong>${fmtGs(item.cantidad * item.precio)}</strong></td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    `;
+    
+    console.log(`✅ Items renderizados para pedido ${pedidoId}`);
+  } catch (err) {
+    console.error(`Error renderizando items para ${pedidoId}:`, err);
+    container.innerHTML = `<p class="items-error">Error cargando ítems</p>`;
+  }
 }
 
 /* ========= Eventos ========= */
@@ -697,17 +712,20 @@ async function loadPedidos() {
   
   console.log("📦 Pedidos obtenidos:", allPedidos.length);
   
-  // Cargar ítems para cada pedido
-  for (const pedido of allPedidos) {
+  // Renderizar primero
+  applyFilters();
+  updateStats();
+  
+  // Luego cargar items para cada tarjeta visible
+  for (const pedido of filteredPedidos) {
     if (pedido.pedido_id) {
-      setTimeout(() => loadItemsForCard(pedido.pedido_id), 100);
+      await loadItemsForCard(pedido.pedido_id);
     }
   }
   
   if (loadingView) loadingView.style.display = "none";
   
-  applyFilters();
-  updateStats();
+  console.log("✅ Todos los items cargados");
 }
 
 document.addEventListener("DOMContentLoaded", () => {
