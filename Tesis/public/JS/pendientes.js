@@ -1,4 +1,4 @@
-// JS/pendientes.js - VERSIÓN FINAL CORREGIDA
+// JS/pendientes.js - VERSIÓN FINAL COMPLETA CON DATOS DE CLIENTE
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 /* ========= Supabase ========= */
@@ -42,72 +42,74 @@ async function fetchAllPedidos() {
   try {
     console.log("🔄 Cargando pedidos...");
     
-    // Intentar cargar desde v_pedidos_pendientes
-    let { data, error } = await supabase
-      .from("v_pedidos_pendientes")
-      .select("*")
+    // Cargar pedidos
+    const { data: pedidos, error: errorPedidos } = await supabase
+      .from("pedidos")
+      .select("id, estado, estado_pago, metodo_pago, monto_total, creado_en, usuario_id")
       .order("creado_en", { ascending: false });
     
-    if (error) {
-      console.warn("Vista v_pedidos_pendientes no disponible, intentando tabla pedidos...", error.message);
-      
-      // Fallback a tabla pedidos directa
-      const result = await supabase
-        .from("pedidos")
-        .select(`
-          id,
-          pedido_nro,
-          estado,
-          estado_pago,
-          metodo_pago,
-          monto_total,
-          notas,
-          creado_en,
-          usuario_id
-        `)
-        .order("creado_en", { ascending: false });
-      
-      if (result.error) throw result.error;
-      
-      // Luego cargar los datos del cliente desde clientes_perfil
-      const clientesResult = await supabase
-        .from("clientes_perfil")
-        .select("*");
-      
-      const clientesMap = {};
-      (clientesResult.data || []).forEach(c => {
-        clientesMap[c.user_id] = c;
-      });
-      
-      data = (result.data || []).map(p => {
-        const cliente = clientesMap[p.usuario_id] || {};
-        return {
-          pedido_id: p.id,
-          pedido_nro: p.pedido_nro,
-          estado: p.estado,
-          estado_pago: p.estado_pago,
-          metodo_pago: p.metodo_pago,
-          monto_total: p.monto_total,
-          creado_en: p.creado_en,
-          razon: cliente.razon || "",
-          mail: cliente.mail || "",
-          email: cliente.email || "",
-          ruc: cliente.ruc || "",
-          tel: cliente.tel || "",
-          contacto: cliente.contacto || "",
-          ciudad: cliente.ciudad || "",
-          barrio: cliente.barrio || "",
-          depto: cliente.depto || "",
-          postal: cliente.postal || "",
-          calle1: cliente.calle1 || "",
-          calle2: cliente.calle2 || "",
-          nro: cliente.nro || ""
-        };
-      });
+    if (errorPedidos) {
+      console.error("Error cargando pedidos:", errorPedidos.message);
+      throw errorPedidos;
     }
+
+    if (!pedidos || pedidos.length === 0) {
+      console.log("✅ Sin pedidos");
+      return [];
+    }
+
+    console.log(`📦 ${pedidos.length} pedidos obtenidos`);
+
+    // Extraer IDs de usuarios únicos
+    const userIds = [...new Set(pedidos.map(p => p.usuario_id).filter(Boolean))];
+    console.log(`👥 Cargando datos de ${userIds.length} clientes`);
     
-    console.log(`✅ ${data?.length || 0} pedidos cargados`);
-    return data || [];
+    // Cargar datos del cliente
+    const { data: clientes, error: errorClientes } = await supabase
+      .from("clientes_perfil")
+      .select("*")
+      .in("user_id", userIds);
+    
+    if (errorClientes) {
+      console.warn("⚠️ Error cargando clientes:", errorClientes.message);
+    }
+
+    // Mapear clientes por user_id
+    const clientesMap = {};
+    (clientes || []).forEach(c => {
+      clientesMap[c.user_id] = c;
+    });
+
+    console.log(`✅ ${Object.keys(clientesMap).length} clientes mapeados`);
+
+    // Combinar datos
+    const resultado = pedidos.map(p => {
+      const cliente = clientesMap[p.usuario_id] || {};
+      return {
+        pedido_id: p.id,
+        pedido_nro: p.id.substring(0, 8).toUpperCase(),
+        estado: p.estado,
+        estado_pago: p.estado_pago,
+        metodo_pago: p.metodo_pago,
+        monto_total: p.monto_total,
+        creado_en: p.creado_en,
+        razon: cliente.razon || "",
+        mail: cliente.mail || "",
+        ruc: cliente.ruc || "",
+        tel: cliente.tel || "",
+        contacto: cliente.contacto || "",
+        ciudad: cliente.ciudad || "",
+        barrio: cliente.barrio || "",
+        depto: cliente.depto || "",
+        postal: cliente.postal || "",
+        calle1: cliente.calle1 || "",
+        calle2: cliente.calle2 || "",
+        nro: cliente.nro || ""
+      };
+    });
+    
+    console.log(`✅ ${resultado.length} pedidos procesados correctamente`);
+    return resultado;
   } catch (err) {
     console.error("Error cargando pedidos:", err);
     showToast("Error al cargar pedidos: " + err.message, "error");
@@ -140,32 +142,21 @@ async function fetchItemsByPedido(pedidoId) {
   
   try {
     console.log("📦 Cargando items para pedido:", pedidoId);
-    console.log("   Tipo de pedidoId:", typeof pedidoId, "Valor:", pedidoId);
     
     // Primero cargar los detalles del pedido
     const { data: detalles, error: errorDetalles } = await supabase
       .from("detalles_pedido")
-      .select("id, cantidad, precio_unitario, producto_id, subtotal, pedido_id")
+      .select("id, cantidad, precio_unitario, producto_id, subtotal")
       .eq("pedido_id", pedidoId)
       .order("id", { ascending: true });
     
     if (errorDetalles) {
-      console.error("❌ Error cargando detalles:", errorDetalles.message, errorDetalles.details);
+      console.warn("Error cargando detalles:", errorDetalles.message);
       return [];
     }
     
-    console.log("📦 Respuesta detalles:", detalles);
-    
     if (!detalles || detalles.length === 0) {
-      console.warn("⚠️ Sin ítems para este pedido. Detalles:", detalles);
-      
-      // Debug: intentar listar todos los detalles_pedido para ver si hay datos
-      const allDetalles = await supabase
-        .from("detalles_pedido")
-        .select("pedido_id, id, cantidad, precio_unitario");
-      
-      console.log("🔍 DEBUG - Todos los detalles_pedido en BD:", allDetalles.data);
-      
+      console.log("📦 Sin ítems para este pedido");
       return [];
     }
     
@@ -179,8 +170,7 @@ async function fetchItemsByPedido(pedidoId) {
         nombre: "(producto sin ID)",
         imagen: null,
         cantidad: Number(d.cantidad || 1),
-        precio: Number(d.precio_unitario || 0),
-        subtotal: Number(d.subtotal || 0)
+        precio: Number(d.precio_unitario || 0)
       }));
     }
     
@@ -195,8 +185,7 @@ async function fetchItemsByPedido(pedidoId) {
         nombre: "(error cargando producto)",
         imagen: null,
         cantidad: Number(d.cantidad || 1),
-        precio: Number(d.precio_unitario || 0),
-        subtotal: Number(d.subtotal || 0)
+        precio: Number(d.precio_unitario || 0)
       }));
     }
     
@@ -212,8 +201,7 @@ async function fetchItemsByPedido(pedidoId) {
         nombre: prod?.nombre || "(producto desconocido)",
         imagen: prod?.imagen || null,
         cantidad: Number(d.cantidad || 1),
-        precio: Number(d.precio_unitario || 0),
-        subtotal: Number(d.subtotal || 0)
+        precio: Number(d.precio_unitario || 0)
       };
     });
     
@@ -359,8 +347,8 @@ function createCardPedido(p) {
             <span class="nro-value">#${p.pedido_nro || p.pedido_id?.slice(0, 8) || "---"}</span>
           </div>
           <div class="card-client-info">
-            <div class="client-name">${fmt(p.razon || p.email || "Cliente")}</div>
-            <div class="client-email">${fmt(p.mail || p.email)}</div>
+            <div class="client-name">${fmt(p.razon || "Cliente")}</div>
+            <div class="client-email">${fmt(p.mail)}</div>
           </div>
         </div>
         
@@ -488,7 +476,7 @@ function openModal(pedido) {
   content.innerHTML = `
     <div class="modal-header">
       <h2>Editar Pedido #${pedido.pedido_nro || pedido.pedido_id?.slice(0, 8) || "---"}</h2>
-      <p class="modal-client">${fmt(pedido.razon || pedido.email || "Cliente")}</p>
+      <p class="modal-client">${fmt(pedido.razon || "Cliente")}</p>
     </div>
     
     <div class="modal-body">
