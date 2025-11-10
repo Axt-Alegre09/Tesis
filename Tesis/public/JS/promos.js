@@ -1,5 +1,5 @@
-// ==================== PROMOS.JS ====================
-// Gestión de promociones - Standalone
+// ==================== PROMOS.JS MEJORADO ====================
+// Gestión de promociones - Standalone con buscador
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -12,6 +12,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // ==================== ESTADO ====================
 let promosData = [];
 let productosData = [];
+let productosOriginal = []; // Guardar lista original para filtrar
 let currentPromoId = null;
 
 // ==================== HELPERS ====================
@@ -119,6 +120,85 @@ function getEstadoPromo(promo) {
   return { label: 'Activa', color: 'var(--success)', icon: '✅' };
 }
 
+// ==================== BUSCAR PRODUCTOS ====================
+
+function filterProductos(searchTerm) {
+  const term = searchTerm.toLowerCase().trim();
+  
+  if (!term) {
+    // Si está vacío, mostrar todos
+    productosData = [...productosOriginal];
+  } else {
+    // Filtrar por nombre
+    productosData = productosOriginal.filter(p => 
+      p.nombre.toLowerCase().includes(term)
+    );
+  }
+  
+  renderProductosAsignar();
+}
+
+function renderProductosAsignar() {
+  const list = document.getElementById('productosAsignarList');
+  if (!list) return;
+
+  if (productosData.length === 0) {
+    list.innerHTML = `
+      <div style="padding: 2rem; text-align: center; color: var(--text-muted);">
+        <i class="bi bi-search" style="font-size: 2rem; display: block; margin-bottom: 0.5rem; opacity: 0.5;"></i>
+        <p style="font-weight: 600; margin-bottom: 0.5rem;">No hay productos que coincidan</p>
+        <p style="font-size: 0.9rem;">Intenta con otro término de búsqueda</p>
+      </div>
+    `;
+    return;
+  }
+
+  // Obtener los IDs de productos ya asignados del formulario
+  const checkboxes = list.querySelectorAll('input[type="checkbox"]');
+  const asignadosIds = new Set(
+    Array.from(checkboxes)
+      .filter(cb => cb.checked)
+      .map(cb => cb.value)
+  );
+
+  list.innerHTML = productosData.map(p => `
+    <label class="producto-item" style="
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 0.75rem;
+    " onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">
+      <input 
+        type="checkbox" 
+        value="${p.id}"
+        ${asignadosIds.has(p.id) ? 'checked' : ''}
+        style="width: 20px; height: 20px; cursor: pointer; flex-shrink: 0;"
+      >
+      <div style="flex: 1;">
+        <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">${p.nombre}</div>
+        <div style="font-size: 0.85rem; color: var(--text-secondary);">${formatPrice(p.precio)} Gs</div>
+      </div>
+      <div style="
+        background: var(--primary);
+        color: white;
+        padding: 0.5rem 0.75rem;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        white-space: nowrap;
+        flex-shrink: 0;
+      ">
+        ${formatPrice(p.precio)} Gs
+      </div>
+    </label>
+  `).join('');
+}
+
 // ==================== CARGAR DATOS ====================
 
 async function loadPromos() {
@@ -190,6 +270,7 @@ async function loadProductos() {
     
     console.log(`✅ ${data.length} productos cargados`);
     productosData = data;
+    productosOriginal = [...data]; // Guardar copia original
     
   } catch (error) {
     console.error('Error cargando productos:', error);
@@ -485,20 +566,94 @@ async function asignarProductos(promoId) {
     const asignadosIds = new Set(asignados.map(a => a.producto_id));
 
     const title = document.getElementById('modalAsignarTitle');
+    const searchContainer = document.getElementById('searchContainerPromos');
     const list = document.getElementById('productosAsignarList');
 
     title.textContent = `Asignar productos a "${promo.nombre}"`;
+    
+    // Crear el buscador
+    if (searchContainer) {
+      searchContainer.innerHTML = `
+        <div style="
+          position: relative;
+          margin-bottom: 1.5rem;
+        ">
+          <i class="bi bi-search" style="
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            z-index: 1;
+          "></i>
+          <input 
+            type="text" 
+            id="searchProductosPromo"
+            placeholder="Buscar producto por nombre..." 
+            style="
+              width: 100%;
+              padding: 0.875rem 1rem 0.875rem 2.75rem;
+              border: 2px solid var(--border);
+              border-radius: 8px;
+              font-size: 0.95rem;
+              transition: all 0.2s;
+              font-family: inherit;
+            "
+            onkeyup="filterProductos(this.value)"
+          >
+          <div style="
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 0.85rem;
+          ">
+            <span id="resultadosBusqueda">${productosData.length} productos</span>
+          </div>
+        </div>
+      `;
+    }
 
+    // Resetear datos a todos los productos
+    productosData = [...productosOriginal];
+    
+    // Renderizar la lista
     list.innerHTML = productosData.map(p => `
-      <label class="producto-item">
+      <label class="producto-item" style="
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+        margin-bottom: 0.75rem;
+      " onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">
         <input 
           type="checkbox" 
           value="${p.id}"
           ${asignadosIds.has(p.id) ? 'checked' : ''}
+          style="width: 20px; height: 20px; cursor: pointer; flex-shrink: 0;"
+          onchange="document.getElementById('resultadosBusqueda').textContent = '${productosData.length} producto(s) seleccionado(s)'"
         >
-        <div class="producto-info">
-          <div class="producto-nombre">${p.nombre}</div>
-          <div class="producto-precio">${formatPrice(p.precio)} Gs</div>
+        <div style="flex: 1;">
+          <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">${p.nombre}</div>
+          <div style="font-size: 0.85rem; color: var(--text-secondary);">${formatPrice(p.precio)} Gs</div>
+        </div>
+        <div style="
+          background: var(--primary);
+          color: white;
+          padding: 0.5rem 0.75rem;
+          border-radius: 6px;
+          font-size: 0.8rem;
+          font-weight: 600;
+          white-space: nowrap;
+          flex-shrink: 0;
+        ">
+          ${formatPrice(p.precio)} Gs
         </div>
       </label>
     `).join('');
@@ -579,3 +734,4 @@ window.editPromo = editPromo;
 window.deletePromo = deletePromo;
 window.toggleActivoPromo = toggleActivoPromo;
 window.asignarProductos = asignarProductos;
+window.filterProductos = filterProductos;
