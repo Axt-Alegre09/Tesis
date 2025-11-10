@@ -30,6 +30,18 @@ function getFormData() {
   }
 
   console.log("📋 Datos del formulario capturados:", data);
+  console.log("   RUC:", data.ruc);
+  console.log("   Razón:", data.razon);
+  console.log("   Tel:", data.tel);
+  console.log("   Mail:", data.mail);
+  console.log("   Contacto:", data.contacto);
+  console.log("   Ciudad:", data.ciudad);
+  console.log("   Barrio:", data.barrio);
+  console.log("   Depto:", data.depto);
+  console.log("   Postal:", data.postal);
+  console.log("   Calle1:", data.calle1);
+  console.log("   Calle2:", data.calle2);
+  console.log("   Nro:", data.nro);
   return data;
 }
 
@@ -291,5 +303,4 @@ document.addEventListener("DOMContentLoaded", () => {
 
   console.log("✅ pasarelaPagos.js LISTO");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-  
 });
