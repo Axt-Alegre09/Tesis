@@ -1,325 +1,539 @@
-// JS/pendientes.js
+// JS/pendientes.js - VERSIÓN MEJORADA
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 /* ========= Supabase ========= */
 const SUPABASE_URL = "https://jyygevitfnbwrvxrjexp.supabase.co";
-const SUPABASE_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5eWdldml0Zm5id3J2eHJqZXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2OTQ2OTYsImV4cCI6MjA3MTI3MDY5Nn0.St0IiSZSeELESshctneazCJHXCDBi9wrZ28UkiEDXYo";
-const supa = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5eWdldml0Zm5id3J2eHJqZXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2OTQ2OTYsImV4cCI6MjA3MTI3MDY5Nn0.St0IiSZSeELESshctneazCJHXCDBi9wrZ28UkiEDXYo";
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-/* ========= Helpers ========= */
-const $  = (s, r = document) => r.querySelector(s);
-const $$ = (s, r = document) => [...r.querySelectorAll(s)];
-const dz = (v) => (v ?? "").toString().trim();
-const fmtGs = (n) => new Intl.NumberFormat("es-PY").format(Number(n || 0)) + " Gs";
-const hoyLargo = () =>
-  new Date().toLocaleDateString("es-PY", { day: "2-digit", month: "long", year: "numeric" });
-
-// (fix) no usar ?. a la izquierda de =
-{
-  const el = $("#fecha");
-  if (el) el.textContent = hoyLargo();
-}
-const backBtn = $(".back");
-if (backBtn) backBtn.addEventListener("click", () => history.back());
-
-/* ========= Estados ========= */
-// >>> Como pediste <<<
-const ESTADOS_PEDIDO = ["pendiente", "finalizado", "cancelado"];
-const ESTADOS_PAGO   = ["pendiente", "pagado"];
-const colorEstado = { pendiente:"#b38a00", finalizado:"#1d6f42", cancelado:"#8b0000" };
-const colorPago   = { pendiente:"#b38a00", pagado:"#1d6f42" };
-const badge = (estado, palette) => {
-  if (!estado) return "";
-  const color = palette[estado] || "#444";
-  return `<span class="badge" style="display:inline-block;padding:.15rem .5rem;border-radius:999px;background:${color}15;color:${color};border:1px solid ${color}40;font-size:.78rem;margin-left:.25rem;">${estado}</span>`;
+/* ========= Estados y Colores ========= */
+const ESTADOS_PEDIDO = {
+  pendiente: { label: "Pendiente", icon: "clock", color: "#f59e0b", bg: "#fef3c7" },
+  finalizado: { label: "Finalizado", icon: "check-circle", color: "#10b981", bg: "#d1fae5" },
+  cancelado: { label: "Cancelado", icon: "x-circle", color: "#ef4444", bg: "#fee2e2" }
 };
 
-/* ========= Data ========= */
-async function fetchPendientes() {
-  const { data, error } = await supa
-    .from("v_pedidos_pendientes")
-    .select("*")
-    .eq("estado", "pendiente")                       // solo pendientes
-    .order("creado_en", { ascending: false });       // más nuevo primero
-  if (error) throw error;
-  return data || [];
-}
+const ESTADOS_PAGO = {
+  pendiente: { label: "Pendiente", icon: "clock", color: "#f59e0b", bg: "#fef3c7" },
+  pagado: { label: "Pagado", icon: "check-circle", color: "#10b981", bg: "#d1fae5" }
+};
 
-// Ítems reales del pedido (si RLS lo permite)
-async function fetchItemsByPedido(pedido_id) {
-  if (!pedido_id) return [];
-  const { data, error } = await supa
-    .from("detalles_pedido")
-    .select(`
-      cantidad,
-      precio_unitario,
-      productos:productos!detalles_pedido_producto_id_fkey ( id, nombre )
-    `)
-    .eq("pedido_id", pedido_id)
-    .order("id", { ascending: true });
-  if (error) {
-    console.warn("detalles_pedido bloqueado o error:", error.message);
+const METODOS_PAGO = ["Transferencia", "Tarjeta", "Efectivo"];
+
+/* ========= Helpers ========= */
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => [...document.querySelectorAll(s)];
+const fmt = (v) => (v ?? "").toString().trim();
+const fmtGs = (n) => new Intl.NumberFormat("es-PY").format(Number(n || 0)) + " Gs";
+const fmtFecha = (f) => f ? new Date(f).toLocaleDateString("es-PY", { day: "2-digit", month: "short", year: "numeric" }) : "-";
+
+/* ========= Estado Global ========= */
+let allPedidos = [];
+let filteredPedidos = [];
+let filterEstado = "pendiente";
+let filterPago = "";
+let searchTerm = "";
+
+/* ========= Funciones de Datos ========= */
+
+async function fetchAllPedidos() {
+  try {
+    const { data, error } = await supabase
+      .from("v_pedidos_pendientes")
+      .select("*")
+      .order("creado_en", { ascending: false });
+    
+    if (error) throw error;
+    
+    return data || [];
+  } catch (err) {
+    console.error("Error cargando pedidos:", err);
+    showToast("Error al cargar pedidos", "error");
     return [];
   }
-  return (data || []).map(d => ({
-    titulo: d?.productos?.nombre || "(item)",
-    cantidad: Number(d?.cantidad || 1),
-    precio: Number(d?.precio_unitario || 0)
-  }));
 }
 
-async function updatePedido(pedido_id, payload) {
-  if (!pedido_id) throw new Error("Este snapshot no tiene pedido_id para actualizar.");
-  const toSend = { ...payload };
-  Object.keys(toSend).forEach(k => {
-    if (toSend[k] === "" || typeof toSend[k] === "undefined") delete toSend[k];
+async function updatePedido(pedidoId, updates) {
+  if (!pedidoId) throw new Error("ID de pedido requerido");
+  
+  try {
+    const { error } = await supabase
+      .from("pedidos")
+      .update(updates)
+      .eq("id", pedidoId);
+    
+    if (error) throw error;
+    return true;
+  } catch (err) {
+    console.error("Error actualizando pedido:", err);
+    throw err;
+  }
+}
+
+async function fetchItemsByPedido(pedidoId) {
+  if (!pedidoId) return [];
+  
+  try {
+    const { data, error } = await supabase
+      .from("detalles_pedido")
+      .select(`
+        cantidad,
+        precio_unitario,
+        productos:productos!detalles_pedido_producto_id_fkey ( id, nombre, imagen )
+      `)
+      .eq("pedido_id", pedidoId)
+      .order("id", { ascending: true });
+    
+    if (error) {
+      console.warn("Error cargando items:", error.message);
+      return [];
+    }
+    
+    return (data || []).map(d => ({
+      nombre: d?.productos?.nombre || "(sin nombre)",
+      imagen: d?.productos?.imagen || null,
+      cantidad: Number(d?.cantidad || 1),
+      precio: Number(d?.precio_unitario || 0)
+    }));
+  } catch (err) {
+    console.error("Error en fetchItemsByPedido:", err);
+    return [];
+  }
+}
+
+/* ========= Filtrado ========= */
+
+function applyFilters() {
+  filteredPedidos = allPedidos.filter(p => {
+    // Filtro por estado
+    if (filterEstado && p.estado !== filterEstado) return false;
+    
+    // Filtro por pago
+    if (filterPago && p.estado_pago !== filterPago) return false;
+    
+    // Búsqueda por cliente, email, RUC
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      const matchesRazon = (p.razon || "").toLowerCase().includes(term);
+      const matchesEmail = (p.mail || "").toLowerCase().includes(term);
+      const matchesRuc = (p.ruc || "").toLowerCase().includes(term);
+      const matchesTel = (p.tel || "").toLowerCase().includes(term);
+      
+      if (!matchesRazon && !matchesEmail && !matchesRuc && !matchesTel) return false;
+    }
+    
+    return true;
   });
-  const { error } = await supa.from("pedidos").update(toSend).eq("id", pedido_id);
-  if (error) throw error;
+  
+  renderPedidos();
+  updateStats();
 }
 
-/* ========= UI ========= */
-const grid = $("#grid");
+function updateStats() {
+  const pendientes = allPedidos.filter(p => p.estado === "pendiente").length;
+  const finalizados = allPedidos.filter(p => p.estado === "finalizado").length;
+  const cancelados = allPedidos.filter(p => p.estado === "cancelado").length;
+  
+  document.getElementById("countPendientes").textContent = pendientes;
+  document.getElementById("countFinalizados").textContent = finalizados;
+  document.getElementById("countCancelados").textContent = cancelados;
+}
 
-function render(list) {
-  grid.innerHTML = "";
-  if (!list.length) {
-    grid.innerHTML = `<section class="card"><p>No hay pedidos pendientes.</p></section>`;
+/* ========= Renderizado ========= */
+
+function renderPedidos() {
+  const grid = $("#grid");
+  
+  if (filteredPedidos.length === 0) {
+    grid.style.display = "none";
+    $("#emptyView").style.display = "flex";
     return;
   }
-  list.forEach((p, idx) => grid.appendChild(cardPedido(p, idx)));
+  
+  grid.style.display = "grid";
+  $("#emptyView").style.display = "none";
+  
+  grid.innerHTML = filteredPedidos.map(p => createCardPedido(p)).join("");
+  
+  // Agregar event listeners
+  $$(".card-header").forEach(card => {
+    card.addEventListener("click", (e) => {
+      const cardEl = e.currentTarget.closest(".card");
+      const body = cardEl.querySelector(".card-body");
+      cardEl.classList.toggle("expanded");
+    });
+  });
+  
+  $$(".btn-editar").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const pedidoId = btn.dataset.pedidoId;
+      const pedido = allPedidos.find(p => p.pedido_id === pedidoId);
+      openModal(pedido);
+    });
+  });
 }
 
-function cardPedido(p, idx) {
-  const sec = document.createElement("section");
-  sec.className = "card";
-  sec.dataset.snapshot_id = p.snapshot_id ?? "";
-  sec.dataset.pedido_id = p.pedido_id || "";
-
-  const nro = typeof p.pedido_nro === "number" ? p.pedido_nro : idx;
-
-  sec.innerHTML = `
-    <h3>Pedido N°: ${nro}
-      ${p.estado ? badge(p.estado, colorEstado) : ""}
-      ${p.estado_pago ? badge(p.estado_pago, colorPago) : ""}
-    </h3>
-
-    <form class="info two-cols" data-mode="view">
-      <div class="col">
-        <label>Ruc / Ci : <input value="${dz(p.ruc)}" disabled></label>
-        <label>Nombre : <input value="${dz(p.razon)}" disabled></label>
-        <label>Teléfono : <input value="${dz(p.tel)}" disabled></label>
-        <label>Correo : <input value="${dz(p.mail)}" disabled></label>
-        <label>Contacto : <input value="${dz(p.contacto)}" disabled></label>
-        <label>Dirección postal : <input value="${dz(p.postal)}" disabled></label>
-
-        <div class="hr"></div>
-        <div class="detalle">
-          <b>Detalle de Pedido :</b>
-          <div class="items-wrap">
-            <div class="items-loading">(cargando ítems…)</div>
+function createCardPedido(p) {
+  const estado = ESTADOS_PEDIDO[p.estado] || ESTADOS_PEDIDO.pendiente;
+  const pago = ESTADOS_PAGO[p.estado_pago] || ESTADOS_PAGO.pendiente;
+  const total = fmtGs(Number(p.total_real || 0));
+  const fecha = fmtFecha(p.creado_en);
+  
+  return `
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title-section">
+          <div class="card-nro">
+            <span class="nro-label">Pedido</span>
+            <span class="nro-value">#${p.pedido_nro || "---"}</span>
+          </div>
+          <div class="card-client-info">
+            <div class="client-name">${fmt(p.razon)}</div>
+            <div class="client-email">${fmt(p.mail)}</div>
           </div>
         </div>
-        <p style="margin-top:8px;"><b>Total :</b> <span class="total">${fmtGs(Number(p.total_real || 0))}</span></p>
+        
+        <div class="card-badges">
+          <span class="badge" style="background: ${estado.bg}; color: ${estado.color};">
+            <i class="bi bi-${estado.icon}"></i> ${estado.label}
+          </span>
+          <span class="badge" style="background: ${pago.bg}; color: ${pago.color};">
+            <i class="bi bi-${pago.icon}"></i> ${pago.label}
+          </span>
+        </div>
+        
+        <i class="bi bi-chevron-down"></i>
       </div>
-
-      <div class="col">
-        <label>Ciudad : <input value="${dz(p.ciudad)}" disabled></label>
-        <label>Barrio : <input value="${dz(p.barrio)}" disabled></label>
-        <label>Departamento : <input value="${dz(p.depto)}" disabled></label>
-        <label>Calle 1 : <input value="${dz(p.calle1)}" disabled></label>
-        <label>Calle 2 : <input value="${dz(p.calle2)}" disabled></label>
-        <label>N° Casa : <input value="${dz(p.nro)}" disabled></label>
-
-        <div class="hr"></div>
-
-        <label>Método de Pago :
-          <select name="metodo_pago" ${p.pedido_id ? "" : "disabled"}>
-            ${["Transferencia","Tarjeta","Efectivo"].map(opt => `<option value="${opt}" ${p.metodo_pago===opt?"selected":""}>${opt}</option>`).join("")}
-          </select>
-        </label>
-
-        <label>Estado pago :
-          <select name="estado_pago" ${p.pedido_id ? "" : "disabled"}>
-            ${ESTADOS_PAGO.map(e => `<option value="${e}" ${p.estado_pago===e?"selected":""}>${e}</option>`).join("")}
-          </select>
-        </label>
-
-        <label>Estado pedido :
-          <select name="estado" ${p.pedido_id ? "" : "disabled"}>
-            ${ESTADOS_PEDIDO.map(e => `<option value="${e}" ${p.estado===e?"selected":""}>${e}</option>`).join("")}
-          </select>
-        </label>
+      
+      <div class="card-body">
+        <div class="card-section">
+          <div class="section-title">Información de Contacto</div>
+          <div class="info-grid">
+            <div class="info-item">
+              <label>RUC/CI:</label>
+              <span>${fmt(p.ruc)}</span>
+            </div>
+            <div class="info-item">
+              <label>Teléfono:</label>
+              <span>${fmt(p.tel)}</span>
+            </div>
+            <div class="info-item">
+              <label>Correo:</label>
+              <span>${fmt(p.mail)}</span>
+            </div>
+            <div class="info-item">
+              <label>Contacto:</label>
+              <span>${fmt(p.contacto)}</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="card-section">
+          <div class="section-title">Dirección de Entrega</div>
+          <div class="info-grid">
+            <div class="info-item full">
+              <label>Dirección Postal:</label>
+              <span>${fmt(p.postal)}</span>
+            </div>
+            <div class="info-item">
+              <label>Ciudad:</label>
+              <span>${fmt(p.ciudad)}</span>
+            </div>
+            <div class="info-item">
+              <label>Barrio:</label>
+              <span>${fmt(p.barrio)}</span>
+            </div>
+            <div class="info-item">
+              <label>Departamento:</label>
+              <span>${fmt(p.depto)}</span>
+            </div>
+            <div class="info-item">
+              <label>Calle 1:</label>
+              <span>${fmt(p.calle1)}</span>
+            </div>
+            <div class="info-item">
+              <label>Calle 2:</label>
+              <span>${fmt(p.calle2)}</span>
+            </div>
+            <div class="info-item">
+              <label>N° Casa:</label>
+              <span>${fmt(p.nro)}</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="card-section">
+          <div class="section-title">Detalles del Pedido</div>
+          <div id="items-${p.pedido_id}" class="items-loading">
+            <p>Cargando ítems...</p>
+          </div>
+          <div class="card-total">
+            <span class="total-label">Total:</span>
+            <span class="total-value">${total}</span>
+          </div>
+        </div>
+        
+        <div class="card-section">
+          <div class="section-title">Gestión</div>
+          <div class="info-grid">
+            <div class="info-item">
+              <label>Método de Pago:</label>
+              <span>${fmt(p.metodo_pago)}</span>
+            </div>
+            <div class="info-item">
+              <label>Fecha:</label>
+              <span>${fecha}</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="card-actions">
+          <button class="btn-editar" data-pedido-id="${p.pedido_id}">
+            <i class="bi bi-pencil"></i> Editar Estado
+          </button>
+          <button class="btn-finalizar" data-pedido-id="${p.pedido_id}">
+            <i class="bi bi-check-lg"></i> Finalizar
+          </button>
+          <button class="btn-cancelar" data-pedido-id="${p.pedido_id}">
+            <i class="bi bi-x-lg"></i> Cancelar
+          </button>
+        </div>
       </div>
-    </form>
-
-    <div class="acciones">
-      <button class="btn brown btn-edit" ${p.pedido_id ? "" : "disabled"}>Actualizar</button>
-      <button class="btn green btn-ok" ${p.pedido_id ? "" : "disabled"}>Finalizar</button>
     </div>
   `;
+}
 
-  const form      = $("form", sec);
-  const btnEd     = $(".btn-edit", sec);
-  const btnOk     = $(".btn-ok", sec);
-  const itemsWrap = $(".items-wrap", sec);
-  const totalSpan = $(".total", sec);
-  let btnCancel = null;
-
-  // ====== ÍTEMS (con fallback a snapshot) ======
-  (async () => {
-    let items = [];
-    if (p.pedido_id) items = await fetchItemsByPedido(p.pedido_id);
-
-    if (!items.length && Array.isArray(p.items) && p.items.length) {
-      items = p.items.map(x => ({
-        titulo: dz(x.titulo) || "(item)",
-        cantidad: Number(x.cantidad || 1),
-        precio: Number(x.precio || 0)
-      }));
-    }
-
-    if (!items.length) {
-      itemsWrap.innerHTML = `<div class="items-empty">(sin ítems)</div>`;
-    } else {
-      const rows = items.map(d => `
-        <tr>
-          <td>${dz(d.titulo)}</td>
-          <td style="text-align:center;">${d.cantidad}</td>
-          <td style="text-align:right;">${fmtGs(d.precio)}</td>
-          <td style="text-align:right;"><b>${fmtGs(d.cantidad * d.precio)}</b></td>
-        </tr>
-      `).join("");
-
-      itemsWrap.innerHTML = `
-        <table class="items">
-          <thead>
-            <tr>
-              <th>Producto</th>
-              <th style="width:70px;text-align:center;">Cant.</th>
-              <th style="width:150px;text-align:right;">Precio xU</th>
-              <th style="width:160px;text-align:right;">Subtotal</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>`;
-    }
-
-    const calc = (items || []).reduce((a, r) => a + r.cantidad * r.precio, 0);
-    const finalTotal = Number(p.total_real || 0) || calc;
-    totalSpan.textContent = fmtGs(finalTotal);
-  })().catch(console.error);
-
-  // ====== Editar / Guardar ======
-  btnEd?.addEventListener("click", async (e) => {
-    e.preventDefault();
-    if (!p.pedido_id) return alert("Este snapshot no tiene pedido vinculado (pedido_id).");
-
-    const mode = form.dataset.mode;
-    if (mode === "view") {
-      $$("select[name='metodo_pago'], select[name='estado_pago'], select[name='estado']", form)
-        .forEach(el => el.disabled = false);
-      form.dataset.mode = "edit";
-      btnEd.textContent = "Guardar";
-
-      if (!btnCancel) {
-        btnCancel = document.createElement("button");
-        btnCancel.className = "btn";
-        btnCancel.textContent = "Cancelar";
-        $(".acciones", sec).insertBefore(btnCancel, btnOk);
-        btnCancel.addEventListener("click", async (ev) => {
-          ev.preventDefault();
-          await reloadCard(sec, sec.dataset.snapshot_id || null);
-        });
-      }
-    } else {
-      const metodo_pago = form.querySelector("select[name='metodo_pago']")?.value || undefined;
-      const estado_pago = form.querySelector("select[name='estado_pago']")?.value || undefined;
-      const estado      = form.querySelector("select[name='estado']")?.value || undefined;
-
-      try {
-        btnEd.disabled = true;
-        await updatePedido(p.pedido_id, { metodo_pago, estado_pago, estado });
-        await reloadCard(sec, sec.dataset.snapshot_id || null);
-      } catch (err) {
-        alert("No se pudo guardar: " + (err?.message || err));
-        console.error(err);
-      } finally {
-        btnEd.disabled = false;
-      }
-    }
-  });
-
-  // ====== Finalizar ======
-  btnOk?.addEventListener("click", async (e) => {
-    e.preventDefault();
-    if (!p.pedido_id) return alert("Este snapshot no tiene pedido vinculado (pedido_id).");
-    if (!confirm("¿Dar por finalizado este pedido (estado: finalizado)?")) return;
-
+function openModal(pedido) {
+  if (!pedido) return;
+  
+  const modal = $("#modalDetalles");
+  const content = $("#modalContent");
+  
+  const estado = ESTADOS_PEDIDO[pedido.estado] || ESTADOS_PEDIDO.pendiente;
+  const pago = ESTADOS_PAGO[pedido.estado_pago] || ESTADOS_PAGO.pendiente;
+  
+  content.innerHTML = `
+    <div class="modal-header">
+      <h2>Editar Pedido #${pedido.pedido_nro || "---"}</h2>
+      <p class="modal-client">${fmt(pedido.razon)}</p>
+    </div>
+    
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="modalEstado">Estado del Pedido:</label>
+        <select id="modalEstado" data-pedido-id="${pedido.pedido_id}">
+          ${Object.entries(ESTADOS_PEDIDO).map(([key, val]) => 
+            `<option value="${key}" ${pedido.estado === key ? "selected" : ""}>${val.label}</option>`
+          ).join("")}
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label for="modalPago">Estado de Pago:</label>
+        <select id="modalPago" data-pedido-id="${pedido.pedido_id}">
+          ${Object.entries(ESTADOS_PAGO).map(([key, val]) => 
+            `<option value="${key}" ${pedido.estado_pago === key ? "selected" : ""}>${val.label}</option>`
+          ).join("")}
+        </select>
+      </div>
+      
+      <div class="form-group">
+        <label for="modalMetodo">Método de Pago:</label>
+        <select id="modalMetodo" data-pedido-id="${pedido.pedido_id}">
+          ${METODOS_PAGO.map(m => 
+            `<option value="${m}" ${pedido.metodo_pago === m ? "selected" : ""}>${m}</option>`
+          ).join("")}
+        </select>
+      </div>
+    </div>
+    
+    <div class="modal-footer">
+      <button class="btn-secondary" id="btnCancelarModal">
+        Cancelar
+      </button>
+      <button class="btn-primary" id="btnGuardarModal" data-pedido-id="${pedido.pedido_id}">
+        <i class="bi bi-check-lg"></i> Guardar Cambios
+      </button>
+    </div>
+  `;
+  
+  // Event listeners del modal
+  $("#btnCancelarModal").addEventListener("click", () => closeModal());
+  
+  $("#btnGuardarModal").addEventListener("click", async () => {
+    const estado = $("#modalEstado").value;
+    const estadoPago = $("#modalPago").value;
+    const metodo = $("#modalMetodo").value;
+    const pedidoId = $("#btnGuardarModal").dataset.pedidoId;
+    
     try {
-      btnOk.disabled = true;
-      await updatePedido(p.pedido_id, { estado: "finalizado" });
-      // quitamos la tarjeta; si no queda ninguna, mostramos vacío
-      sec.remove();
-      if (!grid.children.length) render([]);
+      await updatePedido(pedidoId, {
+        estado,
+        estado_pago: estadoPago,
+        metodo_pago: metodo
+      });
+      
+      showToast("Pedido actualizado correctamente", "success");
+      closeModal();
+      await loadPedidos();
     } catch (err) {
-      alert("No se pudo finalizar: " + (err?.message || err));
-      console.error(err);
-    } finally {
-      btnOk.disabled = false;
+      showToast("Error al actualizar: " + err.message, "error");
     }
   });
-
-  return sec;
+  
+  modal.classList.add("active");
 }
 
-async function reloadCard(oldNode, snapshotId) {
-  try {
-    const pedidoId = oldNode?.dataset?.pedido_id || null;
+function closeModal() {
+  const modal = $("#modalDetalles");
+  modal.classList.remove("active");
+}
 
-    // Si no hay llaves, sacar la tarjeta
-    if (!snapshotId && !pedidoId) {
-      oldNode.remove();
-      if (!grid.children.length) render([]);
-      return;
-    }
+function showToast(msg, type = "info") {
+  const toast = document.createElement("div");
+  toast.className = `toast toast-${type}`;
+  toast.innerHTML = `
+    <i class="bi bi-${type === "success" ? "check-circle" : "exclamation-circle"}"></i>
+    ${msg}
+  `;
+  toast.style.cssText = `
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    background: ${type === "success" ? "#10b981" : type === "error" ? "#ef4444" : "#3b82f6"};
+    color: white;
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    animation: slideIn 0.3s ease-out;
+  `;
+  
+  document.body.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.style.animation = "slideOut 0.3s ease-in";
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
 
-    // Construir query sin eq(null)
-    let q = supa.from("v_pedidos_pendientes").select("*").limit(1);
-    if (snapshotId && pedidoId) {
-      q = q.or(`snapshot_id.eq.${snapshotId},pedido_id.eq.${pedidoId}`);
-    } else if (snapshotId) {
-      q = q.eq("snapshot_id", snapshotId);
-    } else {
-      q = q.eq("pedido_id", pedidoId);
-    }
+/* ========= Carga de ítems ========= */
 
-    const { data, error } = await q.single();
-    if (error) throw error;
+async function loadItemsForCard(pedidoId) {
+  const container = $(`#items-${pedidoId}`);
+  if (!container) return;
+  
+  const items = await fetchItemsByPedido(pedidoId);
+  
+  if (items.length === 0) {
+    container.innerHTML = `<p class="items-empty">Sin ítems en este pedido</p>`;
+    return;
+  }
+  
+  const total = items.reduce((sum, item) => sum + (item.cantidad * item.precio), 0);
+  
+  container.innerHTML = `
+    <table class="items-table">
+      <thead>
+        <tr>
+          <th>Producto</th>
+          <th>Cantidad</th>
+          <th>Precio Unit.</th>
+          <th>Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${items.map(item => `
+          <tr>
+            <td>${item.nombre}</td>
+            <td>${item.cantidad}</td>
+            <td>${fmtGs(item.precio)}</td>
+            <td><strong>${fmtGs(item.cantidad * item.precio)}</strong></td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+  `;
+}
 
-    if (!data) {
-      oldNode.remove();
-      if (!grid.children.length) render([]);
-      return;
-    }
+/* ========= Eventos ========= */
 
-    const idx = [...grid.children].indexOf(oldNode);
-    const newNode = cardPedido(data, Math.max(0, idx));
-    oldNode.replaceWith(newNode);
-  } catch (err) {
-    console.error("reloadCard error:", err);
-    alert("No se pudo recargar el pedido: " + (err?.message || err));
+function setupEventListeners() {
+  // Filtros
+  $("#filterEstado").addEventListener("change", (e) => {
+    filterEstado = e.target.value;
+    applyFilters();
+  });
+  
+  $("#filterPago").addEventListener("change", (e) => {
+    filterPago = e.target.value;
+    applyFilters();
+  });
+  
+  $("#searchCliente").addEventListener("keyup", (e) => {
+    searchTerm = e.target.value;
+    applyFilters();
+  });
+  
+  // Refresh
+  $("#btnRefresh").addEventListener("click", loadPedidos);
+  
+  // Modal
+  $("#closeModal").addEventListener("click", closeModal);
+  $("#modalDetalles").addEventListener("click", (e) => {
+    if (e.target.id === "modalDetalles") closeModal();
+  });
+  
+  // Agregar estilos dinámicos
+  if (!document.querySelector("style[data-pendientes]")) {
+    const style = document.createElement("style");
+    style.setAttribute("data-pendientes", "");
+    style.textContent = `
+      @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+      }
+      @keyframes slideOut {
+        from { transform: translateX(0); opacity: 1; }
+        to { transform: translateX(100%); opacity: 0; }
+      }
+    `;
+    document.head.appendChild(style);
   }
 }
 
-/* ========= Init ========= */
-(async () => {
-  try {
-    const rows = await fetchPendientes();
-    render(rows);
-  } catch (err) {
-    alert("Error cargando pedidos: " + (err?.message || err));
-    console.error(err);
+/* ========= Inicialización ========= */
+
+async function loadPedidos() {
+  $("#loadingView").style.display = "flex";
+  $("#grid").style.display = "none";
+  
+  allPedidos = await fetchAllPedidos();
+  
+  // Cargar ítems para cada pedido
+  for (const pedido of allPedidos) {
+    if (pedido.pedido_id) {
+      setTimeout(() => loadItemsForCard(pedido.pedido_id), 100);
+    }
   }
-})();
+  
+  $("#loadingView").style.display = "none";
+  
+  applyFilters();
+  updateStats();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  console.log("🚀 Inicializando módulo de pedidos pendientes...");
+  
+  setupEventListeners();
+  loadPedidos();
+  
+  // Recargar cada 30 segundos
+  setInterval(loadPedidos, 30000);
+  
+  console.log("✅ Módulo de pedidos inicializado");
+});
