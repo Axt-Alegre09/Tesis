@@ -1,361 +1,326 @@
-// JS/pasarelaPagos.js - VERSIÓN ORIGINAL + LOGGING EN buildPayload
-import { supabase } from "./ScriptLogin.js";
+// ============================================================================
+// pasarelaPagos.js - VERSIÓN CON CAPTURA COMPLETA DE DATOS DEL CLIENTE
+// ============================================================================
 
-(async function() {
-  console.log("🔵 pasarelaPagos.js - Iniciando...");
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-  const $ = function(id) {
-    return document.getElementById(id);
-  };
-  
-  const fmtPY = function(n) {
-    return new Intl.NumberFormat("es-PY").format(Number(n || 0)) + " Gs";
-  };
+const SUPABASE_URL = "https://jyygevitfnbwrvxrjexp.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5eWdldml0Zm5id3J2eHJqZXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2OTQ2OTYsImV4cCI6MjA3MTI3MDY5Nn0.St0IiSZSeELESshctneazCJHXCDBi9wrZ28UkiEDXYo";
 
-  // ============ ESPERAR FORMULARIO CON MUTATIONOBSERVER ============
-  async function esperarFormulario(selector, timeoutMs = 30000) {
-    console.log(`⏳ Esperando formulario ${selector}...`);
-    
-    return new Promise((resolve, reject) => {
-      // 1. Verificar si ya existe
-      const elemento = document.querySelector(selector);
-      if (elemento) {
-        console.log("✅ Formulario encontrado inmediatamente");
-        resolve(elemento);
-        return;
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+console.log("✅ Supabase inicializado");
+
+// ============================================================================
+// OBTENER DATOS DEL FORMULARIO
+// ============================================================================
+
+function getFormData() {
+  const form = document.querySelector("#checkout-form");
+  if (!form) {
+    console.error("❌ Formulario no encontrado");
+    return null;
+  }
+
+  const formData = new FormData(form);
+  const data = {};
+
+  // Obtener todos los campos del formulario
+  for (let [key, value] of formData.entries()) {
+    data[key] = value;
+  }
+
+  console.log("📋 Datos del formulario capturados:", data);
+  return data;
+}
+
+// ============================================================================
+// CONSTRUIR PAYLOAD CON DATOS CLIENTE
+// ============================================================================
+
+function buildPayload(cartData, formData, metodo) {
+  console.log("🔵 buildPayload() - Iniciando...");
+  console.log("   cartData recibido:", cartData);
+
+  if (!cartData || !cartData.items) {
+    throw new Error("Cart data vacío");
+  }
+
+  console.log("📦 Items en cartData:", cartData.items);
+  console.log("📦 Total en cartData:", cartData.total);
+
+  // Procesar items
+  const items = [];
+  if (Array.isArray(cartData.items)) {
+    for (const item of cartData.items) {
+      console.log("   Procesando item:", item);
+
+      if (!item.id || !item.precio || !item.cantidad) {
+        console.warn("   ⚠️ Item incompleto, saltando:", item);
+        continue;
       }
 
-      // 2. Esperar usando MutationObserver
-      const observer = new MutationObserver(() => {
-        const el = document.querySelector(selector);
-        if (el) {
-          console.log("✅ Formulario detectado por MutationObserver");
-          observer.disconnect();
-          clearTimeout(timeoutId);
-          resolve(el);
-        }
+      items.push({
+        id: item.id,
+        precio: Number(item.precio),
+        cantidad: Number(item.cantidad),
+        nombre: item.nombre || "Sin nombre"
       });
-
-      // Observar cambios en todo el documento
-      observer.observe(document.documentElement, {
-        childList: true,
-        subtree: true
-      });
-
-      // 3. Timeout de seguridad
-      const timeoutId = setTimeout(() => {
-        observer.disconnect();
-        console.error(`❌ Timeout: Formulario ${selector} no apareció en ${timeoutMs}ms`);
-        reject(new Error(`Timeout esperando ${selector}`));
-      }, timeoutMs);
-    });
+    }
   }
 
-  // ============ DATOS DEL CARRITO ============
-  function getCartData() {
-    try {
-      const snap = JSON.parse(
-        sessionStorage.getItem("checkout_snapshot") || 
-        sessionStorage.getItem("checkout") || 
-        "null"
-      );
-      if (snap && snap.items && snap.items.length > 0) {
-        console.log("✅ Datos desde sessionStorage");
-        return snap;
-      }
-    } catch (e) {
-      console.warn("Error leyendo sessionStorage");
-    }
+  console.log("✅ Items procesados:", items);
 
-    try {
-      const cart = JSON.parse(localStorage.getItem("productos-en-carrito") || "[]");
-      if (cart.length > 0) {
-        const total = cart.reduce(function(a, it) {
-          return a + Number(it.precio || 0) * Number(it.cantidad || 1);
-        }, 0);
-        console.log("✅ Datos desde localStorage");
-        return { items: cart, total: total, source: "local" };
-      }
-    } catch (e) {
-      console.warn("Error leyendo localStorage");
-    }
+  const total = Number(cartData.total || 0);
+  console.log("💰 Total calculado:", total);
 
-    console.error("❌ Carrito vacío");
-    return { items: [], total: 0, source: "none" };
-  }
+  const metodo_pago = metodo || "transferencia";
+  console.log("💳 Método de pago:", metodo_pago);
 
-  // ============ CONSTRUIR PAYLOAD ============
-  function buildPayload(cartData) {
-    console.log("🔵 buildPayload() - Iniciando...");
-    console.log("   cartData recibido:", cartData);
-    
-    if (!cartData || !cartData.items || cartData.items.length === 0) {
-      throw new Error("El carrito está vacío");
-    }
+  // ⭐ NUEVO: Incluir datos del cliente del formulario
+  console.log("👤 Datos del cliente:", {
+    razon: formData?.razon || "",
+    ruc: formData?.ruc || "",
+    tel: formData?.tel || "",
+    mail: formData?.mail || "",
+    contacto: formData?.contacto || "",
+    ciudad: formData?.ciudad || "",
+    barrio: formData?.barrio || "",
+    depto: formData?.depto || "",
+    postal: formData?.postal || "",
+    calle1: formData?.calle1 || "",
+    calle2: formData?.calle2 || "",
+    nro: formData?.nro || ""
+  });
 
-    console.log("📦 Items en cartData:", cartData.items);
-    console.log("📦 Total en cartData:", cartData.total);
+  const payload = {
+    items,
+    total,
+    metodo_pago,
+    // ⭐ Incluir datos de facturación y envío
+    razon: formData?.razon || "",
+    ruc: formData?.ruc || "",
+    tel: formData?.tel || "",
+    mail: formData?.mail || "",
+    contacto: formData?.contacto || "",
+    ciudad: formData?.ciudad || "",
+    barrio: formData?.barrio || "",
+    depto: formData?.depto || "",
+    postal: formData?.postal || "",
+    calle1: formData?.calle1 || "",
+    calle2: formData?.calle2 || "",
+    nro: formData?.nro || ""
+  };
 
-    // Validar formato UUID
-    function isValidUUID(str) {
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      return uuidRegex.test(str);
-    }
+  console.log("✅ Payload construido completo:");
+  console.log("   Items en payload:", payload.items);
+  console.log("   Cantidad de items:", payload.items.length);
+  console.log("   Total en payload:", payload.total);
+  console.log("   📦 Payload completo:", payload);
 
-    const items = cartData.items.map(function(it) {
-      console.log("   Procesando item:", it);
-      
-      const id = String(it.id || '');
-      
-      // Validar que el ID sea UUID válido
-      if (!isValidUUID(id)) {
-        console.error("❌ ID inválido para producto:", it);
-        throw new Error(`Producto con ID inválido: ${it.titulo || it.nombre || 'sin nombre'}`);
-      }
+  return payload;
+}
 
-      return {
-        id: id,
-        titulo: String(it.titulo || it.nombre || 'Producto'),
-        precio: Number(it.precio || 0),
-        cantidad: Number(it.cantidad || 1)
-      };
-    });
+// ============================================================================
+// GUARDAR PEDIDO EN BD
+// ============================================================================
 
-    console.log("✅ Items procesados:", items);
-
-    const total = Number(
-      cartData.total || 
-      items.reduce(function(a, it) {
-        return a + it.precio * it.cantidad;
-      }, 0)
-    );
-
-    console.log("💰 Total calculado:", total);
-
-    const metodoInput = document.querySelector('input[name="metodo"]:checked');
-    const metodo = metodoInput ? metodoInput.value : "efectivo";
-
-    console.log("💳 Método de pago:", metodo);
-
-    const getValue = function(id) {
-      const el = $(id);
-      return el ? (el.value || "").trim() : "";
-    };
-
-    const payload = {
-      source: cartData.source || "local",
-      items: items,
-      total: total,
-      ruc: getValue("ruc") || "Sin RUC",
-      razon: getValue("razon") || "Cliente",
-      tel: getValue("tel") || "Sin teléfono",
-      mail: getValue("mail") || "sin@email.com",
-      contacto: getValue("contacto") || "Sin contacto",
-      ciudad: getValue("ciudad") || "Sin ciudad",
-      barrio: getValue("barrio") || "Sin barrio",
-      depto: getValue("depto") || "Sin depto",
-      postal: getValue("postal") || "Sin postal",
-      calle1: getValue("calle1") || "Sin calle",
-      calle2: getValue("calle2") || "",
-      nro: getValue("nro") || "S/N",
-      hora_desde: getValue("hora-desde") || "09:00",
-      hora_hasta: getValue("hora-hasta") || "18:00",
-      metodo_pago: metodo
-    };
-
-    console.log("✅ Payload construido completo:");
-    console.log("   Items en payload:", payload.items);
-    console.log("   Cantidad de items:", payload.items.length);
-    console.log("   Total en payload:", payload.total);
-    console.log("   📦 Payload completo:", payload);
-
-    return payload;
-  }
-
-  // ============ GUARDAR EN BD ============
-  async function guardarPedidoEnBD() {
-    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+async function guardarPedidoEnBD(usuario, email, cartData, formData, metodo) {
+  try {
     console.log("🔵 Guardando pedido en BD...");
     console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
+    console.log("✅ Usuario:", usuario);
+    console.log("   Email:", email);
+
+    console.log("✅ Carrito:", cartData.items?.length, "items");
+    console.log("   Items:", cartData.items);
+
+    // Construir payload con datos del cliente
+    const payload = buildPayload(cartData, formData, metodo);
+
+    console.log("✅ Payload construido");
+
+    console.log("🚀 Llamando a crear_pedido_desde_checkout...");
+
+    // Llamar RPC
+    const { data, error } = await supabase.rpc("crear_pedido_desde_checkout", {
+      p_usuario: usuario,
+      p_checkout: payload
+    });
+
+    if (error) {
+      console.error("❌ Error en RPC:", error);
+      throw error;
+    }
+
+    console.log("✅ RPC ejecutado exitosamente");
+    console.log("   Respuesta:", data);
+
+    if (!data || data.length === 0) {
+      throw new Error("RPC retornó respuesta vacía");
+    }
+
+    const resultado = data[0];
+    console.log("🔍 DEBUG_MSG COMPLETO:");
+    console.log("   " + resultado.debug_msg);
+
+    return {
+      pedido_id: resultado.pedido_id,
+      snapshot_id: resultado.snapshot_id,
+      debug_msg: resultado.debug_msg
+    };
+  } catch (err) {
+    console.error("❌ Error guardando pedido:", err);
+    throw err;
+  }
+}
+
+// ============================================================================
+// INTERCEPTAR FORM SUBMIT
+// ============================================================================
+
+function setupFormInterceptor() {
+  const form = document.querySelector("#checkout-form");
+
+  if (!form) {
+    console.log("⏳ Esperando formulario #checkout-form...");
+    setTimeout(setupFormInterceptor, 100);
+    return;
+  }
+
+  console.log("✅ Formulario encontrado inmediatamente");
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    console.log("🔵 SUBMIT INTERCEPTADO");
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
     try {
-      // 1. Verificar usuario
-      const userData = await supabase.auth.getUser();
-      
-      if (userData.error || !userData.data || !userData.data.user) {
+      // 1. Obtener datos del usuario
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData?.user) {
         throw new Error("Usuario no autenticado");
       }
-      
-      const user = userData.data.user;
-      console.log("✅ Usuario:", user.id);
-      console.log("   Email:", user.email);
+
+      const usuario = userData.user.id;
+      const email = userData.user.email;
 
       // 2. Obtener datos del carrito
-      const cartData = getCartData();
+      const cartData = getCartFromSessionStorage();
       if (!cartData || !cartData.items || cartData.items.length === 0) {
         throw new Error("Carrito vacío");
       }
-      console.log("✅ Carrito:", cartData.items.length, "items");
-      console.log("   Items:", cartData.items);
 
-      // 3. Construir payload (con validación UUID)
-      const payload = buildPayload(cartData);
-      console.log("✅ Payload construido");
-
-      // 4. Llamar a la función RPC
-      console.log("🚀 Llamando a crear_pedido_desde_checkout...");
-
-      const rpcResult = await supabase.rpc("crear_pedido_desde_checkout", {
-        p_usuario: user.id,
-        p_checkout: payload
-      });
-
-      if (rpcResult.error) {
-        console.error("❌ Error RPC:", rpcResult.error);
-        throw rpcResult.error;
+      // 3. ⭐ OBTENER DATOS DEL FORMULARIO
+      const formData = getFormData();
+      if (!formData) {
+        throw new Error("No se pudieron obtener datos del formulario");
       }
 
-      console.log("✅ RPC ejecutado exitosamente");
-      console.log("   Respuesta:", rpcResult.data);
-      
-      // LOG DEL DEBUG_MSG COMPLETO
-      if (rpcResult.data && rpcResult.data[0]) {
-        console.log("🔍 DEBUG_MSG COMPLETO:");
-        console.log("   " + (rpcResult.data[0].debug_msg || "SIN DEBUG_MSG"));
-      }
+      // 4. Obtener método de pago seleccionado
+      const metodoSeleccionado = document.querySelector(
+        'input[name="metodo"]:checked'
+      )?.value || "transferencia";
 
-      // 5. Extraer IDs del resultado
-      const result = Array.isArray(rpcResult.data) ? rpcResult.data[0] : rpcResult.data;
-      const pedidoId = result ? result.pedido_id : null;
-      
-      if (!pedidoId) {
-        throw new Error("No se recibió pedido_id del servidor");
-      }
+      console.log("🔵 Guardando en BD primero...");
+
+      // 5. Guardar pedido en BD (con datos del cliente)
+      const resultado = await guardarPedidoEnBD(
+        usuario,
+        email,
+        cartData,
+        formData,
+        metodoSeleccionado
+      );
 
       console.log("✅ Pedido creado exitosamente");
-      console.log("   ID del pedido:", pedidoId);
-      console.log("   Snapshot ID:", result.snapshot_id);
+      console.log("   ID del pedido:", resultado.pedido_id);
+      console.log("   Snapshot ID:", resultado.snapshot_id);
 
-      // 6. Guardar info global para usar en checkout.js
-      window.__pedido_creado__ = {
-        pedido_id: pedidoId,
-        snapshot_id: result.snapshot_id,
-        total: payload.total,
-        metodo: payload.metodo_pago
-      };
-
-      // 7. Limpiar carrito
+      // 6. Limpiar carrito
       console.log("🧹 Limpiando carrito...");
-      try {
-        if (window.CartAPI && window.CartAPI.empty) {
-          await window.CartAPI.empty();
-        }
-        localStorage.removeItem("productos-en-carrito");
-        sessionStorage.removeItem("checkout_snapshot");
-        sessionStorage.removeItem("checkout");
-        console.log("✅ Carrito limpiado");
-      } catch (e) {
-        console.warn("⚠️ Error limpiando:", e);
-      }
+      sessionStorage.removeItem("carrito");
+      console.log("✅ Carrito limpiado");
 
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
       console.log("✅ PEDIDO GUARDADO EXITOSAMENTE");
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
-      return { success: true, pedido_id: pedidoId };
-
+      // 7. Ejecutar el submit original si existe checkout.js
+      if (window.procesarPago) {
+        console.log("🔵 Ejecutando checkout.js...");
+        window.procesarPago();
+      } else {
+        console.log("⚠️ checkout.js no disponible, redirigiendo...");
+        // Redirigir a página de éxito
+        setTimeout(() => {
+          window.location.href = "/";
+        }, 2000);
+      }
     } catch (err) {
-      console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-      console.error("❌ ERROR AL GUARDAR PEDIDO");
-      console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-      console.error("Mensaje:", err.message);
-      console.error("Detalles:", err);
-      console.error("Stack:", err.stack);
-      
-      return { success: false, error: err.message };
+      console.error("❌ Error en submit:", err);
+      alert("Error: " + err.message);
     }
+  });
+
+  console.log("✅ Interceptor configurado correctamente");
+}
+
+// ============================================================================
+// OBTENER CARRITO DESDE SESSION STORAGE
+// ============================================================================
+
+function getCartFromSessionStorage() {
+  const storedCart = sessionStorage.getItem("carrito");
+  if (!storedCart) {
+    console.error("❌ Carrito no encontrado en sessionStorage");
+    return null;
   }
 
-  // ============ INTERCEPTOR ============
-  function setupInterceptor(form) {
-    console.log("✅ Configurando interceptor en el formulario");
-
-    // Guardar el handler original
-    const checkoutOriginal = form.onsubmit;
-    
-    // Reemplazar completamente
-    form.onsubmit = async function(evento) {
-      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-      console.log("🔵 SUBMIT INTERCEPTADO");
-      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-
-      evento.preventDefault();
-      evento.stopPropagation();
-
-      // Verificar carrito antes de proceder
-      const cartData = getCartData();
-      if (!cartData || !cartData.items || cartData.items.length === 0) {
-        alert("El carrito está vacío");
-        return false;
-      }
-
-      console.log("🔵 Guardando en BD primero...");
-
-      const resultado = await guardarPedidoEnBD();
-
-      if (!resultado.success) {
-        alert("Error al guardar el pedido: " + resultado.error);
-        console.error("❌ No se pudo guardar el pedido");
-        return false;
-      }
-
-      console.log("✅ Pedido guardado exitosamente");
-      console.log("🔵 Ejecutando checkout.js...");
-
-      // Ejecutar handler original
-      if (checkoutOriginal) {
-        return checkoutOriginal.call(form, evento);
-      }
-
-      return false;
-    };
-
-    console.log("✅ Interceptor configurado correctamente");
-  }
-
-  // ============ INIT ============
   try {
-    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    console.log("🔵 Inicializando pasarelaPagos.js");
-    
-    // Esperar a que aparezca el formulario (hasta 30 segundos)
-    const form = await esperarFormulario("#checkout-form", 30000);
-    
-    if (!form) {
-      throw new Error("No se pudo encontrar el formulario");
-    }
+    const cartData = JSON.parse(storedCart);
+    console.log("✅ Datos desde sessionStorage");
+    return cartData;
+  } catch (err) {
+    console.error("❌ Error parseando carrito:", err);
+    return null;
+  }
+}
 
-    console.log("✅ Formulario encontrado");
+// ============================================================================
+// INICIALIZAR
+// ============================================================================
 
-    const cartData = getCartData();
-    console.log("🛒 Items:", cartData.items ? cartData.items.length : 0);
-    console.log("💰 Total:", fmtPY(cartData.total || 0));
-    
-    setupInterceptor(form);
+document.addEventListener("DOMContentLoaded", () => {
+  console.log("✅ checkout-tarjetas.js cargado correctamente");
+  console.log("🔵 pasarelaPagos.js - Iniciando...");
 
-    console.log("✅ pasarelaPagos.js LISTO");
-    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+  console.log("🔵 Inicializando pasarelaPagos.js");
+  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
-    // Exponer función para debug
-    window.testGuardarPedido = guardarPedidoEnBD;
-    console.log("💡 window.testGuardarPedido() disponible para testing");
+  // Configurar el interceptor del formulario
+  setupFormInterceptor();
 
-  } catch (error) {
-    console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    console.error("❌ ERROR FATAL en pasarelaPagos.js");
-    console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    console.error("Mensaje:", error.message);
-    console.error("Stack:", error.stack);
+  // Mostrar carrito
+  const cartData = getCartFromSessionStorage();
+  if (cartData) {
+    console.log("🛒 Items:", cartData.items?.length || 0);
+    console.log("💰 Total:", new Intl.NumberFormat("es-PY").format(cartData.total || 0), "Gs");
   }
 
-})();
+  console.log("✅ pasarelaPagos.js LISTO");
+  console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+});
+
+// Exponemos función para testing
+window.testGuardarPedido = async function() {
+  const cartData = getCartFromSessionStorage();
+  const formData = getFormData();
+  const usuario = (await supabase.auth.getUser()).data.user.id;
+  
+  return guardarPedidoEnBD(usuario, "test@test.com", cartData, formData, "tarjeta");
+};
