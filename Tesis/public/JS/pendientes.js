@@ -141,31 +141,65 @@ async function fetchItemsByPedido(pedidoId) {
   if (!pedidoId) return [];
   
   try {
-    const { data, error } = await supabase
+    console.log("📦 Cargando items para pedido:", pedidoId);
+    
+    // Primero cargar los detalles del pedido
+    const { data: detalles, error: errorDetalles } = await supabase
       .from("detalles_pedido")
-      .select(`
-        cantidad,
-        precio_unitario,
-        productos (
-          id,
-          nombre,
-          imagen
-        )
-      `)
+      .select("id, cantidad, precio_unitario, producto_id")
       .eq("pedido_id", pedidoId)
       .order("id", { ascending: true });
     
-    if (error) {
-      console.warn("Error cargando items:", error.message);
+    if (errorDetalles) {
+      console.warn("Error cargando detalles:", errorDetalles.message);
       return [];
     }
     
-    return (data || []).map(d => ({
-      nombre: d?.productos?.nombre || "(sin nombre)",
-      imagen: d?.productos?.imagen || null,
-      cantidad: Number(d?.cantidad || 1),
-      precio: Number(d?.precio_unitario || 0)
+    if (!detalles || detalles.length === 0) {
+      console.log("📦 Sin ítems para este pedido");
+      return [];
+    }
+    
+    // Luego cargar los productos por separado
+    const productIds = detalles.map(d => d.producto_id).filter(Boolean);
+    
+    if (productIds.length === 0) return detalles.map(d => ({
+      nombre: "(producto sin ID)",
+      imagen: null,
+      cantidad: Number(d.cantidad || 1),
+      precio: Number(d.precio_unitario || 0)
     }));
+    
+    const { data: productos, error: errorProductos } = await supabase
+      .from("productos")
+      .select("id, nombre, imagen")
+      .in("id", productIds);
+    
+    if (errorProductos) {
+      console.warn("Error cargando productos:", errorProductos.message);
+      return detalles.map(d => ({
+        nombre: "(error cargando producto)",
+        imagen: null,
+        cantidad: Number(d.cantidad || 1),
+        precio: Number(d.precio_unitario || 0)
+      }));
+    }
+    
+    // Mapear productos con sus detalles
+    const productMap = {};
+    (productos || []).forEach(p => {
+      productMap[p.id] = p;
+    });
+    
+    return detalles.map(d => {
+      const prod = productMap[d.producto_id];
+      return {
+        nombre: prod?.nombre || "(producto desconocido)",
+        imagen: prod?.imagen || null,
+        cantidad: Number(d.cantidad || 1),
+        precio: Number(d.precio_unitario || 0)
+      };
+    });
   } catch (err) {
     console.error("Error en fetchItemsByPedido:", err);
     return [];
