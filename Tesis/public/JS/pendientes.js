@@ -62,7 +62,8 @@ async function fetchAllPedidos() {
 
     // Extraer IDs de usuarios únicos
     const userIds = [...new Set(pedidos.map(p => p.usuario_id).filter(Boolean))];
-    console.log(`👥 Cargando datos de ${userIds.length} clientes. IDs:`, userIds);
+    console.log(`👥 Cargando datos de ${userIds.length} clientes. IDs:`);
+    userIds.forEach((id, i) => console.log(`   ${i+1}. ${id}`));
     
     // Cargar datos del cliente
     let clientes = [];
