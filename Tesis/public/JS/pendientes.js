@@ -1,10 +1,12 @@
-// JS/pendientes.js - VERSIÓN MEJORADA
+// JS/pendientes.js - VERSIÓN CORREGIDA
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 /* ========= Supabase ========= */
 const SUPABASE_URL = "https://jyygevitfnbwrvxrjexp.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5eWdldml0Zm5id3J2eHJqZXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2OTQ2OTYsImV4cCI6MjA3MTI3MDY5Nn0.St0IiSZSeELESshctneazCJHXCDBi9wrZ28UkiEDXYo";
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+console.log("✅ Supabase inicializado");
 
 /* ========= Estados y Colores ========= */
 const ESTADOS_PEDIDO = {
@@ -38,17 +40,79 @@ let searchTerm = "";
 
 async function fetchAllPedidos() {
   try {
-    const { data, error } = await supabase
+    console.log("🔄 Cargando pedidos...");
+    
+    // Intentar cargar desde v_pedidos_pendientes
+    let { data, error } = await supabase
       .from("v_pedidos_pendientes")
       .select("*")
       .order("creado_en", { ascending: false });
     
-    if (error) throw error;
+    if (error) {
+      console.warn("Vista v_pedidos_pendientes no disponible, intentando tabla pedidos...", error.message);
+      
+      // Fallback a tabla pedidos directa
+      const result = await supabase
+        .from("pedidos")
+        .select(`
+          id,
+          pedido_nro,
+          estado,
+          estado_pago,
+          metodo_pago,
+          total_real,
+          creado_en,
+          clientes_perfil!pedidos_cliente_id_fkey (
+            id,
+            email,
+            nombre,
+            razon,
+            ruc,
+            tel,
+            mail,
+            contacto,
+            ciudad,
+            barrio,
+            depto,
+            postal,
+            calle1,
+            calle2,
+            nro
+          )
+        `)
+        .order("creado_en", { ascending: false });
+      
+      if (result.error) throw result.error;
+      
+      data = (result.data || []).map(p => ({
+        pedido_id: p.id,
+        pedido_nro: p.pedido_nro,
+        estado: p.estado,
+        estado_pago: p.estado_pago,
+        metodo_pago: p.metodo_pago,
+        total_real: p.total_real,
+        creado_en: p.creado_en,
+        razon: p.clientes_perfil?.[0]?.razon || p.clientes_perfil?.razon || "",
+        mail: p.clientes_perfil?.[0]?.mail || p.clientes_perfil?.mail || "",
+        email: p.clientes_perfil?.[0]?.email || p.clientes_perfil?.email || "",
+        ruc: p.clientes_perfil?.[0]?.ruc || p.clientes_perfil?.ruc || "",
+        tel: p.clientes_perfil?.[0]?.tel || p.clientes_perfil?.tel || "",
+        contacto: p.clientes_perfil?.[0]?.contacto || p.clientes_perfil?.contacto || "",
+        ciudad: p.clientes_perfil?.[0]?.ciudad || p.clientes_perfil?.ciudad || "",
+        barrio: p.clientes_perfil?.[0]?.barrio || p.clientes_perfil?.barrio || "",
+        depto: p.clientes_perfil?.[0]?.depto || p.clientes_perfil?.depto || "",
+        postal: p.clientes_perfil?.[0]?.postal || p.clientes_perfil?.postal || "",
+        calle1: p.clientes_perfil?.[0]?.calle1 || p.clientes_perfil?.calle1 || "",
+        calle2: p.clientes_perfil?.[0]?.calle2 || p.clientes_perfil?.calle2 || "",
+        nro: p.clientes_perfil?.[0]?.nro || p.clientes_perfil?.nro || ""
+      }));
+    }
     
+    console.log(`✅ ${data?.length || 0} pedidos cargados`);
     return data || [];
   } catch (err) {
     console.error("Error cargando pedidos:", err);
-    showToast("Error al cargar pedidos", "error");
+    showToast("Error al cargar pedidos: " + err.message, "error");
     return [];
   }
 }
@@ -57,12 +121,15 @@ async function updatePedido(pedidoId, updates) {
   if (!pedidoId) throw new Error("ID de pedido requerido");
   
   try {
+    console.log("💾 Actualizando pedido:", pedidoId, updates);
+    
     const { error } = await supabase
       .from("pedidos")
       .update(updates)
       .eq("id", pedidoId);
     
     if (error) throw error;
+    console.log("✅ Pedido actualizado");
     return true;
   } catch (err) {
     console.error("Error actualizando pedido:", err);
@@ -79,7 +146,11 @@ async function fetchItemsByPedido(pedidoId) {
       .select(`
         cantidad,
         precio_unitario,
-        productos:productos!detalles_pedido_producto_id_fkey ( id, nombre, imagen )
+        productos (
+          id,
+          nombre,
+          imagen
+        )
       `)
       .eq("pedido_id", pedidoId)
       .order("id", { ascending: true });
@@ -134,9 +205,15 @@ function updateStats() {
   const finalizados = allPedidos.filter(p => p.estado === "finalizado").length;
   const cancelados = allPedidos.filter(p => p.estado === "cancelado").length;
   
-  document.getElementById("countPendientes").textContent = pendientes;
-  document.getElementById("countFinalizados").textContent = finalizados;
-  document.getElementById("countCancelados").textContent = cancelados;
+  const elPendientes = document.getElementById("countPendientes");
+  const elFinalizados = document.getElementById("countFinalizados");
+  const elCancelados = document.getElementById("countCancelados");
+  
+  if (elPendientes) elPendientes.textContent = pendientes;
+  if (elFinalizados) elFinalizados.textContent = finalizados;
+  if (elCancelados) elCancelados.textContent = cancelados;
+  
+  console.log(`📊 Stats: Pendientes=${pendientes}, Finalizados=${finalizados}, Cancelados=${cancelados}`);
 }
 
 /* ========= Renderizado ========= */
@@ -144,14 +221,21 @@ function updateStats() {
 function renderPedidos() {
   const grid = $("#grid");
   
+  if (!grid) {
+    console.error("❌ No se encontró #grid");
+    return;
+  }
+  
   if (filteredPedidos.length === 0) {
     grid.style.display = "none";
-    $("#emptyView").style.display = "flex";
+    const emptyView = $("#emptyView");
+    if (emptyView) emptyView.style.display = "flex";
     return;
   }
   
   grid.style.display = "grid";
-  $("#emptyView").style.display = "none";
+  const emptyView = $("#emptyView");
+  if (emptyView) emptyView.style.display = "none";
   
   grid.innerHTML = filteredPedidos.map(p => createCardPedido(p)).join("");
   
@@ -159,16 +243,50 @@ function renderPedidos() {
   $$(".card-header").forEach(card => {
     card.addEventListener("click", (e) => {
       const cardEl = e.currentTarget.closest(".card");
-      const body = cardEl.querySelector(".card-body");
-      cardEl.classList.toggle("expanded");
+      cardEl?.classList.toggle("expanded");
     });
   });
   
   $$(".btn-editar").forEach(btn => {
-    btn.addEventListener("click", (e) => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
       const pedidoId = btn.dataset.pedidoId;
       const pedido = allPedidos.find(p => p.pedido_id === pedidoId);
-      openModal(pedido);
+      if (pedido) openModal(pedido);
+    });
+  });
+  
+  $$(".btn-finalizar").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const pedidoId = btn.dataset.pedidoId;
+      const confirmed = confirm("¿Marcar este pedido como finalizado?");
+      if (confirmed) {
+        try {
+          await updatePedido(pedidoId, { estado: "finalizado" });
+          showToast("Pedido finalizado", "success");
+          await loadPedidos();
+        } catch (err) {
+          showToast("Error: " + err.message, "error");
+        }
+      }
+    });
+  });
+  
+  $$(".btn-cancelar").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const pedidoId = btn.dataset.pedidoId;
+      const confirmed = confirm("¿Cancelar este pedido?");
+      if (confirmed) {
+        try {
+          await updatePedido(pedidoId, { estado: "cancelado" });
+          showToast("Pedido cancelado", "success");
+          await loadPedidos();
+        } catch (err) {
+          showToast("Error: " + err.message, "error");
+        }
+      }
     });
   });
 }
@@ -185,11 +303,11 @@ function createCardPedido(p) {
         <div class="card-title-section">
           <div class="card-nro">
             <span class="nro-label">Pedido</span>
-            <span class="nro-value">#${p.pedido_nro || "---"}</span>
+            <span class="nro-value">#${p.pedido_nro || p.pedido_id?.slice(0, 8) || "---"}</span>
           </div>
           <div class="card-client-info">
-            <div class="client-name">${fmt(p.razon)}</div>
-            <div class="client-email">${fmt(p.mail)}</div>
+            <div class="client-name">${fmt(p.razon || p.email || "Cliente")}</div>
+            <div class="client-email">${fmt(p.mail || p.email)}</div>
           </div>
         </div>
         
@@ -309,13 +427,15 @@ function openModal(pedido) {
   const modal = $("#modalDetalles");
   const content = $("#modalContent");
   
+  if (!modal || !content) return;
+  
   const estado = ESTADOS_PEDIDO[pedido.estado] || ESTADOS_PEDIDO.pendiente;
   const pago = ESTADOS_PAGO[pedido.estado_pago] || ESTADOS_PAGO.pendiente;
   
   content.innerHTML = `
     <div class="modal-header">
-      <h2>Editar Pedido #${pedido.pedido_nro || "---"}</h2>
-      <p class="modal-client">${fmt(pedido.razon)}</p>
+      <h2>Editar Pedido #${pedido.pedido_nro || pedido.pedido_id?.slice(0, 8) || "---"}</h2>
+      <p class="modal-client">${fmt(pedido.razon || pedido.email || "Cliente")}</p>
     </div>
     
     <div class="modal-body">
@@ -358,35 +478,42 @@ function openModal(pedido) {
   `;
   
   // Event listeners del modal
-  $("#btnCancelarModal").addEventListener("click", () => closeModal());
+  const btnCancel = document.getElementById("btnCancelarModal");
+  const btnSave = document.getElementById("btnGuardarModal");
   
-  $("#btnGuardarModal").addEventListener("click", async () => {
-    const estado = $("#modalEstado").value;
-    const estadoPago = $("#modalPago").value;
-    const metodo = $("#modalMetodo").value;
-    const pedidoId = $("#btnGuardarModal").dataset.pedidoId;
-    
-    try {
-      await updatePedido(pedidoId, {
-        estado,
-        estado_pago: estadoPago,
-        metodo_pago: metodo
-      });
+  if (btnCancel) {
+    btnCancel.addEventListener("click", () => closeModal());
+  }
+  
+  if (btnSave) {
+    btnSave.addEventListener("click", async () => {
+      const estado = (document.getElementById("modalEstado") || {}).value;
+      const estadoPago = (document.getElementById("modalPago") || {}).value;
+      const metodo = (document.getElementById("modalMetodo") || {}).value;
+      const pedidoId = btnSave.dataset.pedidoId;
       
-      showToast("Pedido actualizado correctamente", "success");
-      closeModal();
-      await loadPedidos();
-    } catch (err) {
-      showToast("Error al actualizar: " + err.message, "error");
-    }
-  });
+      try {
+        await updatePedido(pedidoId, {
+          estado,
+          estado_pago: estadoPago,
+          metodo_pago: metodo
+        });
+        
+        showToast("Pedido actualizado correctamente", "success");
+        closeModal();
+        await loadPedidos();
+      } catch (err) {
+        showToast("Error al actualizar: " + err.message, "error");
+      }
+    });
+  }
   
   modal.classList.add("active");
 }
 
 function closeModal() {
   const modal = $("#modalDetalles");
-  modal.classList.remove("active");
+  if (modal) modal.classList.remove("active");
 }
 
 function showToast(msg, type = "info") {
@@ -463,29 +590,47 @@ async function loadItemsForCard(pedidoId) {
 
 function setupEventListeners() {
   // Filtros
-  $("#filterEstado").addEventListener("change", (e) => {
-    filterEstado = e.target.value;
-    applyFilters();
-  });
+  const filterEstadoEl = $("#filterEstado");
+  const filterPagoEl = $("#filterPago");
+  const searchClienteEl = $("#searchCliente");
+  const btnRefreshEl = $("#btnRefresh");
+  const closeModalEl = $("#closeModal");
+  const modalDetallesEl = $("#modalDetalles");
   
-  $("#filterPago").addEventListener("change", (e) => {
-    filterPago = e.target.value;
-    applyFilters();
-  });
+  if (filterEstadoEl) {
+    filterEstadoEl.addEventListener("change", (e) => {
+      filterEstado = e.target.value;
+      applyFilters();
+    });
+  }
   
-  $("#searchCliente").addEventListener("keyup", (e) => {
-    searchTerm = e.target.value;
-    applyFilters();
-  });
+  if (filterPagoEl) {
+    filterPagoEl.addEventListener("change", (e) => {
+      filterPago = e.target.value;
+      applyFilters();
+    });
+  }
   
-  // Refresh
-  $("#btnRefresh").addEventListener("click", loadPedidos);
+  if (searchClienteEl) {
+    searchClienteEl.addEventListener("keyup", (e) => {
+      searchTerm = e.target.value;
+      applyFilters();
+    });
+  }
   
-  // Modal
-  $("#closeModal").addEventListener("click", closeModal);
-  $("#modalDetalles").addEventListener("click", (e) => {
-    if (e.target.id === "modalDetalles") closeModal();
-  });
+  if (btnRefreshEl) {
+    btnRefreshEl.addEventListener("click", loadPedidos);
+  }
+  
+  if (closeModalEl) {
+    closeModalEl.addEventListener("click", closeModal);
+  }
+  
+  if (modalDetallesEl) {
+    modalDetallesEl.addEventListener("click", (e) => {
+      if (e.target.id === "modalDetalles") closeModal();
+    });
+  }
   
   // Agregar estilos dinámicos
   if (!document.querySelector("style[data-pendientes]")) {
@@ -508,10 +653,15 @@ function setupEventListeners() {
 /* ========= Inicialización ========= */
 
 async function loadPedidos() {
-  $("#loadingView").style.display = "flex";
-  $("#grid").style.display = "none";
+  const loadingView = $("#loadingView");
+  const grid = $("#grid");
+  
+  if (loadingView) loadingView.style.display = "flex";
+  if (grid) grid.style.display = "none";
   
   allPedidos = await fetchAllPedidos();
+  
+  console.log("📦 Pedidos obtenidos:", allPedidos.length);
   
   // Cargar ítems para cada pedido
   for (const pedido of allPedidos) {
@@ -520,7 +670,7 @@ async function loadPedidos() {
     }
   }
   
-  $("#loadingView").style.display = "none";
+  if (loadingView) loadingView.style.display = "none";
   
   applyFilters();
   updateStats();
