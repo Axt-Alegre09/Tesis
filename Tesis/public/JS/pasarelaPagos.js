@@ -1,5 +1,5 @@
 // ============================================================================
-// pasarelaPagos.js - VERSIÓN CON CAPTURA COMPLETA DE DATOS DEL CLIENTE
+// pasarelaPagos.js - VERSIÓN FINAL CORREGIDA
 // ============================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -25,13 +25,46 @@ function getFormData() {
   const formData = new FormData(form);
   const data = {};
 
-  // Obtener todos los campos del formulario
   for (let [key, value] of formData.entries()) {
     data[key] = value;
   }
 
   console.log("📋 Datos del formulario capturados:", data);
   return data;
+}
+
+// ============================================================================
+// OBTENER CARRITO - CON FALLBACK A URL PARAM
+// ============================================================================
+
+function getCartFromSessionStorage() {
+  // 1. Intentar desde sessionStorage
+  const storedCart = sessionStorage.getItem("carrito");
+  if (storedCart) {
+    try {
+      const cartData = JSON.parse(storedCart);
+      console.log("✅ Carrito obtenido desde sessionStorage");
+      return cartData;
+    } catch (err) {
+      console.warn("⚠️ Error parseando sessionStorage:", err);
+    }
+  }
+
+  // 2. Fallback: Construir desde URL param (monto)
+  const params = new URLSearchParams(window.location.search);
+  const monto = params.get("monto");
+  
+  if (monto) {
+    console.log("✅ Carrito obtenido desde URL param (monto):", monto);
+    // Retornar carrito mínimo con el monto
+    return {
+      items: [],
+      total: Number(monto)
+    };
+  }
+
+  console.error("❌ Carrito no encontrado en sessionStorage ni URL");
+  return null;
 }
 
 // ============================================================================
@@ -42,24 +75,15 @@ function buildPayload(cartData, formData, metodo) {
   console.log("🔵 buildPayload() - Iniciando...");
   console.log("   cartData recibido:", cartData);
 
-  if (!cartData || !cartData.items) {
+  if (!cartData) {
     throw new Error("Cart data vacío");
   }
 
-  console.log("📦 Items en cartData:", cartData.items);
-  console.log("📦 Total en cartData:", cartData.total);
-
-  // Procesar items
+  // Procesar items - pueden estar vacíos si vinieron desde URL
   const items = [];
-  if (Array.isArray(cartData.items)) {
+  if (Array.isArray(cartData.items) && cartData.items.length > 0) {
     for (const item of cartData.items) {
-      console.log("   Procesando item:", item);
-
-      if (!item.id || !item.precio || !item.cantidad) {
-        console.warn("   ⚠️ Item incompleto, saltando:", item);
-        continue;
-      }
-
+      if (!item.id || !item.precio || !item.cantidad) continue;
       items.push({
         id: item.id,
         precio: Number(item.precio),
@@ -69,7 +93,7 @@ function buildPayload(cartData, formData, metodo) {
     }
   }
 
-  console.log("✅ Items procesados:", items);
+  console.log("✅ Items procesados:", items.length);
 
   const total = Number(cartData.total || 0);
   console.log("💰 Total calculado:", total);
@@ -77,7 +101,6 @@ function buildPayload(cartData, formData, metodo) {
   const metodo_pago = metodo || "transferencia";
   console.log("💳 Método de pago:", metodo_pago);
 
-  // ⭐ NUEVO: Incluir datos del cliente del formulario
   console.log("👤 Datos del cliente:", {
     razon: formData?.razon || "",
     ruc: formData?.ruc || "",
@@ -97,7 +120,6 @@ function buildPayload(cartData, formData, metodo) {
     items,
     total,
     metodo_pago,
-    // ⭐ Incluir datos de facturación y envío
     razon: formData?.razon || "",
     ruc: formData?.ruc || "",
     tel: formData?.tel || "",
@@ -112,12 +134,7 @@ function buildPayload(cartData, formData, metodo) {
     nro: formData?.nro || ""
   };
 
-  console.log("✅ Payload construido completo:");
-  console.log("   Items en payload:", payload.items);
-  console.log("   Cantidad de items:", payload.items.length);
-  console.log("   Total en payload:", payload.total);
-  console.log("   📦 Payload completo:", payload);
-
+  console.log("✅ Payload construido completo");
   return payload;
 }
 
@@ -133,17 +150,11 @@ async function guardarPedidoEnBD(usuario, email, cartData, formData, metodo) {
     console.log("✅ Usuario:", usuario);
     console.log("   Email:", email);
 
-    console.log("✅ Carrito:", cartData.items?.length, "items");
-    console.log("   Items:", cartData.items);
-
-    // Construir payload con datos del cliente
     const payload = buildPayload(cartData, formData, metodo);
 
     console.log("✅ Payload construido");
-
     console.log("🚀 Llamando a crear_pedido_desde_checkout...");
 
-    // Llamar RPC
     const { data, error } = await supabase.rpc("crear_pedido_desde_checkout", {
       p_usuario: usuario,
       p_checkout: payload
@@ -208,13 +219,13 @@ function setupFormInterceptor() {
       const usuario = userData.user.id;
       const email = userData.user.email;
 
-      // 2. Obtener datos del carrito
+      // 2. Obtener datos del carrito (con fallback a URL)
       const cartData = getCartFromSessionStorage();
-      if (!cartData || !cartData.items || cartData.items.length === 0) {
-        throw new Error("Carrito vacío");
+      if (!cartData || cartData.total === 0) {
+        throw new Error("Carrito vacío o total = 0");
       }
 
-      // 3. ⭐ OBTENER DATOS DEL FORMULARIO
+      // 3. OBTENER DATOS DEL FORMULARIO
       const formData = getFormData();
       if (!formData) {
         throw new Error("No se pudieron obtener datos del formulario");
@@ -227,7 +238,7 @@ function setupFormInterceptor() {
 
       console.log("🔵 Guardando en BD primero...");
 
-      // 5. Guardar pedido en BD (con datos del cliente)
+      // 5. Guardar pedido en BD
       const resultado = await guardarPedidoEnBD(
         usuario,
         email,
@@ -238,28 +249,22 @@ function setupFormInterceptor() {
 
       console.log("✅ Pedido creado exitosamente");
       console.log("   ID del pedido:", resultado.pedido_id);
-      console.log("   Snapshot ID:", resultado.snapshot_id);
 
       // 6. Limpiar carrito
       console.log("🧹 Limpiando carrito...");
       sessionStorage.removeItem("carrito");
+      localStorage.removeItem("carrito");
       console.log("✅ Carrito limpiado");
 
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
       console.log("✅ PEDIDO GUARDADO EXITOSAMENTE");
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
-      // 7. Ejecutar el submit original si existe checkout.js
-      if (window.procesarPago) {
-        console.log("🔵 Ejecutando checkout.js...");
-        window.procesarPago();
-      } else {
-        console.log("⚠️ checkout.js no disponible, redirigiendo...");
-        // Redirigir a página de éxito
-        setTimeout(() => {
-          window.location.href = "/";
-        }, 2000);
-      }
+      // 7. Redirigir a página de éxito
+      setTimeout(() => {
+        window.location.href = "/";
+      }, 1500);
+
     } catch (err) {
       console.error("❌ Error en submit:", err);
       alert("Error: " + err.message);
@@ -267,27 +272,6 @@ function setupFormInterceptor() {
   });
 
   console.log("✅ Interceptor configurado correctamente");
-}
-
-// ============================================================================
-// OBTENER CARRITO DESDE SESSION STORAGE
-// ============================================================================
-
-function getCartFromSessionStorage() {
-  const storedCart = sessionStorage.getItem("carrito");
-  if (!storedCart) {
-    console.error("❌ Carrito no encontrado en sessionStorage");
-    return null;
-  }
-
-  try {
-    const cartData = JSON.parse(storedCart);
-    console.log("✅ Datos desde sessionStorage");
-    return cartData;
-  } catch (err) {
-    console.error("❌ Error parseando carrito:", err);
-    return null;
-  }
 }
 
 // ============================================================================
@@ -302,10 +286,8 @@ document.addEventListener("DOMContentLoaded", () => {
   console.log("🔵 Inicializando pasarelaPagos.js");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
-  // Configurar el interceptor del formulario
   setupFormInterceptor();
 
-  // Mostrar carrito
   const cartData = getCartFromSessionStorage();
   if (cartData) {
     console.log("🛒 Items:", cartData.items?.length || 0);
@@ -315,12 +297,3 @@ document.addEventListener("DOMContentLoaded", () => {
   console.log("✅ pasarelaPagos.js LISTO");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 });
-
-// Exponemos función para testing
-window.testGuardarPedido = async function() {
-  const cartData = getCartFromSessionStorage();
-  const formData = getFormData();
-  const usuario = (await supabase.auth.getUser()).data.user.id;
-  
-  return guardarPedidoEnBD(usuario, "test@test.com", cartData, formData, "tarjeta");
-};
