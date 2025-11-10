@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Paniquiños</title>
+  <title>Pasarela de Pagos - Paniquiños</title>
 
   <link rel="shortcut icon" href="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinosico.ico" type="image/x-icon">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
@@ -177,7 +177,7 @@
             <div class="grid-2">
               <div>
                 <label class="form-label" for="efectivo-monto">Monto con el que pagás</label>
-                <input class="form-input" id="efectivo-monto" name="efectivo-monto" type="number" min="0" step="1000" placeholder="100000" required>
+                <input class="form-input" id="efectivo-monto" name="efectivo-monto" type="number" min="0" step="1000" placeholder="100000">
               </div>
               <div>
                 <label class="form-label">Total de tu pedido</label>
@@ -239,7 +239,7 @@
   <!-- Tu lógica legacy (validaciones UI / factura opcional) -->
   <script src="JS/checkout.js"></script>
 
-  <!-- CORREGIDO: Ahora es un módulo que puede importar supabase -->
+  <!-- Pasarela de pagos principal -->
   <script type="module" src="JS/pasarelaPagos.js"></script>
 </body>
 </html>

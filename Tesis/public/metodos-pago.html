@@ -9,7 +9,6 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
   <link rel="stylesheet" href="CSS/main.css">
-  <link rel="stylesheet" href="CSS/metodos-pago.css">
 </head>
 <body>
   <div class="wrapper">
@@ -38,18 +37,14 @@
         <!-- Lista de tarjetas guardadas -->
         <section class="tarjetas-guardadas" id="tarjetas-guardadas">
           <h3>Tus tarjetas</h3>
+          
           <div id="lista-tarjetas" class="lista-tarjetas">
             <div class="loading">
-              <div class="spinner-border" role="status"></div>
+              <div class="spinner-border text-primary" role="status"></div>
               <span>Cargando tarjetas...</span>
             </div>
           </div>
         </section>
-
-        <!-- Botón para agregar nueva tarjeta -->
-        <button class="btn-agregar-tarjeta" id="btn-agregar">
-          <i class="bi bi-plus-circle"></i> Agregar nueva tarjeta
-        </button>
 
         <!-- Modal para agregar/editar tarjeta -->
         <div class="modal-overlay" id="modal-tarjeta" hidden>
@@ -179,7 +174,8 @@
         </div>
       </div>
     </main>
-                <!-- Scripts -->
-            <script type="module" src="JS/metodos-pago.js"></script>
+
+    <script type="module" src="JS/metodos-pago.js"></script>
+  </div>
 </body>
 </html>
