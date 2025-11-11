@@ -9,159 +9,149 @@
   <link rel="stylesheet" href="CSS/catering.css" />
 </head>
 <body>
-  <div class="catering-wrapper">
+  <div class="catering-app">
     
-    <!-- BARRA DE CONTROLES -->
-    <div class="controls-bar">
-      <div class="controls-left">
-        <div class="filter-group">
-          <button class="filter-btn active" data-filter="all">
-            <span class="badge">0</span> Todos
+    <!-- BARRA SUPERIOR -->
+    <div class="top-bar">
+      <div class="bar-left">
+        <div class="filter-pills">
+          <button class="pill active" data-filter="all">
+            <span class="count">0</span>Todos
           </button>
-          <button class="filter-btn" data-filter="pending">
-            <span class="badge">0</span> Pendientes
+          <button class="pill" data-filter="pending">
+            <span class="count">0</span>Pendientes
           </button>
-          <button class="filter-btn" data-filter="in-progress">
-            <span class="badge">0</span> En Curso
+          <button class="pill" data-filter="in-progress">
+            <span class="count">0</span>En Curso
           </button>
-          <button class="filter-btn" data-filter="completed">
-            <span class="badge">0</span> Finalizados
+          <button class="pill" data-filter="completed">
+            <span class="count">0</span>Finalizados
           </button>
         </div>
       </div>
 
-      <div class="controls-right">
-        <input type="search" id="searchInput" class="search-box" placeholder="Buscar cliente, teléfono..." />
-        <button id="btnNewReserva" class="btn-add">+ Agendar</button>
+      <div class="bar-right">
+        <div class="search-wrapper">
+          <input type="search" id="searchInput" class="search-field" placeholder="Buscar..." />
+        </div>
+        <button id="btnNew" class="btn-new-main">+ Agendar</button>
       </div>
     </div>
 
-    <!-- CONTENIDO PRINCIPAL -->
-    <main class="main-content">
-      
-      <!-- TABLA DE RESERVAS -->
-      <section class="table-section">
-        <div class="table-wrapper">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Cliente</th>
-                <th>Teléfono</th>
-                <th>Fecha</th>
-                <th>Invitados</th>
-                <th>Estado</th>
-                <th style="width: 100px;">Acciones</th>
-              </tr>
-            </thead>
-            <tbody id="tableBody">
-              <!-- Llenado dinámicamente -->
-            </tbody>
-          </table>
-          
-          <div id="emptyState" class="empty-message">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/>
-            </svg>
-            <p>No hay reservas registradas</p>
-          </div>
-        </div>
-      </section>
+    <!-- TABLA PRINCIPAL -->
+    <section class="table-container">
+      <table class="main-table">
+        <thead>
+          <tr>
+            <th>Cliente</th>
+            <th>Teléfono</th>
+            <th>Fecha</th>
+            <th>Invitados</th>
+            <th>Estado</th>
+            <th class="col-actions">Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          <!-- Dinámico -->
+        </tbody>
+      </table>
 
-      <!-- PANEL FORMULARIO -->
-      <aside class="form-section">
-        <div class="form-box">
-          
-          <div class="form-top">
-            <h3 id="formTitle">Nueva Reserva</h3>
-            <button id="btnCloseForm" class="btn-close" title="Cerrar">✕</button>
-          </div>
-
-          <form id="reservaForm" class="form">
-            
-            <!-- Nombre y Email -->
-            <div class="form-row">
-              <div class="form-group">
-                <label>Nombre *</label>
-                <input id="r_nombre" type="text" placeholder="Cliente" required />
-              </div>
-              <div class="form-group">
-                <label>Email</label>
-                <input id="r_email" type="email" placeholder="correo@ejemplo.com" />
-              </div>
-            </div>
-
-            <!-- Teléfono y Dirección -->
-            <div class="form-row">
-              <div class="form-group">
-                <label>Teléfono *</label>
-                <input id="r_telefono" type="tel" placeholder="0991 000 000" required />
-              </div>
-              <div class="form-group">
-                <label>Dirección</label>
-                <input id="r_direccion" type="text" placeholder="Ubicación" />
-              </div>
-            </div>
-
-            <!-- Tipo y Menú -->
-            <div class="form-row">
-              <div class="form-group">
-                <label>Tipo Servicio</label>
-                <input id="r_tipo" type="text" placeholder="Ej: Catering" />
-              </div>
-              <div class="form-group">
-                <label>Menú</label>
-                <input id="r_menu" type="text" placeholder="Seleccionar" />
-              </div>
-            </div>
-
-            <!-- Invitados y Fecha -->
-            <div class="form-row">
-              <div class="form-group">
-                <label>Invitados *</label>
-                <input id="r_invitados" type="number" min="1" placeholder="0" required />
-              </div>
-              <div class="form-group">
-                <label>Fecha *</label>
-                <input id="r_fecha" type="date" required />
-              </div>
-            </div>
-
-            <!-- Hora -->
-            <div class="form-group">
-              <label>Hora *</label>
-              <input id="r_hora" type="time" required />
-            </div>
-
-            <!-- Estado (solo en edición) -->
-            <div id="statusGroup" class="form-group" style="display: none;">
-              <label>Estado</label>
-              <select id="r_estado">
-                <option value="pending">Pendiente</option>
-                <option value="in-progress">En Curso</option>
-                <option value="completed">Finalizado</option>
-              </select>
-            </div>
-
-            <!-- Botones -->
-            <div class="form-buttons">
-              <button type="button" id="btnCancel" class="btn btn-cancel">Cancelar</button>
-              <button type="submit" id="btnSave" class="btn btn-save">Agendar</button>
-              <button type="button" id="btnDelete" class="btn btn-delete" style="display: none;">Eliminar</button>
-            </div>
-
-          </form>
-
-        </div>
-      </aside>
-
-    </main>
+      <div id="emptyMsg" class="no-data">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+          <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+        </svg>
+        <p>No hay reservas</p>
+      </div>
+    </section>
 
   </div>
 
-  <!-- Toast -->
-  <div id="toastContainer" class="toast-container"></div>
+  <!-- MODAL DRAWER -->
+  <div id="modalBackdrop" class="modal-backdrop"></div>
+  <div id="modalDrawer" class="modal-drawer">
+    <div class="drawer-header">
+      <h2 id="drawerTitle">Nueva Reserva</h2>
+      <button id="btnCloseModal" class="close-btn">✕</button>
+    </div>
 
-  <!-- Script -->
+    <form id="mainForm" class="main-form">
+      <!-- FILA 1 -->
+      <div class="form-row">
+        <div class="form-col">
+          <label>Nombre *</label>
+          <input id="f_nombre" type="text" placeholder="Cliente" required />
+        </div>
+        <div class="form-col">
+          <label>Teléfono *</label>
+          <input id="f_telefono" type="tel" placeholder="0991 000 000" required />
+        </div>
+      </div>
+
+      <!-- FILA 2 -->
+      <div class="form-row">
+        <div class="form-col">
+          <label>Email</label>
+          <input id="f_email" type="email" placeholder="correo@ejemplo.com" />
+        </div>
+        <div class="form-col">
+          <label>Dirección</label>
+          <input id="f_direccion" type="text" placeholder="Ubicación" />
+        </div>
+      </div>
+
+      <!-- FILA 3 -->
+      <div class="form-row">
+        <div class="form-col">
+          <label>Tipo Servicio</label>
+          <input id="f_tipo" type="text" placeholder="Catering" />
+        </div>
+        <div class="form-col">
+          <label>Menú</label>
+          <input id="f_menu" type="text" placeholder="Seleccionar" />
+        </div>
+      </div>
+
+      <!-- FILA 4 -->
+      <div class="form-row">
+        <div class="form-col">
+          <label>Invitados *</label>
+          <input id="f_invitados" type="number" min="1" placeholder="0" required />
+        </div>
+        <div class="form-col">
+          <label>Fecha *</label>
+          <input id="f_fecha" type="date" required />
+        </div>
+      </div>
+
+      <!-- FILA 5 -->
+      <div class="form-row">
+        <div class="form-col">
+          <label>Hora *</label>
+          <input id="f_hora" type="time" required />
+        </div>
+        <div class="form-col" id="statusCol" style="display: none;">
+          <label>Estado</label>
+          <select id="f_estado">
+            <option value="pending">Pendiente</option>
+            <option value="in-progress">En Curso</option>
+            <option value="completed">Finalizado</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- BOTONES -->
+      <div class="form-footer">
+        <button type="button" id="btnModalCancel" class="btn-cancel">Cancelar</button>
+        <button type="submit" id="btnModalSave" class="btn-save">Agendar</button>
+        <button type="button" id="btnModalDelete" class="btn-delete" style="display: none;">Eliminar</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- TOAST -->
+  <div id="toastArea" class="toast-area"></div>
+
+  <!-- SCRIPT -->
   <script type="module" src="JS/catering.js"></script>
 </body>
 </html>
