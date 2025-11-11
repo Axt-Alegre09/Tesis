@@ -1,4 +1,4 @@
-// JS/checkout.js - VERSIÓN MEJORADA CON PROMOS Y FORMATEO
+// JS/checkout.js - VERSIÓN CON GUARDAR CARRITO EN localStorage
 (function () {
   // --------- DOM ---------
   const form = document.getElementById('checkout-form');
@@ -158,11 +158,23 @@
   }
 
   // --------- Envío del formulario ---------
-  form?.addEventListener('submit', (e) => {
+  form?.addEventListener("submit", (e) => {
     e.preventDefault();
 
     const metodo = document.querySelector('input[name="metodo"]:checked')?.value;
     const { total, source, items } = getCheckoutData();
+
+    // ⭐ GUARDAR CARRITO EN localStorage ANTES DE NAVEGAR
+    try {
+      const cartToSave = {
+        items: items || [],
+        total: total || 0
+      };
+      localStorage.setItem("carrito", JSON.stringify(cartToSave));
+      console.log("✅ Carrito guardado en localStorage:", cartToSave);
+    } catch (err) {
+      console.warn("⚠️ Error guardando carrito en localStorage:", err);
+    }
 
     if (source !== 'remote' && (!isFinite(total) || total <= 0)) {
       return;
