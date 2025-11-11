@@ -9,80 +9,80 @@
   <link rel="stylesheet" href="CSS/catering.css" />
 </head>
 <body>
-  <div class="catering-container">
+  <div class="catering-wrapper">
     
-    <!-- HEADER CON FILTROS -->
-    <header class="catering-header">
-      <div class="header-content">
-        <h1>Reservas de Catering</h1>
-        <div class="filters">
+    <!-- BARRA DE CONTROLES -->
+    <div class="controls-bar">
+      <div class="controls-left">
+        <div class="filter-group">
           <button class="filter-btn active" data-filter="all">
-            <span class="count">0</span> Todos
+            <span class="badge">0</span> Todos
           </button>
           <button class="filter-btn" data-filter="pending">
-            <span class="count">0</span> Pendientes
+            <span class="badge">0</span> Pendientes
           </button>
           <button class="filter-btn" data-filter="in-progress">
-            <span class="count">0</span> En Curso
+            <span class="badge">0</span> En Curso
           </button>
           <button class="filter-btn" data-filter="completed">
-            <span class="count">0</span> Finalizados
+            <span class="badge">0</span> Finalizados
           </button>
         </div>
       </div>
-      
-      <div class="header-actions">
-        <input type="search" id="searchInput" class="search-input" placeholder="Buscar por nombre, teléfono..." />
-        <button id="btnNewReserva" class="btn btn-new">+ Nueva Reserva</button>
+
+      <div class="controls-right">
+        <input type="search" id="searchInput" class="search-box" placeholder="Buscar cliente, teléfono..." />
+        <button id="btnNewReserva" class="btn-add">+ Agendar</button>
       </div>
-    </header>
+    </div>
 
     <!-- CONTENIDO PRINCIPAL -->
-    <main class="catering-main">
+    <main class="main-content">
       
-      <!-- COLUMNA IZQUIERDA: TABLA DE RESERVAS -->
-      <section class="reservas-list">
-        <table class="reservas-table">
-          <thead>
-            <tr>
-              <th>Cliente</th>
-              <th>Teléfono</th>
-              <th>Fecha</th>
-              <th>Invitados</th>
-              <th>Estado</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody id="reservasTableBody">
-            <!-- Llenado dinámicamente por JS -->
-          </tbody>
-        </table>
-        
-        <div id="emptyState" class="empty-state">
-          <p>📋 No hay reservas registradas</p>
+      <!-- TABLA DE RESERVAS -->
+      <section class="table-section">
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th>Teléfono</th>
+                <th>Fecha</th>
+                <th>Invitados</th>
+                <th>Estado</th>
+                <th style="width: 100px;">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody">
+              <!-- Llenado dinámicamente -->
+            </tbody>
+          </table>
+          
+          <div id="emptyState" class="empty-message">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/>
+            </svg>
+            <p>No hay reservas registradas</p>
+          </div>
         </div>
       </section>
 
-      <!-- COLUMNA DERECHA: FORMULARIO -->
-      <aside class="form-panel">
-        <div class="form-card">
+      <!-- PANEL FORMULARIO -->
+      <aside class="form-section">
+        <div class="form-box">
           
-          <div class="form-header">
-            <h2 id="formTitle">Nueva Reserva</h2>
+          <div class="form-top">
+            <h3 id="formTitle">Nueva Reserva</h3>
             <button id="btnCloseForm" class="btn-close" title="Cerrar">✕</button>
           </div>
 
-          <form id="formReserva" class="form">
+          <form id="reservaForm" class="form">
             
-            <div class="form-group">
-              <label>Nombre/Razón Social *</label>
-              <input id="r_nombre" type="text" placeholder="Nombre del cliente" required />
-            </div>
-
+            <!-- Nombre y Email -->
             <div class="form-row">
               <div class="form-group">
-                <label>Teléfono *</label>
-                <input id="r_telefono" type="tel" placeholder="0991 000 000" required />
+                <label>Nombre *</label>
+                <input id="r_nombre" type="text" placeholder="Cliente" required />
               </div>
               <div class="form-group">
                 <label>Email</label>
@@ -90,25 +90,34 @@
               </div>
             </div>
 
-            <div class="form-group">
-              <label>Dirección</label>
-              <input id="r_direccion" type="text" placeholder="Calle y número" />
-            </div>
-
+            <!-- Teléfono y Dirección -->
             <div class="form-row">
               <div class="form-group">
-                <label>Tipo de Servicio</label>
-                <input id="r_tipo" type="text" placeholder="Catering, Evento…" />
+                <label>Teléfono *</label>
+                <input id="r_telefono" type="tel" placeholder="0991 000 000" required />
+              </div>
+              <div class="form-group">
+                <label>Dirección</label>
+                <input id="r_direccion" type="text" placeholder="Ubicación" />
+              </div>
+            </div>
+
+            <!-- Tipo y Menú -->
+            <div class="form-row">
+              <div class="form-group">
+                <label>Tipo Servicio</label>
+                <input id="r_tipo" type="text" placeholder="Ej: Catering" />
               </div>
               <div class="form-group">
                 <label>Menú</label>
-                <input id="r_menu" type="text" placeholder="Menú seleccionado" />
+                <input id="r_menu" type="text" placeholder="Seleccionar" />
               </div>
             </div>
 
+            <!-- Invitados y Fecha -->
             <div class="form-row">
               <div class="form-group">
-                <label>Nº de Invitados *</label>
+                <label>Invitados *</label>
                 <input id="r_invitados" type="number" min="1" placeholder="0" required />
               </div>
               <div class="form-group">
@@ -117,12 +126,13 @@
               </div>
             </div>
 
+            <!-- Hora -->
             <div class="form-group">
               <label>Hora *</label>
               <input id="r_hora" type="time" required />
             </div>
 
-            <!-- Solo visible en modo edición -->
+            <!-- Estado (solo en edición) -->
             <div id="statusGroup" class="form-group" style="display: none;">
               <label>Estado</label>
               <select id="r_estado">
@@ -132,10 +142,11 @@
               </select>
             </div>
 
-            <div class="form-actions">
-              <button type="button" id="btnCancelForm" class="btn btn-secondary">Cancelar</button>
-              <button type="submit" id="btnSubmit" class="btn btn-primary">Agendar</button>
-              <button type="button" id="btnDelete" class="btn btn-danger" style="display: none;">Eliminar</button>
+            <!-- Botones -->
+            <div class="form-buttons">
+              <button type="button" id="btnCancel" class="btn btn-cancel">Cancelar</button>
+              <button type="submit" id="btnSave" class="btn btn-save">Agendar</button>
+              <button type="button" id="btnDelete" class="btn btn-delete" style="display: none;">Eliminar</button>
             </div>
 
           </form>
@@ -150,7 +161,7 @@
   <!-- Toast -->
   <div id="toastContainer" class="toast-container"></div>
 
-  <!-- Script original -->
+  <!-- Script -->
   <script type="module" src="JS/catering.js"></script>
 </body>
 </html>
