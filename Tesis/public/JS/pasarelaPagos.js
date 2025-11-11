@@ -46,11 +46,25 @@ function getFormData() {
 }
 
 // ============================================================================
-// OBTENER CARRITO - CON FALLBACK A URL PARAM
+// OBTENER CARRITO - AHORA LEE DE localStorage PRIMERO
 // ============================================================================
 
 function getCartFromSessionStorage() {
-  // 1. Intentar desde sessionStorage
+  // 1. ⭐ PRIMERO intentar desde localStorage (donde lo guardó checkout.js)
+  const storedCartLocal = localStorage.getItem("carrito");
+  if (storedCartLocal) {
+    try {
+      const cartData = JSON.parse(storedCartLocal);
+      console.log("✅ Carrito obtenido desde localStorage");
+      console.log("   Items:", cartData.items?.length || 0);
+      console.log("   Total:", cartData.total || 0);
+      return cartData;
+    } catch (err) {
+      console.warn("⚠️ Error parseando localStorage:", err);
+    }
+  }
+
+  // 2. Fallback: Intentar desde sessionStorage (legacy)
   const storedCart = sessionStorage.getItem("carrito");
   if (storedCart) {
     try {
@@ -62,7 +76,7 @@ function getCartFromSessionStorage() {
     }
   }
 
-  // 2. Fallback: Construir desde URL param (monto)
+  // 3. Fallback final: Construir desde URL param (monto)
   const params = new URLSearchParams(window.location.search);
   const monto = params.get("monto");
   
@@ -75,7 +89,7 @@ function getCartFromSessionStorage() {
     };
   }
 
-  console.error("❌ Carrito no encontrado en sessionStorage ni URL");
+  console.error("❌ Carrito no encontrado en localStorage, sessionStorage ni URL");
   return null;
 }
 
@@ -231,7 +245,7 @@ function setupFormInterceptor() {
       const usuario = userData.user.id;
       const email = userData.user.email;
 
-      // 2. Obtener datos del carrito (con fallback a URL)
+      // 2. Obtener datos del carrito (ahora lee de localStorage primero)
       const cartData = getCartFromSessionStorage();
       if (!cartData || cartData.total === 0) {
         throw new Error("Carrito vacío o total = 0");
