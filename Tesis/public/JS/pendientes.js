@@ -65,23 +65,20 @@ async function fetchAllPedidos() {
     console.log(`👥 Cargando datos de ${userIds.length} clientes. IDs:`);
     userIds.forEach((id, i) => console.log(`   ${i+1}. ${id}`));
     
-    // Cargar datos del cliente
+    // Cargar datos del cliente - sin usar IN, fetch todo
     let clientes = [];
     let errorClientes = null;
     
-    if (userIds.length > 0) {
-      const result = await supabase
-        .from("clientes_perfil")
-        .select("*")
-        .in("user_id", userIds);
-      
-      clientes = result.data || [];
-      errorClientes = result.error;
-      
-      console.log(`✅ Clientes obtenidos: ${clientes.length}`);
-      if (errorClientes) {
-        console.warn("⚠️ Error en query clientes:", errorClientes.message);
-      }
+    const result = await supabase
+      .from("clientes_perfil")
+      .select("*");
+    
+    clientes = result.data || [];
+    errorClientes = result.error;
+    
+    console.log(`✅ Clientes obtenidos: ${clientes.length}`);
+    if (errorClientes) {
+      console.warn("⚠️ Error en query clientes:", errorClientes.message);
     }
     
     if (errorClientes) {
