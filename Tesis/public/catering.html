@@ -3,94 +3,180 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Gestión de Catering - Paniquiños</title>
+  <title>Catering - Paniquiños</title>
   <link rel="shortcut icon" href="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinosico.ico" type="image/x-icon">
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="CSS/catering.css" />
 </head>
 <body>
-  <div class="wrapper">
-    <header class="topbar">
-      <button class="back" aria-label="Volver">←</button>
-      <h1>Pedidos Catering</h1>
+  <div class="catering-wrapper">
+    
+    <!-- HEADER LIMPIO -->
+    <header class="catering-header">
+      <h1>Catering</h1>
     </header>
 
-    <p class="fecha">Mes actual</p>
-
-    <main class="layout-main">
+    <!-- CONTENEDOR PRINCIPAL -->
+    <main class="catering-main">
       
-      <!-- CALENDARIO - ARRIBA ANCHO COMPLETO -->
-      <section class="card calendar">
-        <header class="calendar__header">
-          <div class="month-nav">
-            <button class="icon-btn" aria-label="Mes anterior">‹</button>
-            <h2 class="month-title">Mes</h2>
-            <button class="icon-btn" aria-label="Mes siguiente">›</button>
+      <!-- CALENDARIO GRANDE -->
+      <section class="calendar-section">
+        <div class="calendar-header">
+          <div class="calendar-nav">
+            <button class="nav-btn prev-btn" aria-label="Mes anterior">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 19l-7-7 7-7"/></svg>
+            </button>
+            <h2 class="calendar-month">Noviembre 2025</h2>
+            <button class="nav-btn next-btn" aria-label="Mes siguiente">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19l7-7-7-7"/></svg>
+            </button>
           </div>
-          <span class="flag" role="img" aria-label="Bandera de Paraguay">🇵🇾</span>
-        </header>
+          <span class="calendar-flag">🇵🇾</span>
+        </div>
 
-        <div class="calendar__table">
-          <div class="wcol head">Sem</div>
-          <div class="head">Dom</div><div class="head">Lun</div><div class="head">Mar</div>
-          <div class="head">Mié</div><div class="head">Jue</div><div class="head">Vie</div><div class="head">Sáb</div>
+        <div class="calendar-container">
+          <div class="calendar__table">
+            <div class="cal-head">Sem</div>
+            <div class="cal-head">Dom</div>
+            <div class="cal-head">Lun</div>
+            <div class="cal-head">Mar</div>
+            <div class="cal-head">Mié</div>
+            <div class="cal-head">Jue</div>
+            <div class="cal-head">Vie</div>
+            <div class="cal-head">Sáb</div>
+          </div>
         </div>
       </section>
 
-      <!-- FORMULARIOS - ABAJO EN 2 COLUMNAS -->
-      <div class="forms-container">
+      <!-- FORMULARIOS AL LADO -->
+      <aside class="forms-section">
         
-        <!-- DATOS DEL SERVICIO -->
-        <section class="card form-card">
-          <h3 class="card__title">Datos del Servicio</h3>
+        <!-- DETALLE DE RESERVA -->
+        <section class="form-panel">
+          <h3 class="form-title">Datos del Servicio</h3>
           <form class="form" id="formDetalle">
-            <div class="form-grid">
-              <label>Nombre<input id="d_nombre" type="text" placeholder="Nombre del cliente" /></label>
-              <label>Teléfono<input id="d_telefono" type="tel" placeholder="0991 000 000" /></label>
-              <label>Dirección<input id="d_direccion" type="text" placeholder="Calle y número" /></label>
-              <label>Email<input id="d_email" type="email" placeholder="correo@ejemplo.com" /></label>
-              <label>Tipo de Servicio<input id="d_tipo" type="text" placeholder="Catering, Evento…" /></label>
-              <label>Menú<input id="d_menu" type="text" placeholder="Menú seleccionado" /></label>
-              <label>Número de invitados<input id="d_invitados" type="number" min="1" step="1" placeholder="0" /></label>
-              <label>Fecha<input id="d_fecha" type="date" /></label>
-              <label>Hora<input id="d_hora" type="time" /></label>
+            <div class="form-group">
+              <label>Nombre</label>
+              <input id="d_nombre" type="text" placeholder="Nombre del cliente" />
             </div>
-            <div class="acciones">
-              <button class="btn brown" id="btnCancelar" type="button">Cancelar</button>
-              <button class="btn warn" id="btnEnCurso" type="button">En curso</button>
-              <button class="btn" id="btnEditar" type="button">Editar</button>
-              <button class="btn green" id="btnFinalizar" type="button">Finalizado</button>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Teléfono</label>
+                <input id="d_telefono" type="tel" placeholder="0991 000 000" />
+              </div>
+              <div class="form-group">
+                <label>Email</label>
+                <input id="d_email" type="email" placeholder="correo@ejemplo.com" />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Dirección</label>
+              <input id="d_direccion" type="text" placeholder="Calle y número" />
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Tipo de Servicio</label>
+                <input id="d_tipo" type="text" placeholder="Catering, Evento…" />
+              </div>
+              <div class="form-group">
+                <label>Menú</label>
+                <input id="d_menu" type="text" placeholder="Menú seleccionado" />
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Invitados</label>
+                <input id="d_invitados" type="number" min="1" placeholder="0" />
+              </div>
+              <div class="form-group">
+                <label>Fecha</label>
+                <input id="d_fecha" type="date" />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Hora</label>
+              <input id="d_hora" type="time" />
+            </div>
+
+            <div class="form-actions">
+              <button type="button" id="btnCancelar" class="btn btn-secondary">Cancelar</button>
+              <button type="button" id="btnEnCurso" class="btn btn-warning">En Curso</button>
+              <button type="button" id="btnEditar" class="btn btn-outline">Editar</button>
+              <button type="button" id="btnFinalizar" class="btn btn-success">Finalizado</button>
             </div>
           </form>
         </section>
 
-        <!-- AGENDAR CATERING -->
-        <section class="card form-card">
-          <h3 class="card__title">Agendar Catering</h3>
+        <!-- AGENDAR NUEVA -->
+        <section class="form-panel">
+          <h3 class="form-title">Agendar Reserva</h3>
           <form class="form" id="formAgendar">
-            <div class="form-grid">
-              <label>Nombre<input id="a_nombre" type="text" placeholder="Nombre del cliente" /></label>
-              <label>Teléfono<input id="a_telefono" type="tel" placeholder="0991 000 000" /></label>
-              <label>Dirección<input id="a_direccion" type="text" placeholder="Calle y número" /></label>
-              <label>Email<input id="a_email" type="email" placeholder="correo@ejemplo.com" /></label>
-              <label>Tipo de Servicio<input id="a_tipo" type="text" placeholder="Catering, Evento…" /></label>
-              <label>Menú<input id="a_menu" type="text" placeholder="Preferencia" /></label>
-              <label>Número de invitados<input id="a_invitados" type="number" min="1" step="1" placeholder="0" /></label>
-              <label>Fecha<input id="a_fecha" type="date" /></label>
-              <label>Hora<input id="a_hora" type="time" /></label>
+            <div class="form-group">
+              <label>Nombre *</label>
+              <input id="a_nombre" type="text" placeholder="Nombre del cliente" required />
             </div>
-            <div class="acciones">
-              <button class="btn brown" id="btnAgendarCancelar" type="button">Cancelar</button>
-              <button class="btn primary" type="submit">Agendar</button>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Teléfono *</label>
+                <input id="a_telefono" type="tel" placeholder="0991 000 000" required />
+              </div>
+              <div class="form-group">
+                <label>Email</label>
+                <input id="a_email" type="email" placeholder="correo@ejemplo.com" />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Dirección</label>
+              <input id="a_direccion" type="text" placeholder="Calle y número" />
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Tipo de Servicio</label>
+                <input id="a_tipo" type="text" placeholder="Catering, Evento…" />
+              </div>
+              <div class="form-group">
+                <label>Menú</label>
+                <input id="a_menu" type="text" placeholder="Preferencia" />
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Invitados *</label>
+                <input id="a_invitados" type="number" min="1" placeholder="0" required />
+              </div>
+              <div class="form-group">
+                <label>Fecha *</label>
+                <input id="a_fecha" type="date" required />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Hora *</label>
+              <input id="a_hora" type="time" required />
+            </div>
+
+            <div class="form-actions">
+              <button type="button" id="btnAgendarCancelar" class="btn btn-secondary">Limpiar</button>
+              <button type="submit" class="btn btn-primary">+ Agendar</button>
             </div>
           </form>
         </section>
-      </div>
+
+      </aside>
 
     </main>
   </div>
 
-  <!-- Módulo ORIGINAL - SIN CAMBIOS -->
+  <!-- Módulo ORIGINAL -->
   <script type="module" src="JS/catering.js"></script>
 </body>
 </html>
