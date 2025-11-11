@@ -1,4 +1,4 @@
-// pendientes.js - VERSIÓN CON DISEÑO MEJORADO Y MODAL
+// pendientes.js - VERSIÓN CON DISEÑO MEJORADO Y MODAL - CORREGIDO
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -23,7 +23,7 @@ async function cargarPedidos() {
     const { data: pedidos, error } = await supabase
       .from("pedidos")
       .select("*")
-      .order("created_at", { ascending: false });
+      .order("creado_en", { ascending: false });
 
     if (error) throw error;
 
@@ -165,7 +165,7 @@ function generarTarjetaPedidoSimple(pedido) {
   const estado = pedido.estado || "pendiente";
   const colorEstado = estado === "finalizado" ? "#10b981" : estado === "cancelado" ? "#ef4444" : "#f59e0b";
   const nroPedido = pedido.id.substring(0, 8).toUpperCase();
-  const total = new Intl.NumberFormat("es-PY").format(pedido.total || 0);
+  const total = new Intl.NumberFormat("es-PY").format(pedido.monto_total || 0);
 
   return `
     <div class="pedido-card-simple" data-pedido-id="${pedido.id}" 
@@ -234,8 +234,8 @@ function mostrarModalPedido(pedido) {
   const estado = pedido.estado || "pendiente";
   const colorEstado = estado === "finalizado" ? "#10b981" : estado === "cancelado" ? "#ef4444" : "#f59e0b";
   const nroPedido = pedido.id.substring(0, 8).toUpperCase();
-  const fecha = new Date(pedido.created_at).toLocaleDateString("es-PY");
-  const total = new Intl.NumberFormat("es-PY").format(pedido.total || 0);
+  const fecha = new Date(pedido.creado_en).toLocaleDateString("es-PY");
+  const total = new Intl.NumberFormat("es-PY").format(pedido.monto_total || 0);
 
   const modal = document.createElement("div");
   modal.className = "modal-pedido";
@@ -356,7 +356,7 @@ function mostrarModalPedido(pedido) {
 
         <!-- ITEMS DEL PEDIDO -->
         <div style="margin-bottom: 24px;">
-          <h3 style="margin: 0 0 12px 0; color: #1f2937; font-size: 16px;">📦 Ítems del Pedido</h3>
+          <h3 style="margin: 0 0 12px 0; color: #1f2937; font-size: 16px;">📦 Ítems del Pedido (${items.length})</h3>
           <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
             <thead>
               <tr style="background: #f3f4f6; border-bottom: 2px solid #e5e7eb;">
