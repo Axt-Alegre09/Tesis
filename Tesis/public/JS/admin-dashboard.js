@@ -294,21 +294,18 @@ const views = {
 `,
 
   pedidos: `
-    <h2 style="font-size: 1.75rem; font-weight: 700; margin-bottom: 2rem;">Pedidos</h2>
     <div class="card">
       <iframe src="pendientes.html" style="width: 100%; height: 80vh; border: none; border-radius: 12px;"></iframe>
     </div>
   `,
 
   catering: `
-    <h2 style="font-size: 1.75rem; font-weight: 700; margin-bottom: 2rem;">Catering</h2>
     <div class="card">
       <iframe src="catering.html" style="width: 100%; height: 80vh; border: none; border-radius: 12px;"></iframe>
     </div>
   `,
 
   clientes: `
-    <h2 style="font-size: 1.75rem; font-weight: 700; margin-bottom: 2rem;">Clientes</h2>
     <div class="card">
       <p style="color: var(--text-secondary); text-align: center; padding: 3rem;">Vista de clientes en desarrollo...</p>
     </div>
