@@ -1,6 +1,6 @@
 // JS/catering.js
-// Panel de Administración de Catering - Versión Final
-// Compatible con las funciones RPC de Supabase
+// Panel de Administración de Catering - Versión Final Adaptada
+// ✅ Adaptado a los parámetros EXACTOS de tu BD
 import { supabase, requireAuth } from "./ScriptLogin.js";
 
 /* ========= Estado Global ========= */
@@ -12,18 +12,15 @@ let isEditMode = false;
 
 /* ========= Elementos del DOM ========= */
 const elements = {
-  // Tabla y contenedores
   tableBody: document.getElementById('tableBody'),
   emptyMsg: document.getElementById('emptyMsg'),
   searchInput: document.getElementById('searchInput'),
   
-  // Modal
   modalBackdrop: document.getElementById('modalBackdrop'),
   modalDrawer: document.getElementById('modalDrawer'),
   drawerTitle: document.getElementById('drawerTitle'),
   mainForm: document.getElementById('mainForm'),
   
-  // Campos del formulario
   f_nombre: document.getElementById('f_nombre'),
   f_telefono: document.getElementById('f_telefono'),
   f_email: document.getElementById('f_email'),
@@ -36,14 +33,12 @@ const elements = {
   f_estado: document.getElementById('f_estado'),
   statusCol: document.getElementById('statusCol'),
   
-  // Botones
   btnNew: document.getElementById('btnNew'),
   btnCloseModal: document.getElementById('btnCloseModal'),
   btnModalCancel: document.getElementById('btnModalCancel'),
   btnModalSave: document.getElementById('btnModalSave'),
   btnModalDelete: document.getElementById('btnModalDelete'),
   
-  // Pills de filtro
   filterPills: document.querySelectorAll('.filter-pills .pill')
 };
 
@@ -64,18 +59,15 @@ const formatDate = (dateStr) => {
 
 const formatTime = (timeStr) => {
   if (!timeStr) return '';
-  // Si viene en formato HH:MM:SS, tomar solo HH:MM
   return timeStr.slice(0, 5);
 };
 
-// Formatear hora para enviar a la BD (agregar segundos si no los tiene)
 const formatTimeForDB = (timeStr) => {
   if (!timeStr) return null;
-  if (timeStr.length === 5) return timeStr + ':00'; // HH:MM -> HH:MM:SS
+  if (timeStr.length === 5) return timeStr + ':00';
   return timeStr;
 };
 
-// MAPEO DE ESTADOS - Según la BD real
 const getStatusText = (status) => {
   const statusMap = {
     'agendado': 'Agendado',
@@ -96,9 +88,7 @@ const getStatusClass = (status) => {
   return classMap[status] || 'pending';
 };
 
-// Normalizar estado para el select del formulario
 const normalizeStatusForForm = (status) => {
-  // El select usa valores: pending, in-progress, completed
   const statusMap = {
     'agendado': 'pending',
     'en_curso': 'in-progress',
@@ -108,7 +98,6 @@ const normalizeStatusForForm = (status) => {
   return statusMap[status] || 'pending';
 };
 
-// Convertir del select al formato de BD
 const statusToBackend = (selectValue) => {
   const statusMap = {
     'pending': 'agendado',
@@ -120,8 +109,7 @@ const statusToBackend = (selectValue) => {
 };
 
 /* ========= TRANSFORMACIÓN DE DATOS (Mapper) ========= */
-// Esta función transforma los datos del formulario al formato esperado por las funciones RPC
-// SIN cambiar nada en la BD
+// ✅ ADAPTADO a los parámetros EXACTOS que espera catering_editar
 function buildReservaUpdateData(currentReserva) {
   return {
     p_id: selectedId,
@@ -139,6 +127,7 @@ function buildReservaUpdateData(currentReserva) {
   };
 }
 
+// ✅ ADAPTADO a los parámetros EXACTOS que espera catering_agendar
 function buildReservaCreateData() {
   return {
     p_razonsocial: elements.f_nombre.value.trim(),
@@ -185,7 +174,7 @@ async function verificarCupo(fecha) {
     
     if (error) {
       console.error('Error verificando cupo:', error);
-      return { tiene_cupo: true }; // Si falla, asumir que hay cupo
+      return { tiene_cupo: true };
     }
     
     return data;
@@ -200,7 +189,6 @@ function openModal(mode = 'new', data = null) {
   isEditMode = mode === 'edit';
   selectedId = data?.id || null;
   
-  // Configurar título y botones
   if (elements.drawerTitle) {
     elements.drawerTitle.textContent = mode === 'new' ? 'Nueva Reserva' : 'Editar Reserva';
   }
@@ -208,7 +196,6 @@ function openModal(mode = 'new', data = null) {
     elements.btnModalSave.textContent = mode === 'new' ? 'Agendar' : 'Guardar Cambios';
   }
   
-  // Mostrar/ocultar columna de estado y botón eliminar
   if (elements.statusCol) {
     elements.statusCol.style.display = mode === 'edit' ? 'block' : 'none';
   }
@@ -216,14 +203,11 @@ function openModal(mode = 'new', data = null) {
     elements.btnModalDelete.style.display = mode === 'edit' ? 'inline-block' : 'none';
   }
   
-  // Limpiar o llenar formulario
   if (mode === 'new') {
     if (elements.mainForm) elements.mainForm.reset();
-    // Establecer fecha de hoy por defecto
     const today = new Date().toISOString().split('T')[0];
     if (elements.f_fecha) elements.f_fecha.value = today;
   } else if (data) {
-    // Llenar campos con datos existentes
     if (elements.f_nombre) elements.f_nombre.value = data.razonsocial || '';
     if (elements.f_telefono) elements.f_telefono.value = data.telefono || '';
     if (elements.f_email) elements.f_email.value = data.email || '';
@@ -236,7 +220,6 @@ function openModal(mode = 'new', data = null) {
     if (elements.f_estado) elements.f_estado.value = normalizeStatusForForm(data.estado);
   }
   
-  // Mostrar modal
   if (elements.modalBackdrop) elements.modalBackdrop.classList.add('active');
   if (elements.modalDrawer) elements.modalDrawer.classList.add('active');
 }
@@ -282,7 +265,6 @@ function applyFilters() {
   const searchTerm = elements.searchInput?.value?.toLowerCase() || '';
   
   filteredReservas = allReservas.filter(reserva => {
-    // Filtro por estado
     let matchesStatus = true;
     if (currentFilter !== 'all') {
       const status = reserva.estado;
@@ -295,7 +277,6 @@ function applyFilters() {
       }
     }
     
-    // Filtro por búsqueda
     let matchesSearch = true;
     if (searchTerm) {
       matchesSearch = 
@@ -343,8 +324,6 @@ function renderTable() {
   
   const rows = filteredReservas.map(reserva => {
     const row = document.createElement('tr');
-    
-    // Indicador visual si es del chatbot
     const esChatBot = reserva.ruc === 'CHAT-BOT';
     
     row.innerHTML = `
@@ -395,7 +374,6 @@ function renderTable() {
 /* ========= CRUD Operations ========= */
 async function saveReserva() {
   try {
-    // Validar campos requeridos
     const requiredFields = [
       { element: elements.f_nombre, name: 'Nombre' },
       { element: elements.f_fecha, name: 'Fecha' },
@@ -414,11 +392,9 @@ async function saveReserva() {
       // ===== MODO EDICIÓN =====
       console.log('📝 Actualizando reserva ID:', selectedId);
       
-      // Obtener la reserva actual para verificar si cambió la fecha
       const currentReserva = allReservas.find(r => r.id === selectedId);
       const fechaCambio = currentReserva?.fecha !== elements.f_fecha.value;
       
-      // Si cambia la fecha y el estado es activo, verificar cupo
       if (fechaCambio && ['agendado', 'en_curso'].includes(currentReserva?.estado)) {
         const cupoInfo = await verificarCupo(elements.f_fecha.value);
         if (!cupoInfo.tiene_cupo) {
@@ -427,30 +403,22 @@ async function saveReserva() {
         }
       }
       
-      // Preparar datos para actualización usando la función mapper
+      // ✅ Preparar datos EXACTAMENTE como espera catering_editar
       const updateData = buildReservaUpdateData(currentReserva);
       
-      console.log('📤 Datos transformados para enviar:', updateData);
+      console.log('📤 Datos transformados para RPC catering_editar:', updateData);
       
+      // ✅ Llamar a la función RPC con los parámetros correctos
       const { data: editData, error: editError } = await supabase.rpc('catering_editar', updateData);
       
       if (editError) {
-        console.error('❌ Error en catering_editar - DETALLES COMPLETOS:', {
+        console.error('❌ Error en catering_editar:', {
           message: editError.message,
           code: editError.code,
           details: editError.details,
-          hint: editError.hint,
-          status: editError.status
+          hint: editError.hint
         });
-        
-        // Manejar error de cupo lleno
-        if (editError.message?.includes('Cupo lleno')) {
-          const match = editError.message.match(/límite (\d+)/);
-          const limite = match ? match[1] : '?';
-          showToast(`Cupo lleno para esa fecha. Límite: ${limite} servicios`, 'error');
-        } else {
-          showToast(editError.message || 'Error al actualizar', 'error');
-        }
+        showToast(editError.message || 'Error al actualizar', 'error');
         return;
       }
       
@@ -461,14 +429,14 @@ async function saveReserva() {
       if (currentReserva && currentReserva.estado !== newStatus) {
         console.log('📊 Actualizando estado de', currentReserva.estado, 'a', newStatus);
         
-        const { data: statusData, error: statusError } = await supabase.rpc('catering_set_estado', {
+        const { error: statusError } = await supabase.rpc('catering_set_estado', {
           p_id: selectedId,
           p_estado: newStatus
         });
         
         if (statusError) {
           console.error('Error en catering_set_estado:', statusError);
-          showToast('Datos actualizados pero hubo un problema con el estado', 'warning');
+          showToast('Datos actualizados pero hubo problema con el estado', 'warning');
         } else {
           showToast('✅ Reserva actualizada exitosamente', 'success');
         }
@@ -480,28 +448,25 @@ async function saveReserva() {
       // ===== MODO CREACIÓN =====
       console.log('➕ Creando nueva reserva');
       
-      // Verificar cupo antes de crear
       const cupoInfo = await verificarCupo(elements.f_fecha.value);
       if (!cupoInfo.tiene_cupo) {
         showToast(`No hay cupo disponible para el ${formatDate(elements.f_fecha.value)}. Límite: ${cupoInfo.limite}, Usados: ${cupoInfo.usados}`, 'error');
         return;
       }
       
-      // Preparar datos para creación usando la función mapper
+      // ✅ Preparar datos EXACTAMENTE como espera catering_agendar
       const createData = buildReservaCreateData();
       
-      console.log('📤 Datos transformados para enviar:', createData);
+      console.log('📤 Datos transformados para RPC catering_agendar:', createData);
       
+      // ✅ Llamar a la función RPC con los parámetros correctos
       const { data, error } = await supabase.rpc('catering_agendar', createData);
       
       if (error) {
         console.error('❌ Error en catering_agendar:', error);
         
-        // Manejar error de cupo lleno
         if (error.message?.includes('Cupo lleno')) {
-          const match = error.message.match(/límite (\d+)/);
-          const limite = match ? match[1] : '?';
-          showToast(`Cupo lleno para esa fecha. Límite: ${limite} servicios. Prueba otra fecha.`, 'error');
+          showToast('Cupo lleno para esa fecha. Prueba otra fecha.', 'error');
         } else {
           showToast(error.message || 'Error al crear la reserva', 'error');
         }
@@ -525,8 +490,7 @@ async function deleteReserva(id) {
   if (!confirm('¿Está seguro de CANCELAR esta reserva?\n\nEsto cambiará el estado a "Cancelado" y liberará el cupo.')) return;
   
   try {
-    // Cambiar estado a cancelado (no eliminar físicamente)
-    const { data, error } = await supabase.rpc('catering_set_estado', {
+    const { error } = await supabase.rpc('catering_set_estado', {
       p_id: id,
       p_estado: 'cancelado'
     });
@@ -544,28 +508,23 @@ async function deleteReserva(id) {
 }
 
 /* ========= Event Listeners ========= */
-// Botón nueva reserva
 elements.btnNew?.addEventListener('click', () => openModal('new'));
 
-// Cerrar modal
 elements.btnCloseModal?.addEventListener('click', closeModal);
 elements.btnModalCancel?.addEventListener('click', closeModal);
 elements.modalBackdrop?.addEventListener('click', closeModal);
 
-// Guardar reserva
 elements.mainForm?.addEventListener('submit', async (e) => {
   e.preventDefault();
   await saveReserva();
 });
 
-// Eliminar desde modal
 elements.btnModalDelete?.addEventListener('click', async () => {
   if (selectedId) {
     await deleteReserva(selectedId);
   }
 });
 
-// Filtros
 elements.filterPills.forEach(pill => {
   pill.addEventListener('click', () => {
     elements.filterPills.forEach(p => p.classList.remove('active'));
@@ -575,12 +534,10 @@ elements.filterPills.forEach(pill => {
   });
 });
 
-// Búsqueda
 elements.searchInput?.addEventListener('input', () => {
   applyFilters();
 });
 
-// Delegación de eventos para botones de la tabla
 elements.tableBody?.addEventListener('click', async (e) => {
   const btn = e.target.closest('button');
   if (!btn) return;
@@ -595,14 +552,12 @@ elements.tableBody?.addEventListener('click', async (e) => {
   }
 });
 
-// Prevenir envío del formulario con Enter en campos que no sean el submit
 elements.mainForm?.addEventListener('keypress', (e) => {
   if (e.key === 'Enter' && e.target.tagName !== 'BUTTON') {
     e.preventDefault();
   }
 });
 
-// Listener para cambio de fecha (mostrar info de cupo)
 elements.f_fecha?.addEventListener('change', async () => {
   const fecha = elements.f_fecha.value;
   if (!fecha) return;
@@ -613,7 +568,6 @@ elements.f_fecha?.addEventListener('change', async () => {
   
   const mensaje = `📅 ${formatDate(fecha)} ${esFinDeSemana ? '(Fin de semana)' : '(Día de semana)'}: ${cupoInfo.disponible} cupos disponibles de ${cupoInfo.limite}`;
   
-  // Mostrar info temporal
   const info = document.createElement('small');
   info.style.color = cupoInfo.disponible > 0 ? 'green' : 'red';
   info.textContent = mensaje;
@@ -629,10 +583,8 @@ elements.f_fecha?.addEventListener('change', async () => {
   try {
     console.log('🚀 Inicializando Panel de Catering...');
     
-    // Verificar autenticación
     await requireAuth();
     
-    // Cargar datos iniciales
     await loadReservas();
     
     console.log('✅ Panel de Catering inicializado correctamente');
@@ -641,7 +593,6 @@ elements.f_fecha?.addEventListener('change', async () => {
     
   } catch (error) {
     console.error('❌ Error al inicializar:', error);
-    // Si el error es de autenticación, redirigir al login
     if (error.message?.includes('auth') || error.message?.includes('session')) {
       window.location.href = 'login.html';
     }
