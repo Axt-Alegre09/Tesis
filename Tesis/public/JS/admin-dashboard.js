@@ -3,6 +3,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { initProductos } from './modules/productos.js';
+import { initClientes } from './clientes.js';
 
 // ========== Supabase ==========
 const SUPABASE_URL = "https://jyygevitfnbwrvxrjexp.supabase.co";
@@ -306,8 +307,303 @@ const views = {
   `,
 
   clientes: `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
+      <div>
+        <h2 style="font-size: 1.75rem; font-weight: 700; margin-bottom: 0.5rem;">Gestión de Clientes</h2>
+        <p style="color: var(--text-secondary);" id="contadorClientes">Cargando clientes...</p>
+      </div>
+      <button class="btn-primary" id="btnExportarClientes">
+        <i class="bi bi-download"></i>
+        Exportar CSV
+      </button>
+    </div>
+
+    <!-- Estadísticas -->
+    <div class="grid-4" style="margin-bottom: 2rem;">
+      <div class="card" style="border-top: 3px solid var(--primary);">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+          <div style="width: 50px; height: 50px; border-radius: 12px; background: rgba(111,92,56,0.1); color: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
+            <i class="bi bi-people"></i>
+          </div>
+          <div>
+            <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Total Clientes</div>
+            <div style="font-size: 1.75rem; font-weight: 700;" id="totalClientes">0</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="border-top: 3px solid var(--success);">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+          <div style="width: 50px; height: 50px; border-radius: 12px; background: rgba(16,185,129,0.1); color: var(--success); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
+            <i class="bi bi-person-plus"></i>
+          </div>
+          <div>
+            <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Nuevos (30 días)</div>
+            <div style="font-size: 1.75rem; font-weight: 700;" id="clientesNuevos">0</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="border-top: 3px solid var(--info);">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+          <div style="width: 50px; height: 50px; border-radius: 12px; background: rgba(59,130,246,0.1); color: var(--info); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
+            <i class="bi bi-geo-alt"></i>
+          </div>
+          <div>
+            <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Ciudad Principal</div>
+            <div style="font-size: 1.2rem; font-weight: 700;" id="ciudadTop">-</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="border-top: 3px solid var(--warning);">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+          <div style="width: 50px; height: 50px; border-radius: 12px; background: rgba(245,158,11,0.1); color: var(--warning); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
+            <i class="bi bi-envelope-check"></i>
+          </div>
+          <div>
+            <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Con Email</div>
+            <div style="font-size: 1.75rem; font-weight: 700;" id="clientesConEmail">0</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filtros y Búsqueda -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; align-items: center;">
+        <div style="position: relative;">
+          <i class="bi bi-search" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
+          <input 
+            type="search" 
+            id="searchClientes" 
+            placeholder="Buscar por nombre, email, teléfono o RUC..." 
+            style="width: 100%; padding: 0.75rem 1rem 0.75rem 2.5rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem;"
+          >
+        </div>
+        <select id="filterCiudad" style="padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem;">
+          <option value="">Todas las ciudades</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Tabla de Clientes -->
     <div class="card">
-      <p style="color: var(--text-secondary); text-align: center; padding: 3rem;">Vista de clientes en desarrollo...</p>
+      <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr style="border-bottom: 2px solid var(--border);">
+              <th style="padding: 1rem; text-align: left; font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase;">Cliente</th>
+              <th style="padding: 1rem; text-align: left; font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase;">Contacto</th>
+              <th style="padding: 1rem; text-align: left; font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase;">Ubicación</th>
+              <th style="padding: 1rem; text-align: center; font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase;">RUC</th>
+              <th style="padding: 1rem; text-align: center; font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase;">Registro</th>
+              <th style="padding: 1rem; text-align: center; font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase;">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="clientesTableBody">
+            <tr>
+              <td colspan="6" style="padding: 3rem; text-align: center; color: var(--text-muted);">
+                <div class="spinner-border" role="status" style="width: 3rem; height: 3rem; border-width: 0.3rem;"></div>
+                <p style="margin-top: 1rem;">Cargando clientes...</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Modal Ver Detalle -->
+    <div class="modal-overlay" id="modalDetalleCliente" style="display: none;">
+      <div class="card" style="max-width: 700px; width: 90%; max-height: 90vh; overflow-y: auto; position: relative;">
+        <button id="closeModalDetalle" style="position: absolute; top: 1rem; right: 1rem; background: transparent; border: none; font-size: 1.5rem; color: var(--text-muted); cursor: pointer; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 6px; transition: all 0.2s;">
+          <i class="bi bi-x-lg"></i>
+        </button>
+        
+        <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 1.5rem;">
+          <i class="bi bi-person-circle" style="color: var(--primary);"></i>
+          Detalles del Cliente
+        </h2>
+        
+        <div style="display: grid; gap: 1.5rem;">
+          <div style="padding: 1.5rem; background: var(--bg-secondary); border-radius: 12px;">
+            <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; color: var(--primary);">
+              <i class="bi bi-person-badge"></i> Información Personal
+            </h3>
+            <div style="display: grid; gap: 0.75rem;">
+              <div>
+                <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Razón Social</label>
+                <div style="font-weight: 600; font-size: 1.05rem;" id="detalleRazon">-</div>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div>
+                  <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">RUC</label>
+                  <div style="font-weight: 600;" id="detalleRuc">-</div>
+                </div>
+                <div>
+                  <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Contacto</label>
+                  <div style="font-weight: 600;" id="detalleContacto">-</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding: 1.5rem; background: var(--bg-secondary); border-radius: 12px;">
+            <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; color: var(--success);">
+              <i class="bi bi-telephone"></i> Contacto
+            </h3>
+            <div style="display: grid; gap: 0.75rem;">
+              <div>
+                <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Teléfono</label>
+                <div style="font-weight: 600;" id="detalleTel">-</div>
+              </div>
+              <div>
+                <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Email</label>
+                <div style="font-weight: 600;" id="detalleMail">-</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding: 1.5rem; background: var(--bg-secondary); border-radius: 12px;">
+            <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; color: var(--info);">
+              <i class="bi bi-geo-alt"></i> Dirección
+            </h3>
+            <div style="display: grid; gap: 0.75rem;">
+              <div>
+                <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Dirección Completa</label>
+                <div style="font-weight: 600;" id="detalleDireccion">-</div>
+              </div>
+              <div>
+                <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Código Postal</label>
+                <div style="font-weight: 600;" id="detallePostal">-</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding: 1.5rem; background: var(--bg-secondary); border-radius: 12px;">
+            <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; color: var(--text-muted);">
+              <i class="bi bi-clock-history"></i> Información del Sistema
+            </h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+              <div>
+                <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Fecha de Registro</label>
+                <div style="font-weight: 600; font-size: 0.9rem;" id="detalleFechaCreacion">-</div>
+              </div>
+              <div>
+                <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Última Actualización</label>
+                <div style="font-weight: 600; font-size: 0.9rem;" id="detalleFechaActualizacion">-</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Editar Cliente -->
+    <div class="modal-overlay" id="modalEditarCliente" style="display: none;">
+      <div class="card" style="max-width: 800px; width: 90%; max-height: 90vh; overflow-y: auto; position: relative;">
+        <button id="closeModalEditar" style="position: absolute; top: 1rem; right: 1rem; background: transparent; border: none; font-size: 1.5rem; color: var(--text-muted); cursor: pointer; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 6px; transition: all 0.2s;">
+          <i class="bi bi-x-lg"></i>
+        </button>
+        
+        <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 1.5rem;">
+          <i class="bi bi-pencil-square" style="color: var(--info);"></i>
+          Editar Cliente
+        </h2>
+        
+        <form id="formEditarCliente" style="display: flex; flex-direction: column; gap: 1.25rem;">
+          <input type="hidden" id="editClienteId">
+          
+          <fieldset style="border: 1px solid var(--border); padding: 1.5rem; border-radius: 12px;">
+            <legend style="font-weight: 700; padding: 0 0.5rem;">Información Personal</legend>
+            
+            <div style="display: grid; gap: 1rem;">
+              <div>
+                <label for="editRazon" style="display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.9rem;">Razón Social *</label>
+                <input type="text" id="editRazon" required style="width: 100%; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem;">
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div>
+                  <label for="editRuc" style="display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.9rem;">RUC</label>
+                  <input type="text" id="editRuc" style="width: 100%; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem;">
+                </div>
+                <div>
+                  <label for="editContacto" style="display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.9rem;">Persona de Contacto</label>
+                  <input type="text" id="editContacto" style="width: 100%; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem;">
+                </div>
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset style="border: 1px solid var(--border); padding: 1.5rem; border-radius: 12px;">
+            <legend style="font-weight: 700; padding: 0 0.5rem;">Contacto</legend>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+              <div>
+                <label for="editTel" style="display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.9rem;">Teléfono</label>
+                <input type="tel" id="editTel" style="width: 100%; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem;">
+              </div>
+              <div>
+                <label for="editMail" style="display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.9rem;">Email</label>
+                <input type="email" id="editMail" style="width: 100%; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem;">
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset style="border: 1px solid var(--border); padding: 1.5rem; border-radius: 12px;">
+            <legend style="font-weight: 700; padding: 0 0.5rem;">Dirección</legend>
+            
+            <div style="display: grid; gap: 1rem;">
+              <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem;">
+                <div>
+                  <label for="editCalle1" style="display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.9rem;">Calle Principal</label>
+                  <input type="text" id="editCalle1" style="width: 100%; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem;">
+                </div>
+                <div>
+                  <label for="editNro" style="display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.9rem;">Número</label>
+                  <input type="text" id="editNro" style="width: 100%; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem;">
+                </div>
+              </div>
+
+              <div>
+                <label for="editCalle2" style="display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.9rem;">Esquina / Calle 2</label>
+                <input type="text" id="editCalle2" style="width: 100%; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem;">
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
+                <div>
+                  <label for="editBarrio" style="display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.9rem;">Barrio</label>
+                  <input type="text" id="editBarrio" style="width: 100%; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem;">
+                </div>
+                <div>
+                  <label for="editCiudad" style="display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.9rem;">Ciudad</label>
+                  <input type="text" id="editCiudad" style="width: 100%; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem;">
+                </div>
+                <div>
+                  <label for="editDepto" style="display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.9rem;">Departamento</label>
+                  <input type="text" id="editDepto" style="width: 100%; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem;">
+                </div>
+              </div>
+
+              <div>
+                <label for="editPostal" style="display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.9rem;">Código Postal</label>
+                <input type="text" id="editPostal" style="width: 100%; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem;">
+              </div>
+            </div>
+          </fieldset>
+
+          <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+            <button type="button" id="btnCancelarEditar" style="flex: 1; padding: 0.875rem; border: 1px solid var(--border); background: white; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s;">
+              Cancelar
+            </button>
+            <button type="submit" class="btn-primary" style="flex: 1; padding: 0.875rem; justify-content: center;">
+              <i class="bi bi-check-lg"></i>
+              Guardar Cambios
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   `,
 
@@ -370,6 +666,13 @@ function navigateTo(viewName) {
     if (viewName === 'productos') {
       setTimeout(() => {
         initProductos();
+      }, 100);
+    }
+
+    // Si es la vista de clientes, inicializar el módulo
+    if (viewName === 'clientes') {
+      setTimeout(() => {
+        initClientes();
       }, 100);
     }
   }
