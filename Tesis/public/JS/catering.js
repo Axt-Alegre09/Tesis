@@ -435,7 +435,13 @@ async function saveReserva() {
       const { data: editData, error: editError } = await supabase.rpc('catering_editar', updateData);
       
       if (editError) {
-        console.error('❌ Error en catering_editar:', editError);
+        console.error('❌ Error en catering_editar - DETALLES COMPLETOS:', {
+          message: editError.message,
+          code: editError.code,
+          details: editError.details,
+          hint: editError.hint,
+          status: editError.status
+        });
         
         // Manejar error de cupo lleno
         if (editError.message?.includes('Cupo lleno')) {
