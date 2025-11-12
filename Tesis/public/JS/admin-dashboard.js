@@ -84,7 +84,9 @@ const views = {
           Tendencia de Ventas (Últimos 7 Días)
         </h3>
       </div>
-      <canvas id="chartVentasTendencia" height="80"></canvas>
+      <div style="position: relative; height: 300px; width: 100%;">
+        <canvas id="chartVentasTendencia"></canvas>
+      </div>
     </div>
 
     <!-- Performance Semanal -->

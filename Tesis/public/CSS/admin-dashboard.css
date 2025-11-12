@@ -627,6 +627,21 @@ button {
   border: 1px solid var(--border);
   box-shadow: var(--shadow-sm);
   margin-bottom: 1.5rem;
+  position: relative;
+  min-height: 350px;
+}
+
+/* Fix para Chart.js - evitar scroll infinito */
+.chart-container canvas {
+  max-height: 300px !important;
+  height: 300px !important;
+  width: 100% !important;
+}
+
+.chart-container > div {
+  position: relative;
+  height: 300px;
+  width: 100%;
 }
 
 .chart-header {
