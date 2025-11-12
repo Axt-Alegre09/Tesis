@@ -632,7 +632,7 @@ button {
 .chart-container {
   background: #ffffff;
   border-radius: 16px;
-  padding: 1.5rem;
+
   border: 2px solid #e8e9eb;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   margin-bottom: 1.5rem;
@@ -656,16 +656,16 @@ button {
 
 .chart-container > div {
   position: relative;
-  height: 280px;
+  height: 80px;
   width: 100%;
 }
 
 .chart-header {
   display: flex;
-  justify-content: space-between;
+  background-color: transparent;
   align-items: center;
-  margin-bottom: 1.25rem;
-  padding-bottom: 1rem;
+  padding: 20px;
+  margin: none;
   border-bottom: 2px solid #e8e9eb;
 }
 
@@ -766,6 +766,7 @@ button {
   border: 2px solid #e8e9eb;
   border-radius: 16px;
   padding: 1.5rem;
+  padding-left: 20px;
   display: flex;
   align-items: center;
   gap: 1rem;
