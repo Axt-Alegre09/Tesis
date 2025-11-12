@@ -15,117 +15,154 @@ const supa = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // ========== VISTAS (Templates HTML de cada sección) ==========
 const views = {
   dashboard: `
-    <div class="welcome-section">
-      <h2 style="font-size: 2rem; margin-bottom: 0.5rem; font-weight: 700;">¡Bienvenido de vuelta! 👋</h2>
-      <p style="color: var(--text-secondary); font-size: 1.05rem;">Aquí está el resumen de tu negocio hoy</p>
+    <div class="welcome-section" style="margin-bottom: 2rem;">
+      <h2 style="font-size: 2.25rem; margin-bottom: 0.5rem; font-weight: 800; background: linear-gradient(135deg, var(--primary), var(--primary-light)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+        ¡Bienvenido de vuelta! 👋
+      </h2>
+      <p style="color: var(--text-secondary); font-size: 1.1rem;">Intelligence Center - Análisis en Tiempo Real</p>
     </div>
 
-    <!-- Stats Grid -->
-    <div class="grid-4" style="margin-top: 2rem;">
-      <div class="card" style="border-top: 3px solid var(--primary);">
-        <div style="display: flex; align-items: center; gap: 1rem;">
-          <div style="width: 50px; height: 50px; border-radius: 12px; background: rgba(111,92,56,0.1); color: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
-            <i class="bi bi-currency-dollar"></i>
-          </div>
-          <div>
-            <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Ventas Hoy</div>
-            <div style="font-size: 1.75rem; font-weight: 700;" id="ventasHoy">0 Gs</div>
-            <div style="font-size: 0.8rem; color: var(--success); font-weight: 600; margin-top: 0.25rem;">
-              <i class="bi bi-arrow-up"></i> +12.5%
-            </div>
+    <!-- KPIs Principales -->
+    <div class="grid-4" style="margin-bottom: 2rem;">
+      <!-- Ventas Hoy -->
+      <div class="kpi-card">
+        <div class="kpi-icon" style="background: linear-gradient(135deg, rgba(111,92,56,0.1), rgba(111,92,56,0.05)); color: var(--primary);">
+          <i class="bi bi-currency-dollar"></i>
+        </div>
+        <div>
+          <div class="kpi-label">Ventas Hoy</div>
+          <div class="kpi-value" id="ventasHoy">Gs 0</div>
+          <div class="kpi-change positive" id="ventasChange">
+            <i class="bi bi-arrow-up"></i>
+            <span>Cargando...</span>
           </div>
         </div>
       </div>
 
-      <div class="card" style="border-top: 3px solid var(--success);">
-        <div style="display: flex; align-items: center; gap: 1rem;">
-          <div style="width: 50px; height: 50px; border-radius: 12px; background: rgba(16,185,129,0.1); color: var(--success); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
-            <i class="bi bi-cart-check"></i>
-          </div>
-          <div>
-            <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Pedidos Hoy</div>
-            <div style="font-size: 1.75rem; font-weight: 700;" id="pedidosHoy">0</div>
-            <div style="font-size: 0.8rem; color: var(--success); font-weight: 600; margin-top: 0.25rem;">
-              <i class="bi bi-arrow-up"></i> +8.2%
-            </div>
-          </div>
+      <!-- Pedidos Hoy -->
+      <div class="kpi-card">
+        <div class="kpi-icon" style="background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(16,185,129,0.05)); color: var(--success);">
+          <i class="bi bi-cart-check"></i>
+        </div>
+        <div>
+          <div class="kpi-label">Pedidos Hoy</div>
+          <div class="kpi-value" id="pedidosHoy">0</div>
+          <div class="kpi-subtitle">Ticket promedio: <span id="ticketPromedio">Gs 0</span></div>
         </div>
       </div>
 
-      <div class="card" style="border-top: 3px solid var(--warning);">
-        <div style="display: flex; align-items: center; gap: 1rem;">
-          <div style="width: 50px; height: 50px; border-radius: 12px; background: rgba(245,158,11,0.1); color: var(--warning); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
-            <i class="bi bi-box-seam"></i>
-          </div>
-          <div>
-            <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Productos</div>
-            <div style="font-size: 1.75rem; font-weight: 700;" id="productosTotal">0</div>
-          </div>
+      <!-- ChatBot IA -->
+      <div class="kpi-card">
+        <div class="kpi-icon" style="background: linear-gradient(135deg, rgba(59,130,246,0.1), rgba(59,130,246,0.05)); color: var(--info);">
+          <i class="bi bi-robot"></i>
+        </div>
+        <div>
+          <div class="kpi-label">Automatización IA</div>
+          <div class="kpi-value" id="chatbotInteracciones">0</div>
+          <div class="kpi-subtitle"><span id="chatbotTasa">0%</span> tasa de éxito</div>
         </div>
       </div>
 
-      <div class="card" style="border-top: 3px solid var(--info);">
-        <div style="display: flex; align-items: center; gap: 1rem;">
-          <div style="width: 50px; height: 50px; border-radius: 12px; background: rgba(59,130,246,0.1); color: var(--info); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
-            <i class="bi bi-people"></i>
-          </div>
-          <div>
-            <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Usuarios Activos</div>
-            <div style="font-size: 1.75rem; font-weight: 700;">23</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Quick Actions -->
-    <div class="grid-3" style="margin-top: 2rem;">
-      <a href="#productos" class="card" style="text-decoration: none; color: inherit; cursor: pointer; transition: all 0.3s;" data-navigate="productos">
-        <div style="width: 50px; height: 50px; border-radius: 12px; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-bottom: 1rem;">
+      <!-- Productos Total -->
+      <div class="kpi-card">
+        <div class="kpi-icon" style="background: linear-gradient(135deg, rgba(245,158,11,0.1), rgba(245,158,11,0.05)); color: var(--warning);">
           <i class="bi bi-box-seam"></i>
         </div>
-        <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem;">Gestionar Productos</h3>
-        <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0;">Agregar, editar o eliminar productos</p>
-      </a>
-
-      <a href="#catering" class="card" style="text-decoration: none; color: inherit; cursor: pointer;" data-navigate="catering">
-        <div style="width: 50px; height: 50px; border-radius: 12px; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-bottom: 1rem;">
-          <i class="bi bi-calendar-event"></i>
+        <div>
+          <div class="kpi-label">Productos</div>
+          <div class="kpi-value" id="productosTotal">0</div>
+          <div class="kpi-subtitle"><span id="productosActivos">0</span> activos</div>
         </div>
-        <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem;">Pedidos Catering</h3>
-        <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0;">Ver y gestionar reservas</p>
-      </a>
+      </div>
+    </div>
 
-      <a href="#pedidos" class="card" style="text-decoration: none; color: inherit; cursor: pointer;" data-navigate="pedidos">
-        <div style="width: 50px; height: 50px; border-radius: 12px; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-bottom: 1rem;">
-          <i class="bi bi-clock-history"></i>
-        </div>
-        <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem;">Pedidos Pendientes</h3>
-        <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0;">Revisar pedidos pendientes</p>
-      </a>
+    <!-- Gráfico de Tendencia -->
+    <div class="chart-container">
+      <div class="chart-header">
+        <h3 class="chart-title">
+          <i class="bi bi-graph-up-arrow"></i>
+          Tendencia de Ventas (Últimos 7 Días)
+        </h3>
+      </div>
+      <canvas id="chartVentasTendencia" height="80"></canvas>
+    </div>
 
-      <a href="#analytics" class="card" style="text-decoration: none; color: inherit; cursor: pointer;" data-navigate="analytics">
-        <div style="width: 50px; height: 50px; border-radius: 12px; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-bottom: 1rem;">
-          <i class="bi bi-graph-up"></i>
-        </div>
-        <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem;">Analytics</h3>
-        <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0;">Métricas y crecimiento</p>
-      </a>
+    <!-- Performance Semanal -->
+    <div class="chart-container">
+      <div class="chart-header">
+        <h3 class="chart-title">
+          <i class="bi bi-calendar-week"></i>
+          Performance Semanal
+        </h3>
+      </div>
+      <div class="week-grid" id="weekGrid">
+        <div class="loading" style="text-align: center; padding: 2rem; grid-column: 1 / -1;">Cargando datos...</div>
+      </div>
+    </div>
 
-      <a href="#reportes" class="card" style="text-decoration: none; color: inherit; cursor: pointer;" data-navigate="reportes">
-        <div style="width: 50px; height: 50px; border-radius: 12px; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-bottom: 1rem;">
-          <i class="bi bi-file-earmark-bar-graph"></i>
+    <!-- Insights en Tiempo Real -->
+    <div class="chart-container">
+      <div class="chart-header">
+        <h3 class="chart-title">
+          <i class="bi bi-lightbulb"></i>
+          Insights en Tiempo Real
+        </h3>
+      </div>
+      <div class="insights-grid">
+        <!-- Top Producto -->
+        <div class="insight-card">
+          <div class="insight-icon">🏆</div>
+          <div class="insight-content">
+            <strong>Producto Estrella Hoy</strong>
+            <span id="topProducto">-</span>
+            <small id="topProductoVentas">0 unidades vendidas</small>
+          </div>
         </div>
-        <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem;">Reportes</h3>
-        <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0;">Informes detallados</p>
-      </a>
 
-      <a href="#configuracion" class="card" style="text-decoration: none; color: inherit; cursor: pointer;" data-navigate="configuracion">
-        <div style="width: 50px; height: 50px; border-radius: 12px; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; margin-bottom: 1rem;">
-          <i class="bi bi-gear"></i>
+        <!-- ChatBot IA Stats -->
+        <div class="insight-card">
+          <div class="insight-icon">🤖</div>
+          <div class="insight-content">
+            <strong>ChatBot IA</strong>
+            <span id="chatbotCarrito">0</span>
+            <small>productos agregados al carrito</small>
+          </div>
         </div>
-        <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem;">Configuración</h3>
-        <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0;">Ajustes del sistema</p>
-      </a>
+
+        <!-- Catering Automatizado -->
+        <div class="insight-card">
+          <div class="insight-icon">🎉</div>
+          <div class="insight-content">
+            <strong>Catering Automatizado</strong>
+            <span id="cateringBot">0%</span>
+            <small id="cateringBotText">del total via ChatBot</small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Impacto de Promociones -->
+    <div class="promo-analysis">
+      <div class="chart-header">
+        <h3 class="chart-title">
+          <i class="bi bi-tag-fill"></i>
+          Impacto de Promociones (Últimos 7 Días)
+        </h3>
+      </div>
+      <div class="promo-grid">
+        <div class="promo-stat">
+          <span class="label">Sin Promoción</span>
+          <span class="value" id="ventasSinPromo">Gs 0</span>
+        </div>
+        <div class="promo-arrow">
+          <i class="bi bi-arrow-right"></i>
+          <span class="uplift" id="promoUplift">+0%</span>
+        </div>
+        <div class="promo-stat highlight">
+          <span class="label">Con Promoción</span>
+          <span class="value" id="ventasConPromo">Gs 0</span>
+        </div>
+      </div>
     </div>
   `,
 
@@ -636,15 +673,221 @@ const views = {
   `
 };
 
+// ========== INICIALIZACIÓN DEL DASHBOARD ==========
+async function initDashboard() {
+  console.log('🚀 Inicializando Dashboard Intelligence...');
+
+  try {
+    // 1. Cargar resumen del día
+    const { data: resumenHoy, error: errorResumen } = await supa
+      .from('v_resumen_hoy')
+      .select('*')
+      .single();
+
+    if (resumenHoy) {
+      document.getElementById('ventasHoy').textContent = formatGs(resumenHoy.total_hoy || 0);
+      document.getElementById('pedidosHoy').textContent = resumenHoy.pedidos_hoy || 0;
+      document.getElementById('ticketPromedio').textContent = formatGs(resumenHoy.ticket_promedio_hoy || 0);
+      
+      // Cambio porcentual (simulado por ahora - puedes comparar con ayer)
+      const changeElem = document.getElementById('ventasChange');
+      if (changeElem) {
+        changeElem.querySelector('span').textContent = '+12.5%';
+      }
+    }
+
+    // 2. Cargar ventas últimos 7 días
+    const { data: ventasSemana, error: errorVentas } = await supa
+      .from('v_ventas_por_dia')
+      .select('*')
+      .order('dia', { ascending: true })
+      .limit(7);
+
+    if (ventasSemana && ventasSemana.length > 0) {
+      initChartVentas(ventasSemana);
+      initWeekGrid(ventasSemana);
+    }
+
+    // 3. Cargar métricas del ChatBot
+    const { data: chatbotMetrics, error: errorChatbot } = await supa
+      .from('v_chatbot_metricas_hoy')
+      .select('*')
+      .single();
+
+    if (chatbotMetrics) {
+      document.getElementById('chatbotInteracciones').textContent = chatbotMetrics.total_interacciones || 0;
+      document.getElementById('chatbotTasa').textContent = `${chatbotMetrics.tasa_exito || 0}%`;
+      document.getElementById('chatbotCarrito').textContent = chatbotMetrics.productos_agregados_bot || 0;
+    }
+
+    // 4. Cargar top producto
+    const { data: topProductos, error: errorTop } = await supa
+      .from('v_top_productos_hoy')
+      .select('*')
+      .limit(1)
+      .single();
+
+    if (topProductos) {
+      document.getElementById('topProducto').textContent = topProductos.nombre || '-';
+      document.getElementById('topProductoVentas').textContent = `${topProductos.cantidad_vendida || 0} unidades vendidas`;
+    } else {
+      document.getElementById('topProducto').textContent = 'Sin ventas hoy';
+      document.getElementById('topProductoVentas').textContent = '0 unidades vendidas';
+    }
+
+    // 5. Cargar comparación catering
+    const { data: cateringStats, error: errorCatering } = await supa
+      .from('v_catering_bot_vs_manual')
+      .select('*')
+      .single();
+
+    if (cateringStats) {
+      document.getElementById('cateringBot').textContent = `${cateringStats.porcentaje_automatizado || 0}%`;
+      document.getElementById('cateringBotText').textContent = 
+        `${cateringStats.catering_bot || 0} de ${cateringStats.total_catering || 0} via ChatBot`;
+    }
+
+    // 6. Cargar impacto promos
+    const { data: promos, error: errorPromos } = await supa
+      .from('v_impacto_promos_semana')
+      .select('*')
+      .single();
+
+    if (promos) {
+      document.getElementById('ventasSinPromo').textContent = formatGs(promos.ventas_sin_promo || 0);
+      document.getElementById('ventasConPromo').textContent = formatGs(promos.ventas_con_promo || 0);
+      document.getElementById('promoUplift').textContent = `+${promos.incremento_porcentaje || 0}%`;
+    }
+
+    // 7. Cargar total productos
+    const { count: totalProductos, error: errorProductos } = await supa
+      .from('productos')
+      .select('*', { count: 'exact', head: true });
+
+    const { count: productosActivos, error: errorActivos } = await supa
+      .from('productos')
+      .select('*', { count: 'exact', head: true })
+      .eq('activo', true);
+
+    document.getElementById('productosTotal').textContent = totalProductos || 0;
+    document.getElementById('productosActivos').textContent = productosActivos || 0;
+
+    console.log('✅ Dashboard cargado correctamente');
+
+  } catch (error) {
+    console.error('❌ Error cargando dashboard:', error);
+  }
+}
+
+// Función para formatear guaraníes
+function formatGs(valor) {
+  return new Intl.NumberFormat('es-PY', {
+    style: 'currency',
+    currency: 'PYG',
+    minimumFractionDigits: 0
+  }).format(valor).replace('PYG', 'Gs').trim();
+}
+
+// Inicializar Chart.js para tendencia de ventas
+function initChartVentas(data) {
+  const ctx = document.getElementById('chartVentasTendencia');
+  if (!ctx) return;
+
+  const labels = data.map(d => {
+    const fecha = new Date(d.dia + 'T00:00:00');
+    return fecha.toLocaleDateString('es-PY', { weekday: 'short', day: 'numeric' });
+  });
+
+  const valores = data.map(d => parseFloat(d.total_gs) || 0);
+
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Ventas (Gs)',
+        data: valores,
+        borderColor: 'rgb(111, 92, 56)',
+        backgroundColor: 'rgba(111, 92, 56, 0.1)',
+        tension: 0.4,
+        fill: true,
+        pointRadius: 6,
+        pointHoverRadius: 8,
+        pointBackgroundColor: 'rgb(111, 92, 56)',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: false
+        },
+        tooltip: {
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          padding: 12,
+          titleFont: { size: 14, weight: 'bold' },
+          bodyFont: { size: 13 },
+          callbacks: {
+            label: (context) => ` ${formatGs(context.parsed.y)}`
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            callback: (value) => formatGs(value)
+          },
+          grid: {
+            color: 'rgba(0, 0, 0, 0.05)'
+          }
+        },
+        x: {
+          grid: {
+            display: false
+          }
+        }
+      }
+    }
+  });
+}
+
+// Inicializar grid semanal
+function initWeekGrid(data) {
+  const grid = document.getElementById('weekGrid');
+  if (!grid) return;
+
+  const hoy = new Date().toISOString().split('T')[0];
+
+  grid.innerHTML = data.map(d => {
+    const fecha = new Date(d.dia + 'T00:00:00');
+    const esHoy = d.dia === hoy;
+    const nombreDia = fecha.toLocaleDateString('es-PY', { weekday: 'short' });
+    const ventas = formatGs(d.total_gs || 0);
+
+    return `
+      <div class="day-cell ${esHoy ? 'today' : ''}">
+        <div class="day-name">${nombreDia}</div>
+        <div class="day-sales">${ventas}</div>
+        <div class="day-orders">${d.pedidos || 0} pedidos</div>
+      </div>
+    `;
+  }).join('');
+}
+
 // ========== NAVEGACIÓN ==========
 function navigateTo(viewName) {
   const contentArea = document.getElementById('contentArea');
   const pageTitle = document.getElementById('pageTitle');
   
-  // Actualizar contenido
   if (views[viewName]) {
     contentArea.innerHTML = views[viewName];
-    pageTitle.textContent = viewName.charAt(0).toUpperCase() + viewName.slice(1);
+    pageTitle.textContent = viewName === 'dashboard' 
+      ? 'Dashboard' 
+      : viewName.charAt(0).toUpperCase() + viewName.slice(1);
     
     // Actualizar nav activo
     document.querySelectorAll('.nav-link').forEach(link => {
@@ -654,7 +897,7 @@ function navigateTo(viewName) {
       }
     });
 
-    // Agregar event listeners a los enlaces de navegación dentro de las vistas
+    // Agregar event listeners
     contentArea.querySelectorAll('[data-navigate]').forEach(link => {
       link.addEventListener('click', (e) => {
         e.preventDefault();
@@ -662,15 +905,16 @@ function navigateTo(viewName) {
       });
     });
 
-    // Si es la vista de productos, inicializar el módulo
-    if (viewName === 'productos') {
+    // Inicializar vista específica
+    if (viewName === 'dashboard') {
+      setTimeout(() => {
+        initDashboard();
+      }, 100);
+    } else if (viewName === 'productos') {
       setTimeout(() => {
         initProductos();
       }, 100);
-    }
-
-    // Si es la vista de clientes, inicializar el módulo
-    if (viewName === 'clientes') {
+    } else if (viewName === 'clientes') {
       setTimeout(() => {
         initClientes();
       }, 100);
@@ -709,7 +953,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // ====== Logout (única parte cambiada de lógica) ======
+  // Logout
   const logoutBtn = document.getElementById('logoutBtn');
 
   logoutBtn?.addEventListener('click', async () => {
@@ -721,7 +965,6 @@ document.addEventListener('DOMContentLoaded', () => {
       console.log('✅ Sesión Supabase cerrada correctamente');
     } catch (error) {
       console.error('❌ Error al cerrar sesión en Supabase:', error);
-      // Igual seguimos con la redirección
     }
 
     window.location.href = 'loginAdmin.html';

@@ -1,4 +1,5 @@
 // /api/ask.js
+// ==================== API CHATBOT CON TRACKING ANALYTICS ====================
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
 
@@ -194,7 +195,7 @@ function initState(state) {
     history: state?.history || [],
     cart: state?.cart || {},
     lastCategory: state?.lastCategory || null,
-    // 🆕 NUEVO: Estado para recopilar datos de catering paso a paso
+    sessionId: state?.sessionId || `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     cateringData: state?.cateringData || {
       enProgreso: false,
       razonsocial: null,
@@ -254,7 +255,7 @@ async function buildContextForGPT(userMsg, state) {
     sum + (item.precio * item.qty), 0
   );
 
-  // 🆕 Contexto de catering en progreso
+  // Contexto de catering en progreso
   const cateringInfo = state.cateringData?.enProgreso ? 
     `\n\n**CATERING EN PROGRESO:**
 Datos recopilados hasta ahora:
@@ -399,7 +400,6 @@ async function processWithGPT(userMsg, state) {
           description: "Mostrar el total del carrito",
           parameters: { type: "object", properties: {} }
         },
-        // 🆕 NUEVA FUNCIÓN: Agendar catering
         {
           name: "agendar_catering",
           description: "Agendar un servicio de catering para eventos. Solo usar cuando se tengan TODOS los datos obligatorios.",
@@ -521,12 +521,11 @@ async function processWithGPT(userMsg, state) {
           };
         }
 
-        // 🆕 NUEVO CASO: Agendar catering
         case "agendar_catering": {
           try {
             console.log('[CATERING] Args originales:', args);
             
-            // 🆕 Normalizar fecha y hora a formato correcto
+            // Normalizar fecha y hora a formato correcto
             const fechaNormalizada = parseFechaNatural(args.fecha);
             const horaNormalizada = parseHoraNatural(args.hora);
             
@@ -547,7 +546,7 @@ async function processWithGPT(userMsg, state) {
               };
             }
             
-            // Llamar a la función de Supabase con el ORDEN CORRECTO de parámetros
+            // Llamar a la función de Supabase
             const { data, error } = await supa.rpc("catering_agendar", {
               p_razonsocial: args.razonsocial,
               p_tipoevento: args.tipoevento,
@@ -565,7 +564,6 @@ async function processWithGPT(userMsg, state) {
             if (error) {
               console.error('[CATERING] Error de Supabase:', error);
               
-              // Si es error de cupo lleno
               if (error.message.includes('Cupo lleno') || error.message.includes('cupo')) {
                 return {
                   reply: `❌ ${error.message}\n\n¿Querés probar con otra fecha? Los fines de semana tenemos más disponibilidad (hasta 3 servicios).`,
@@ -573,7 +571,6 @@ async function processWithGPT(userMsg, state) {
                 };
               }
               
-              // Otro tipo de error
               return {
                 reply: `❌ Hubo un problema: ${error.message}\n\n¿Podés verificar los datos e intentar de nuevo?`,
                 state
@@ -582,7 +579,7 @@ async function processWithGPT(userMsg, state) {
 
             console.log('[CATERING] Agendado exitosamente:', data);
 
-            // Éxito - Limpiar estado de catering
+            // Limpiar estado de catering
             state.cateringData = {
               enProgreso: false,
               razonsocial: null,
@@ -629,11 +626,52 @@ async function processWithGPT(userMsg, state) {
   }
 }
 
-/* ============== Handler principal ============== */
+/* ============== FUNCIÓN DE TRACKING ============== */
+async function trackInteraction(userMsg, reply, action, state, startTime) {
+  try {
+    // Determinar tipo de interacción
+    let tipo = 'consulta';
+    if (action?.type === 'ADD_TO_CART') tipo = 'agregar_carrito';
+    else if (action?.type === 'CATERING_AGENDADO') tipo = 'catering';
+    else if (action?.type === 'REMOVE_FROM_CART') tipo = 'quitar_carrito';
+    else if (userMsg.match(/hola|buen|hey|buenos dias|buenas tardes/i)) tipo = 'saludo';
+    
+    const tiempoMs = Date.now() - startTime;
+    
+    // Registrar en base de datos usando la función RPC
+    const { error } = await supa.rpc('registrar_interaccion_chatbot', {
+      p_user_id: null, // No hay user_id en el backend
+      p_tipo: tipo,
+      p_mensaje: userMsg.substring(0, 500),
+      p_respuesta: reply.substring(0, 1000),
+      p_accion: action?.type || null,
+      p_exitoso: true,
+      p_tiempo_ms: tiempoMs,
+      p_metadata: {
+        state_size: JSON.stringify(state).length,
+        has_cart: Object.keys(state.cart || {}).length > 0,
+        session_id: state.sessionId || 'anonymous'
+      }
+    });
+    
+    if (error) {
+      console.error('[TRACKING ERROR]:', error);
+    } else {
+      console.log(`[TRACKING] ${tipo} - ${tiempoMs}ms ✓`);
+    }
+  } catch (error) {
+    console.error('[TRACKING FATAL]:', error);
+    // No fallar el request por tracking
+  }
+}
+
+/* ============== HANDLER PRINCIPAL CON TRACKING ============== */
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Método no permitido" });
   }
+
+  const startTime = Date.now(); // ⏱️ Iniciar timer para tracking
 
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
@@ -653,6 +691,15 @@ export default async function handler(req, res) {
     if (result.reply) {
       addToHistory(result.state || state, "assistant", result.reply);
     }
+    
+    // 🎯 TRACKING DE INTERACCIÓN (no bloquea la respuesta)
+    trackInteraction(
+      userMsgRaw, 
+      result.reply, 
+      result.action, 
+      result.state || state, 
+      startTime
+    ).catch(err => console.error('[TRACKING] Failed silently:', err));
     
     return res.status(200).json({
       reply: result.reply,
