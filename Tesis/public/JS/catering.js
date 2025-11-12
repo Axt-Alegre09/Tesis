@@ -1,5 +1,6 @@
 // JS/catering.js
-// Panel de Reservas de Catering con tabla
+// Panel de Administración de Catering - Versión Final
+// Compatible con las funciones RPC de Supabase
 import { supabase, requireAuth } from "./ScriptLogin.js";
 
 /* ========= Estado Global ========= */
@@ -49,58 +50,80 @@ const elements = {
 /* ========= Utilidades ========= */
 const formatDate = (dateStr) => {
   if (!dateStr) return '-';
-  const date = new Date(dateStr + 'T00:00:00');
-  return date.toLocaleDateString('es-PY', { 
-    day: '2-digit', 
-    month: 'short', 
-    year: 'numeric' 
-  });
+  try {
+    const date = new Date(dateStr + 'T00:00:00');
+    return date.toLocaleDateString('es-PY', { 
+      day: '2-digit', 
+      month: 'short', 
+      year: 'numeric' 
+    });
+  } catch (e) {
+    return dateStr;
+  }
 };
 
 const formatTime = (timeStr) => {
   if (!timeStr) return '';
+  // Si viene en formato HH:MM:SS, tomar solo HH:MM
   return timeStr.slice(0, 5);
 };
 
+// Formatear hora para enviar a la BD (agregar segundos si no los tiene)
+const formatTimeForDB = (timeStr) => {
+  if (!timeStr) return null;
+  if (timeStr.length === 5) return timeStr + ':00'; // HH:MM -> HH:MM:SS
+  return timeStr;
+};
+
+// MAPEO DE ESTADOS - Según la BD real
 const getStatusText = (status) => {
   const statusMap = {
-    'pending': 'Pendiente',
-    'pendiente': 'Pendiente',
-    'in-progress': 'En Curso',
+    'agendado': 'Agendado',
     'en_curso': 'En Curso',
-    'completed': 'Finalizado',
     'finalizado': 'Finalizado',
     'cancelado': 'Cancelado'
   };
-  return statusMap[status] || status;
+  return statusMap[status] || status || 'Agendado';
 };
 
 const getStatusClass = (status) => {
   const classMap = {
-    'pending': 'pending',
-    'pendiente': 'pending',
-    'in-progress': 'in-progress',
+    'agendado': 'pending',
     'en_curso': 'in-progress',
-    'completed': 'completed',
     'finalizado': 'completed',
     'cancelado': 'cancelled'
   };
   return classMap[status] || 'pending';
 };
 
-const normalizeStatus = (status) => {
+// Normalizar estado para el select del formulario
+const normalizeStatusForForm = (status) => {
+  // El select usa valores: pending, in-progress, completed
   const statusMap = {
-    'pendiente': 'pending',
+    'agendado': 'pending',
     'en_curso': 'in-progress',
     'finalizado': 'completed',
     'cancelado': 'cancelled'
   };
-  return statusMap[status] || status;
+  return statusMap[status] || 'pending';
+};
+
+// Convertir del select al formato de BD
+const statusToBackend = (selectValue) => {
+  const statusMap = {
+    'pending': 'agendado',
+    'in-progress': 'en_curso',
+    'completed': 'finalizado',
+    'cancelled': 'cancelado'
+  };
+  return statusMap[selectValue] || 'agendado';
 };
 
 /* ========= Toast Notifications ========= */
 function showToast(message, type = 'success') {
   const toastArea = document.getElementById('toastArea');
+  if (!toastArea) return;
+  
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
   toast.textContent = message;
@@ -117,48 +140,74 @@ function showToast(message, type = 'success') {
   }, 3000);
 }
 
+/* ========= Verificar Cupo ========= */
+async function verificarCupo(fecha) {
+  try {
+    const { data, error } = await supabase.rpc('verificar_cupo_catering', {
+      p_fecha: fecha
+    });
+    
+    if (error) {
+      console.error('Error verificando cupo:', error);
+      return { tiene_cupo: true }; // Si falla, asumir que hay cupo
+    }
+    
+    return data;
+  } catch (err) {
+    console.error('Error verificando cupo:', err);
+    return { tiene_cupo: true };
+  }
+}
+
 /* ========= Modal Functions ========= */
 function openModal(mode = 'new', data = null) {
   isEditMode = mode === 'edit';
   selectedId = data?.id || null;
   
   // Configurar título y botones
-  elements.drawerTitle.textContent = mode === 'new' ? 'Nueva Reserva' : 'Editar Reserva';
-  elements.btnModalSave.textContent = mode === 'new' ? 'Agendar' : 'Guardar';
+  if (elements.drawerTitle) {
+    elements.drawerTitle.textContent = mode === 'new' ? 'Nueva Reserva' : 'Editar Reserva';
+  }
+  if (elements.btnModalSave) {
+    elements.btnModalSave.textContent = mode === 'new' ? 'Agendar' : 'Guardar Cambios';
+  }
   
   // Mostrar/ocultar columna de estado y botón eliminar
-  if (mode === 'edit') {
-    elements.statusCol.style.display = 'block';
-    elements.btnModalDelete.style.display = 'inline-block';
-  } else {
-    elements.statusCol.style.display = 'none';
-    elements.btnModalDelete.style.display = 'none';
+  if (elements.statusCol) {
+    elements.statusCol.style.display = mode === 'edit' ? 'block' : 'none';
+  }
+  if (elements.btnModalDelete) {
+    elements.btnModalDelete.style.display = mode === 'edit' ? 'inline-block' : 'none';
   }
   
   // Limpiar o llenar formulario
   if (mode === 'new') {
-    elements.mainForm.reset();
+    if (elements.mainForm) elements.mainForm.reset();
+    // Establecer fecha de hoy por defecto
+    const today = new Date().toISOString().split('T')[0];
+    if (elements.f_fecha) elements.f_fecha.value = today;
   } else if (data) {
-    elements.f_nombre.value = data.razonsocial || '';
-    elements.f_telefono.value = data.telefono || '';
-    elements.f_email.value = data.email || '';
-    elements.f_direccion.value = data.lugar || '';
-    elements.f_tipo.value = data.tipoevento || 'Catering';
-    elements.f_menu.value = data.tipocomida || '';
-    elements.f_invitados.value = data.invitados || '';
-    elements.f_fecha.value = data.fecha || '';
-    elements.f_hora.value = formatTime(data.hora);
-    elements.f_estado.value = normalizeStatus(data.estado);
+    // Llenar campos con datos existentes
+    if (elements.f_nombre) elements.f_nombre.value = data.razonsocial || '';
+    if (elements.f_telefono) elements.f_telefono.value = data.telefono || '';
+    if (elements.f_email) elements.f_email.value = data.email || '';
+    if (elements.f_direccion) elements.f_direccion.value = data.lugar || '';
+    if (elements.f_tipo) elements.f_tipo.value = data.tipoevento || 'catering';
+    if (elements.f_menu) elements.f_menu.value = data.tipocomida || '';
+    if (elements.f_invitados) elements.f_invitados.value = data.invitados || '';
+    if (elements.f_fecha) elements.f_fecha.value = data.fecha || '';
+    if (elements.f_hora) elements.f_hora.value = formatTime(data.hora);
+    if (elements.f_estado) elements.f_estado.value = normalizeStatusForForm(data.estado);
   }
   
   // Mostrar modal
-  elements.modalBackdrop.classList.add('active');
-  elements.modalDrawer.classList.add('active');
+  if (elements.modalBackdrop) elements.modalBackdrop.classList.add('active');
+  if (elements.modalDrawer) elements.modalDrawer.classList.add('active');
 }
 
 function closeModal() {
-  elements.modalBackdrop.classList.remove('active');
-  elements.modalDrawer.classList.remove('active');
+  if (elements.modalBackdrop) elements.modalBackdrop.classList.remove('active');
+  if (elements.modalDrawer) elements.modalDrawer.classList.remove('active');
   selectedId = null;
   isEditMode = false;
 }
@@ -166,35 +215,48 @@ function closeModal() {
 /* ========= Data Loading ========= */
 async function loadReservas() {
   try {
+    console.log('📥 Cargando reservas...');
+    
     const { data, error } = await supabase
       .from('reservas_catering')
       .select('*')
       .order('fecha', { ascending: false })
       .order('hora', { ascending: false });
     
-    if (error) throw error;
+    if (error) {
+      console.error('Error al cargar reservas:', error);
+      throw error;
+    }
     
     allReservas = data || [];
+    console.log(`✅ ${allReservas.length} reservas cargadas`);
+    
     applyFilters();
     
   } catch (error) {
-    console.error('Error cargando reservas:', error);
-    showToast('Error al cargar las reservas', 'error');
+    console.error('❌ Error cargando reservas:', error);
+    showToast('Error al cargar las reservas. Revisa la conexión.', 'error');
+    allReservas = [];
+    applyFilters();
   }
 }
 
 /* ========= Filters ========= */
 function applyFilters() {
-  const searchTerm = elements.searchInput.value.toLowerCase();
+  const searchTerm = elements.searchInput?.value?.toLowerCase() || '';
   
   filteredReservas = allReservas.filter(reserva => {
     // Filtro por estado
     let matchesStatus = true;
     if (currentFilter !== 'all') {
-      const status = normalizeStatus(reserva.estado);
-      if (currentFilter === 'pending') matchesStatus = status === 'pending';
-      else if (currentFilter === 'in-progress') matchesStatus = status === 'in-progress';
-      else if (currentFilter === 'completed') matchesStatus = status === 'completed';
+      const status = reserva.estado;
+      if (currentFilter === 'pending') {
+        matchesStatus = status === 'agendado';
+      } else if (currentFilter === 'in-progress') {
+        matchesStatus = status === 'en_curso';
+      } else if (currentFilter === 'completed') {
+        matchesStatus = status === 'finalizado';
+      }
     }
     
     // Filtro por búsqueda
@@ -217,9 +279,9 @@ function applyFilters() {
 function updateCounts() {
   const counts = {
     all: allReservas.length,
-    pending: allReservas.filter(r => normalizeStatus(r.estado) === 'pending').length,
-    'in-progress': allReservas.filter(r => normalizeStatus(r.estado) === 'in-progress').length,
-    completed: allReservas.filter(r => normalizeStatus(r.estado) === 'completed').length
+    pending: allReservas.filter(r => r.estado === 'agendado').length,
+    'in-progress': allReservas.filter(r => r.estado === 'en_curso').length,
+    completed: allReservas.filter(r => r.estado === 'finalizado').length
   };
   
   elements.filterPills.forEach(pill => {
@@ -233,21 +295,29 @@ function updateCounts() {
 
 /* ========= Render Table ========= */
 function renderTable() {
+  if (!elements.tableBody) return;
+  
   if (filteredReservas.length === 0) {
     elements.tableBody.innerHTML = '';
-    elements.emptyMsg.style.display = 'flex';
+    if (elements.emptyMsg) elements.emptyMsg.style.display = 'flex';
     return;
   }
   
-  elements.emptyMsg.style.display = 'none';
+  if (elements.emptyMsg) elements.emptyMsg.style.display = 'none';
   
   const rows = filteredReservas.map(reserva => {
     const row = document.createElement('tr');
     
+    // Indicador visual si es del chatbot
+    const esChatBot = reserva.ruc === 'CHAT-BOT';
+    
     row.innerHTML = `
       <td>
         <div class="cell-content">
-          <span class="text-main">${reserva.razonsocial || 'Sin nombre'}</span>
+          <span class="text-main">
+            ${reserva.razonsocial || 'Sin nombre'}
+            ${esChatBot ? '🤖' : ''}
+          </span>
           <span class="text-sub">${reserva.email || ''}</span>
         </div>
       </td>
@@ -271,7 +341,7 @@ function renderTable() {
             <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
           </svg>
         </button>
-        <button class="btn-action delete" data-id="${reserva.id}" title="Eliminar">
+        <button class="btn-action delete" data-id="${reserva.id}" title="Cancelar">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
           </svg>
@@ -289,87 +359,167 @@ function renderTable() {
 /* ========= CRUD Operations ========= */
 async function saveReserva() {
   try {
-    const formData = {
-      p_razonsocial: elements.f_nombre.value.trim(),
-      p_telefono: elements.f_telefono.value.trim(),
-      p_email: elements.f_email.value.trim(),
-      p_lugar: elements.f_direccion.value.trim(),
-      p_tipoevento: elements.f_tipo.value.trim() || 'Catering',
-      p_tipocomida: elements.f_menu.value.trim(),
-      p_invitados: parseInt(elements.f_invitados.value) || null,
-      p_fecha: elements.f_fecha.value,
-      p_hora: elements.f_hora.value,
-      p_ruc: '',
-      p_observaciones: ''
-    };
+    // Validar campos requeridos
+    const requiredFields = [
+      { element: elements.f_nombre, name: 'Nombre' },
+      { element: elements.f_fecha, name: 'Fecha' },
+      { element: elements.f_hora, name: 'Hora' }
+    ];
     
-    let result;
+    for (const field of requiredFields) {
+      if (!field.element?.value?.trim()) {
+        showToast(`El campo "${field.name}" es requerido`, 'error');
+        field.element?.focus();
+        return;
+      }
+    }
     
     if (isEditMode && selectedId) {
-      // Actualizar reserva existente
-      formData.p_id = selectedId;
+      // ===== MODO EDICIÓN =====
+      console.log('📝 Actualizando reserva ID:', selectedId);
       
-      // Actualizar estado si es modo edición
-      const estadoMap = {
-        'pending': 'pendiente',
-        'in-progress': 'en_curso',
-        'completed': 'finalizado'
-      };
+      // Obtener la reserva actual para verificar si cambió la fecha
+      const currentReserva = allReservas.find(r => r.id === selectedId);
+      const fechaCambio = currentReserva?.fecha !== elements.f_fecha.value;
       
-      // Primero actualizar los datos
-      const { data: editData, error: editError } = await supabase.rpc('catering_editar', formData);
-      if (editError) throw editError;
-      
-      // Luego actualizar el estado si cambió
-      const newEstado = estadoMap[elements.f_estado.value];
-      if (newEstado) {
-        const { data: statusData, error: statusError } = await supabase.rpc('catering_set_estado', {
-          p_id: selectedId,
-          p_estado: newEstado
-        });
-        if (statusError) throw statusError;
-        result = statusData;
-      } else {
-        result = editData;
+      // Si cambia la fecha y el estado es activo, verificar cupo
+      if (fechaCambio && ['agendado', 'en_curso'].includes(currentReserva?.estado)) {
+        const cupoInfo = await verificarCupo(elements.f_fecha.value);
+        if (!cupoInfo.tiene_cupo) {
+          showToast(`No hay cupo disponible para el ${formatDate(elements.f_fecha.value)}. Límite: ${cupoInfo.limite}, Usados: ${cupoInfo.usados}`, 'error');
+          return;
+        }
       }
       
-      showToast('Reserva actualizada exitosamente');
+      // Preparar datos para actualización (ORDEN EXACTO de los parámetros)
+      const updateData = {
+        p_id: selectedId,
+        p_razonsocial: elements.f_nombre.value.trim(),
+        p_ruc: currentReserva?.ruc || '',
+        p_tipoevento: elements.f_tipo?.value?.trim() || 'catering',
+        p_fecha: elements.f_fecha.value,
+        p_hora: formatTimeForDB(elements.f_hora.value),
+        p_tipocomida: elements.f_menu?.value?.trim() || '',
+        p_lugar: elements.f_direccion?.value?.trim() || '-',
+        p_observaciones: '',
+        p_invitados: elements.f_invitados?.value ? parseInt(elements.f_invitados.value) : null,
+        p_telefono: elements.f_telefono?.value?.trim() || null,
+        p_email: elements.f_email?.value?.trim() || null
+      };
+      
+      console.log('Datos a actualizar:', updateData);
+      
+      const { data: editData, error: editError } = await supabase.rpc('catering_editar', updateData);
+      
+      if (editError) {
+        console.error('Error en catering_editar:', editError);
+        
+        // Manejar error de cupo lleno
+        if (editError.message?.includes('Cupo lleno')) {
+          const match = editError.message.match(/límite (\d+)/);
+          const limite = match ? match[1] : '?';
+          showToast(`Cupo lleno para esa fecha. Límite: ${limite} servicios`, 'error');
+        } else {
+          showToast(editError.message || 'Error al actualizar', 'error');
+        }
+        return;
+      }
+      
+      // Si cambió el estado, actualizarlo
+      const newStatus = statusToBackend(elements.f_estado.value);
+      if (currentReserva && currentReserva.estado !== newStatus) {
+        console.log('📊 Actualizando estado de', currentReserva.estado, 'a', newStatus);
+        
+        const { data: statusData, error: statusError } = await supabase.rpc('catering_set_estado', {
+          p_id: selectedId,
+          p_estado: newStatus
+        });
+        
+        if (statusError) {
+          console.error('Error en catering_set_estado:', statusError);
+          showToast('Datos actualizados pero hubo un problema con el estado', 'warning');
+        } else {
+          showToast('Reserva actualizada exitosamente', 'success');
+        }
+      } else {
+        showToast('Reserva actualizada exitosamente', 'success');
+      }
+      
     } else {
-      // Crear nueva reserva
-      const { data, error } = await supabase.rpc('catering_agendar', formData);
-      if (error) throw error;
-      result = data;
-      showToast('Reserva creada exitosamente');
+      // ===== MODO CREACIÓN =====
+      console.log('➕ Creando nueva reserva');
+      
+      // Verificar cupo antes de crear
+      const cupoInfo = await verificarCupo(elements.f_fecha.value);
+      if (!cupoInfo.tiene_cupo) {
+        showToast(`No hay cupo disponible para el ${formatDate(elements.f_fecha.value)}. Límite: ${cupoInfo.limite}, Usados: ${cupoInfo.usados}`, 'error');
+        return;
+      }
+      
+      // Preparar datos para creación (ORDEN EXACTO de los parámetros)
+      const createData = {
+        p_razonsocial: elements.f_nombre.value.trim(),
+        p_ruc: '',
+        p_tipoevento: elements.f_tipo?.value?.trim() || 'catering',
+        p_fecha: elements.f_fecha.value,
+        p_hora: formatTimeForDB(elements.f_hora.value),
+        p_tipocomida: elements.f_menu?.value?.trim() || '',
+        p_lugar: elements.f_direccion?.value?.trim() || '-',
+        p_observaciones: '',
+        p_invitados: elements.f_invitados?.value ? parseInt(elements.f_invitados.value) : null,
+        p_telefono: elements.f_telefono?.value?.trim() || null,
+        p_email: elements.f_email?.value?.trim() || null
+      };
+      
+      console.log('Datos a crear:', createData);
+      
+      const { data, error } = await supabase.rpc('catering_agendar', createData);
+      
+      if (error) {
+        console.error('Error en catering_agendar:', error);
+        
+        // Manejar error de cupo lleno
+        if (error.message?.includes('Cupo lleno')) {
+          const match = error.message.match(/límite (\d+)/);
+          const limite = match ? match[1] : '?';
+          showToast(`Cupo lleno para esa fecha. Límite: ${limite} servicios. Prueba otra fecha.`, 'error');
+        } else {
+          showToast(error.message || 'Error al crear la reserva', 'error');
+        }
+        return;
+      }
+      
+      showToast('Reserva creada exitosamente', 'success');
     }
     
     closeModal();
     await loadReservas();
     
   } catch (error) {
-    console.error('Error guardando reserva:', error);
-    showToast(error.message || 'Error al guardar la reserva', 'error');
+    console.error('❌ Error guardando reserva:', error);
+    showToast('Error inesperado. Revisa la consola.', 'error');
   }
 }
 
 async function deleteReserva(id) {
-  if (!confirm('¿Está seguro de eliminar esta reserva?')) return;
+  if (!confirm('¿Está seguro de CANCELAR esta reserva?\n\nEsto cambiará el estado a "Cancelado" y liberará el cupo.')) return;
   
   try {
-    // Intentar cancelar en lugar de eliminar físicamente
-    const { error } = await supabase.rpc('catering_set_estado', {
+    // Cambiar estado a cancelado (no eliminar físicamente)
+    const { data, error } = await supabase.rpc('catering_set_estado', {
       p_id: id,
       p_estado: 'cancelado'
     });
     
     if (error) throw error;
     
-    showToast('Reserva eliminada exitosamente');
+    showToast('Reserva cancelada exitosamente', 'success');
     closeModal();
     await loadReservas();
     
   } catch (error) {
-    console.error('Error eliminando reserva:', error);
-    showToast('Error al eliminar la reserva', 'error');
+    console.error('Error cancelando reserva:', error);
+    showToast('Error al cancelar la reserva', 'error');
   }
 }
 
@@ -432,6 +582,28 @@ elements.mainForm?.addEventListener('keypress', (e) => {
   }
 });
 
+// Listener para cambio de fecha (mostrar info de cupo)
+elements.f_fecha?.addEventListener('change', async () => {
+  const fecha = elements.f_fecha.value;
+  if (!fecha) return;
+  
+  const cupoInfo = await verificarCupo(fecha);
+  const dayOfWeek = new Date(fecha + 'T00:00:00').getDay();
+  const esFinDeSemana = dayOfWeek === 0 || dayOfWeek === 6;
+  
+  const mensaje = `📅 ${formatDate(fecha)} ${esFinDeSemana ? '(Fin de semana)' : '(Día de semana)'}: ${cupoInfo.disponible} cupos disponibles de ${cupoInfo.limite}`;
+  
+  // Mostrar info temporal
+  const info = document.createElement('small');
+  info.style.color = cupoInfo.disponible > 0 ? 'green' : 'red';
+  info.textContent = mensaje;
+  
+  const parent = elements.f_fecha.parentElement;
+  const oldInfo = parent.querySelector('small');
+  if (oldInfo) oldInfo.remove();
+  parent.appendChild(info);
+});
+
 /* ========= Inicialización ========= */
 (async function init() {
   try {
@@ -444,11 +616,13 @@ elements.mainForm?.addEventListener('keypress', (e) => {
     await loadReservas();
     
     console.log('✅ Panel de Catering inicializado correctamente');
+    console.log('📋 Estados disponibles: agendado, en_curso, finalizado, cancelado');
+    console.log('📅 Límites: 2 servicios/día (L-V), 3 servicios/día (S-D)');
     
   } catch (error) {
     console.error('❌ Error al inicializar:', error);
-    // Redirigir al login si no está autenticado
-    if (error.message?.includes('auth')) {
+    // Si el error es de autenticación, redirigir al login
+    if (error.message?.includes('auth') || error.message?.includes('session')) {
       window.location.href = 'login.html';
     }
   }
