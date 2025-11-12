@@ -119,6 +119,42 @@ const statusToBackend = (selectValue) => {
   return statusMap[selectValue] || 'agendado';
 };
 
+/* ========= TRANSFORMACIÓN DE DATOS (Mapper) ========= */
+// Esta función transforma los datos del formulario al formato esperado por las funciones RPC
+// SIN cambiar nada en la BD
+function buildReservaUpdateData(currentReserva) {
+  return {
+    p_id: selectedId,
+    p_razonsocial: elements.f_nombre.value.trim(),
+    p_ruc: currentReserva?.ruc || '',
+    p_tipoevento: elements.f_tipo?.value?.trim() || 'catering',
+    p_fecha: elements.f_fecha.value,
+    p_hora: formatTimeForDB(elements.f_hora.value),
+    p_tipocomida: elements.f_menu?.value?.trim() || '',
+    p_lugar: elements.f_direccion?.value?.trim() || '-',
+    p_observaciones: '',
+    p_invitados: elements.f_invitados?.value ? parseInt(elements.f_invitados.value) : null,
+    p_telefono: elements.f_telefono?.value?.trim() || null,
+    p_email: elements.f_email?.value?.trim() || null
+  };
+}
+
+function buildReservaCreateData() {
+  return {
+    p_razonsocial: elements.f_nombre.value.trim(),
+    p_ruc: '',
+    p_tipoevento: elements.f_tipo?.value?.trim() || 'catering',
+    p_fecha: elements.f_fecha.value,
+    p_hora: formatTimeForDB(elements.f_hora.value),
+    p_tipocomida: elements.f_menu?.value?.trim() || '',
+    p_lugar: elements.f_direccion?.value?.trim() || '-',
+    p_observaciones: '',
+    p_invitados: elements.f_invitados?.value ? parseInt(elements.f_invitados.value) : null,
+    p_telefono: elements.f_telefono?.value?.trim() || null,
+    p_email: elements.f_email?.value?.trim() || null
+  };
+}
+
 /* ========= Toast Notifications ========= */
 function showToast(message, type = 'success') {
   const toastArea = document.getElementById('toastArea');
@@ -391,28 +427,15 @@ async function saveReserva() {
         }
       }
       
-      // Preparar datos para actualización (ORDEN EXACTO de los parámetros)
-      const updateData = {
-        p_id: selectedId,
-        p_razonsocial: elements.f_nombre.value.trim(),
-        p_ruc: currentReserva?.ruc || '',
-        p_tipoevento: elements.f_tipo?.value?.trim() || 'catering',
-        p_fecha: elements.f_fecha.value,
-        p_hora: formatTimeForDB(elements.f_hora.value),
-        p_tipocomida: elements.f_menu?.value?.trim() || '',
-        p_lugar: elements.f_direccion?.value?.trim() || '-',
-        p_observaciones: '',
-        p_invitados: elements.f_invitados?.value ? parseInt(elements.f_invitados.value) : null,
-        p_telefono: elements.f_telefono?.value?.trim() || null,
-        p_email: elements.f_email?.value?.trim() || null
-      };
+      // Preparar datos para actualización usando la función mapper
+      const updateData = buildReservaUpdateData(currentReserva);
       
-      console.log('Datos a actualizar:', updateData);
+      console.log('📤 Datos transformados para enviar:', updateData);
       
       const { data: editData, error: editError } = await supabase.rpc('catering_editar', updateData);
       
       if (editError) {
-        console.error('Error en catering_editar:', editError);
+        console.error('❌ Error en catering_editar:', editError);
         
         // Manejar error de cupo lleno
         if (editError.message?.includes('Cupo lleno')) {
@@ -424,6 +447,8 @@ async function saveReserva() {
         }
         return;
       }
+      
+      console.log('✅ Respuesta de catering_editar:', editData);
       
       // Si cambió el estado, actualizarlo
       const newStatus = statusToBackend(elements.f_estado.value);
@@ -439,10 +464,10 @@ async function saveReserva() {
           console.error('Error en catering_set_estado:', statusError);
           showToast('Datos actualizados pero hubo un problema con el estado', 'warning');
         } else {
-          showToast('Reserva actualizada exitosamente', 'success');
+          showToast('✅ Reserva actualizada exitosamente', 'success');
         }
       } else {
-        showToast('Reserva actualizada exitosamente', 'success');
+        showToast('✅ Reserva actualizada exitosamente', 'success');
       }
       
     } else {
@@ -456,27 +481,15 @@ async function saveReserva() {
         return;
       }
       
-      // Preparar datos para creación (ORDEN EXACTO de los parámetros)
-      const createData = {
-        p_razonsocial: elements.f_nombre.value.trim(),
-        p_ruc: '',
-        p_tipoevento: elements.f_tipo?.value?.trim() || 'catering',
-        p_fecha: elements.f_fecha.value,
-        p_hora: formatTimeForDB(elements.f_hora.value),
-        p_tipocomida: elements.f_menu?.value?.trim() || '',
-        p_lugar: elements.f_direccion?.value?.trim() || '-',
-        p_observaciones: '',
-        p_invitados: elements.f_invitados?.value ? parseInt(elements.f_invitados.value) : null,
-        p_telefono: elements.f_telefono?.value?.trim() || null,
-        p_email: elements.f_email?.value?.trim() || null
-      };
+      // Preparar datos para creación usando la función mapper
+      const createData = buildReservaCreateData();
       
-      console.log('Datos a crear:', createData);
+      console.log('📤 Datos transformados para enviar:', createData);
       
       const { data, error } = await supabase.rpc('catering_agendar', createData);
       
       if (error) {
-        console.error('Error en catering_agendar:', error);
+        console.error('❌ Error en catering_agendar:', error);
         
         // Manejar error de cupo lleno
         if (error.message?.includes('Cupo lleno')) {
@@ -489,7 +502,8 @@ async function saveReserva() {
         return;
       }
       
-      showToast('Reserva creada exitosamente', 'success');
+      console.log('✅ Respuesta de catering_agendar:', data);
+      showToast('✅ Reserva creada exitosamente', 'success');
     }
     
     closeModal();
@@ -513,7 +527,7 @@ async function deleteReserva(id) {
     
     if (error) throw error;
     
-    showToast('Reserva cancelada exitosamente', 'success');
+    showToast('✅ Reserva cancelada exitosamente', 'success');
     closeModal();
     await loadReservas();
     
