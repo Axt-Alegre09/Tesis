@@ -1,13 +1,7 @@
 // ==================== MÓDULO CLIENTES ====================
 // Gestión completa de clientes para el dashboard admin
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const SUPABASE_URL = "https://jyygevitfnbwrvxrjexp.supabase.co";
-const SUPABASE_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5eWdldml0Zm5id3J2eHJqZXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2OTQ2OTYsImV4cCI6MjA3MTI3MDY5Nn0.St0IiSZSeELESshctneazCJHXCDBi9wrZ28UkiEDXYo";
-
-const supa = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+import { supa } from './supabase-client.js';
 
 let clientesData = [];
 let clientesFiltrados = [];
