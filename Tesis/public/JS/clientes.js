@@ -1,13 +1,7 @@
 // ==================== MÓDULO CLIENTES ====================
 // Gestión completa de clientes para el dashboard admin
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const SUPABASE_URL = "https://jyygevitfnbwrvxrjexp.supabase.co";
-const SUPABASE_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5eWdldml0Zm5id3J2eHJqZXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2OTQ2OTYsImV4cCI6MjA3MTI3MDY5Nn0.St0IiSZSeELESshctneazCJHXCDBi9wrZ28UkiEDXYo";
-
-const supa = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+import { supa } from './supabase-client.js';
 
 let clientesData = [];
 let clientesFiltrados = [];
@@ -79,7 +73,7 @@ function renderizarTablaClientes() {
         <td style="padding: 1rem;">
           <div style="display: flex; align-items: center; gap: 0.75rem;">
             <div style="width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.1rem;">
-              ${cliente.razon.charAt(0).toUpperCase()}
+              ${cliente.razon ? cliente.razon.charAt(0).toUpperCase() : 'S'}
             </div>
             <div>
               <div style="font-weight: 600; margin-bottom: 0.2rem; display: flex; align-items: center; gap: 0.5rem;">
@@ -162,7 +156,8 @@ async function actualizarEstadisticas() {
   try {
     // Total de clientes
     const totalClientes = clientesData.length;
-    document.getElementById('totalClientes').textContent = totalClientes;
+    const elem = document.getElementById('totalClientes');
+    if (elem) elem.textContent = totalClientes;
 
     // Clientes nuevos (últimos 30 días)
     const hace30Dias = new Date();
@@ -170,7 +165,8 @@ async function actualizarEstadisticas() {
     const clientesNuevos = clientesData.filter(c => 
       new Date(c.created_at) > hace30Dias
     ).length;
-    document.getElementById('clientesNuevos').textContent = clientesNuevos;
+    const elemNuevos = document.getElementById('clientesNuevos');
+    if (elemNuevos) elemNuevos.textContent = clientesNuevos;
 
     // Clientes por ciudad (usando la vista v_clientes_por_ciudad)
     const { data: ciudades, error } = await supa
@@ -180,15 +176,18 @@ async function actualizarEstadisticas() {
       .limit(1);
 
     if (!error && ciudades && ciudades.length > 0) {
-      document.getElementById('ciudadTop').textContent = 
-        `${ciudades[0].ciudad} (${ciudades[0].cantidad_clientes})`;
+      const elemCiudad = document.getElementById('ciudadTop');
+      if (elemCiudad) {
+        elemCiudad.textContent = `${ciudades[0].ciudad} (${ciudades[0].cantidad_clientes})`;
+      }
     }
 
     // Clientes con email válido
     const conEmail = clientesData.filter(c => 
       c.mail && c.mail !== 'sin@email.com' && c.mail.includes('@')
     ).length;
-    document.getElementById('clientesConEmail').textContent = conEmail;
+    const elemEmail = document.getElementById('clientesConEmail');
+    if (elemEmail) elemEmail.textContent = conEmail;
 
   } catch (error) {
     console.error('❌ Error al actualizar estadísticas:', error);
@@ -331,6 +330,7 @@ async function guardarCambiosCliente(e) {
     mostrarExito('✅ Cliente actualizado correctamente');
     document.getElementById('modalEditarCliente').style.display = 'none';
     await cargarClientes();
+    await actualizarEstadisticas();
 
   } catch (error) {
     console.error('❌ Error al actualizar cliente:', error);
@@ -397,8 +397,8 @@ function setupEventListeners() {
     const modalDetalle = document.getElementById('modalDetalleCliente');
     const modalEditar = document.getElementById('modalEditarCliente');
     
-    if (e.target === modalDetalle) modalDetalle.style.display = 'none';
-    if (e.target === modalEditar) modalEditar.style.display = 'none';
+    if (e.target === modalDetalle && modalDetalle) modalDetalle.style.display = 'none';
+    if (e.target === modalEditar && modalEditar) modalEditar.style.display = 'none';
   });
 }
 
