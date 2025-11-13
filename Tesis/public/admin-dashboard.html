@@ -9,7 +9,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <link rel="stylesheet" href="CSS/admin-dashboard.css">
-  <link rel="stylesheet" href="CSS/configuracion-styles.css">
 </head>
 <body>
   
@@ -26,7 +25,7 @@
 
     <!-- Navegación -->
     <nav class="sidebar-nav">
-      <!-- Dashboard -->
+    <!-- Dashboard -->
       <a href="#dashboard" class="nav-link active" data-view="dashboard">
         <i class="bi bi-speedometer2"></i>
         <span class="nav-text">Dashboard</span>
@@ -38,7 +37,7 @@
         <span class="nav-text">Productos</span>
       </a>
 
-      <!-- Promos -->
+      <!-- Promos (antes Categorías) -->
       <a href="#promos" class="nav-link" data-view="promos">
         <i class="bi bi-tag-fill"></i>
         <span class="nav-text">Promos</span>
@@ -70,6 +69,7 @@
         <i class="bi bi-gear"></i>
         <span class="nav-text">Configuración</span>
       </a>
+
     </nav>
 
     <!-- Footer del Sidebar -->
@@ -107,10 +107,16 @@
       </div>
       
       <div class="topbar-right">
+        <!-- Search
+        <div class="search-box">
+          <i class="bi bi-search"></i>
+          <input type="search" placeholder="Buscar...">
+        </div> -->
+
         <!-- Notifications -->
         <button class="icon-btn" id="notificationsBtn">
           <i class="bi bi-bell"></i>
-          <span class="badge" id="notificationsBadge" style="display: none;">0</span>
+          <span class="badge">3</span>
         </button>
 
         <!-- Quick Actions -->
@@ -121,21 +127,24 @@
       </div>
     </header>
 
-    <!-- Content Area -->
+    <!-- Content Area (donde se cargan las vistas) -->
     <div class="content-area" id="contentArea">
       <!-- Las vistas se cargan aquí dinámicamente -->
     </div>
 
   </main>
 
-  <!-- Modal Overlay -->
+  <!-- ========== MODAL OVERLAY (para modales futuros) ========== -->
   <div class="modal-overlay" id="modalOverlay"></div>
 
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
-
-  <!-- Admin Dashboard JS (UNA SOLA VEZ) -->
+  <!-- Scripts -->
   <script type="module" src="JS/admin-dashboard.js"></script>
+
+  <!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+
+<!-- Admin Dashboard JS -->
+<script type="module" src="JS/admin-dashboard.js"></script>
 
 </body>
 </html>

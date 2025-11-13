@@ -1,13 +1,14 @@
 // ==================== SUPABASE CONFIG ====================
 // Configuración centralizada de Supabase para todo el dashboard
 
-import { supa } from '../supabase-client.js';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-// Exportar el cliente para compatibilidad con código antiguo
-export const supabase = supa;
-
-// Credenciales (solo para referencia, no se usan)
+// Credenciales
 const SUPABASE_URL = 'https://jyygevitfnbwrvxrjexp.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5eWdldml0Zm5id3J2eHJqZXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2OTQ2OTYsImV4cCI6MjA3MTI3MDY5Nn0.St0IiSZSeELESshctneazCJHXCDBi9wrZ28UkiEDXYo';
+
+// Crear cliente de Supabase
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ==================== HELPERS ====================
 
@@ -161,7 +162,7 @@ export function validateImageFile(file) {
   
   if (!file) {
     return { valid: false, error: 'No se seleccionó ningún archivo' };
-    }
+  }
   
   if (file.size > maxSize) {
     return { valid: false, error: 'La imagen es muy grande. Máximo 5MB' };
@@ -189,7 +190,7 @@ export async function uploadImage(file, bucket = 'productos') {
   const fileExt = file.name.split('.').pop();
   const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
   
-  const { data, error } = await supa.storage
+  const { data, error } = await supabase.storage
     .from(bucket)
     .upload(fileName, file, {
       cacheControl: '3600',
@@ -201,7 +202,7 @@ export async function uploadImage(file, bucket = 'productos') {
   return fileName;
 }
 
-/** 
+/**
  * Eliminar imagen de Supabase Storage
  * @param {string} fileName - Nombre del archivo a eliminar
  * @param {string} bucket - Nombre del bucket (default: 'productos')
@@ -209,7 +210,7 @@ export async function uploadImage(file, bucket = 'productos') {
 export async function deleteImage(fileName, bucket = 'productos') {
   if (!fileName || fileName.startsWith('http')) return;
   
-  const { error } = await supa.storage
+  const { error } = await supabase.storage
     .from(bucket)
     .remove([fileName]);
   

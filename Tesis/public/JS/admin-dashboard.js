@@ -1,19 +1,15 @@
 // ==================== ADMIN DASHBOARD JS - VERSIÓN CORREGIDA ====================
-// ✅ Tabla usuarios → perfiles_usuarios
-// ✅ Implementación de modo mantenimiento
-// ✅ Integración de ChatBot
-// ✅ Sistema de notificaciones completo
-// ✅ Instancia única de Supabase
-// ✅ RUTAS CORREGIDAS
+// Correcciones:
+// 1. ✅ Tabla usuarios → perfiles_usuarios
+// 2. ✅ Implementación de modo mantenimiento
+// 3. ✅ Integración de ChatBot
+// 4. ✅ Sistema de notificaciones completo
+// 5. ✅ Instancia única de Supabase
 
 import { supa } from './supabase-client.js';
-// import { configuracionView, initConfiguracion } from './modules/configuracion-complete.js'; // ⚠️ COMENTADO - TIENE ERROR
+import { configuracionView, initConfiguracion } from './modules/configuracion-complete.js';
 import { initProductos } from './modules/productos.js';
 import { initClientes } from './clientes.js';
-
-// ⚠️ DEBUG LOGS ⚠️
-console.log('🚀 Script admin-dashboard.js ejecutándose...');
-console.log('✅ Imports completados');
 
 // ========== SISTEMA DE NOTIFICACIONES ==========
 class NotificationSystem {
@@ -24,17 +20,23 @@ class NotificationSystem {
   }
 
   init() {
-    console.log('🔔 Inicializando sistema de notificaciones...');
+    // Crear badge de notificaciones
     this.badge = document.getElementById('notificationsBadge');
     
+    // Crear contenedor de notificaciones si no existe
     if (!document.getElementById('notificationsContainer')) {
       this.createNotificationsContainer();
     }
     
     this.container = document.getElementById('notificationsContainer');
+    
+    // Cargar notificaciones iniciales
     this.loadNotifications();
+    
+    // Suscribirse a cambios en tiempo real
     this.subscribeToNotifications();
     
+    // Event listener para el botón
     document.getElementById('notificationsBtn')?.addEventListener('click', () => {
       this.togglePanel();
     });
@@ -78,6 +80,7 @@ class NotificationSystem {
     
     document.body.appendChild(container);
     
+    // Cerrar al hacer click fuera
     document.addEventListener('click', (e) => {
       if (!container.contains(e.target) && 
           !document.getElementById('notificationsBtn')?.contains(e.target)) {
@@ -85,6 +88,7 @@ class NotificationSystem {
       }
     });
     
+    // Marcar todas como leídas
     document.getElementById('markAllReadBtn')?.addEventListener('click', () => {
       this.markAllAsRead();
     });
@@ -111,6 +115,7 @@ class NotificationSystem {
 
       const unreadCount = data.filter(n => !n.leida).length;
       
+      // Actualizar badge
       if (this.badge) {
         if (unreadCount > 0) {
           this.badge.textContent = unreadCount > 99 ? '99+' : unreadCount;
@@ -120,6 +125,7 @@ class NotificationSystem {
         }
       }
 
+      // Renderizar lista
       this.renderNotifications(data);
 
     } catch (error) {
@@ -189,6 +195,7 @@ class NotificationSystem {
       `;
     }).join('');
 
+    // Event listeners para marcar como leída
     list.querySelectorAll('.notification-item').forEach(item => {
       item.addEventListener('click', () => {
         const id = item.dataset.id;
@@ -224,6 +231,7 @@ class NotificationSystem {
   }
 
   subscribeToNotifications() {
+    // Suscribirse a cambios en tiempo real
     this.subscription = supa
       .channel('notificaciones-changes')
       .on('postgres_changes', 
@@ -242,6 +250,7 @@ class NotificationSystem {
   }
 }
 
+// Instancia global del sistema de notificaciones
 let notificationSystem = null;
 
 // ========== SISTEMA DE CHATBOT ==========
@@ -252,12 +261,12 @@ class ChatBotSystem {
   }
 
   init() {
-    console.log('🤖 Inicializando ChatBot...');
     this.createWidget();
     this.loadChatBotMetrics();
   }
 
   createWidget() {
+    // Crear widget flotante del chatbot
     const widget = document.createElement('div');
     widget.id = 'chatbotWidget';
     widget.style.cssText = `
@@ -330,6 +339,7 @@ class ChatBotSystem {
     document.body.appendChild(widget);
     this.widget = widget;
     
+    // Event listeners
     document.getElementById('chatbotToggle')?.addEventListener('click', () => {
       this.toggle();
     });
@@ -348,6 +358,7 @@ class ChatBotSystem {
       }
     });
     
+    // Mostrar widget en dashboard
     if (window.location.hash === '#dashboard' || !window.location.hash) {
       widget.style.display = 'block';
     }
@@ -381,13 +392,16 @@ class ChatBotSystem {
     
     if (!message) return;
     
+    // Agregar mensaje del usuario
     this.addMessage(message, 'user');
     input.value = '';
     
+    // Simular respuesta del bot (aquí conectarías con tu API real)
     setTimeout(() => {
       this.addMessage('Gracias por tu mensaje. Estoy procesando tu solicitud...', 'bot');
     }, 500);
     
+    // Registrar interacción en la base de datos
     try {
       await supa.from('chatbot_interacciones').insert({
         mensaje_usuario: message,
@@ -427,6 +441,7 @@ class ChatBotSystem {
   }
 
   async loadChatBotMetrics() {
+    // Cargar métricas del chatbot cada 30 segundos
     setInterval(async () => {
       if (window.location.hash === '#dashboard' || !window.location.hash) {
         try {
@@ -450,6 +465,7 @@ class ChatBotSystem {
   }
 }
 
+// Instancia global del chatbot
 let chatBotSystem = null;
 
 // ========== MODO MANTENIMIENTO ==========
@@ -459,7 +475,6 @@ class MaintenanceMode {
   }
 
   async init() {
-    console.log('🔧 Inicializando modo mantenimiento...');
     await this.checkStatus();
   }
 
@@ -493,6 +508,7 @@ class MaintenanceMode {
       this.isActive = newStatus;
       this.updateUI();
 
+      // Crear notificación
       await crearNotificacionGlobal(
         'sistema',
         'Modo Mantenimiento',
@@ -512,6 +528,7 @@ class MaintenanceMode {
       badge.style.display = this.isActive ? 'inline-block' : 'none';
     }
 
+    // Actualizar botón en configuración si existe
     const btn = document.getElementById('btnModoMantenimiento');
     if (btn) {
       btn.textContent = this.isActive ? 'Desactivar Mantenimiento' : 'Activar Mantenimiento';
@@ -520,6 +537,7 @@ class MaintenanceMode {
   }
 }
 
+// Instancia global del modo mantenimiento
 let maintenanceMode = null;
 
 // ========== VISTAS (Templates HTML) ==========
@@ -532,7 +550,9 @@ const views = {
       <p style="color: var(--text-secondary); font-size: 1.1rem;">Intelligence Center - Análisis en Tiempo Real</p>
     </div>
 
+    <!-- KPIs Principales -->
     <div class="grid-4" style="margin-bottom: 2rem;">
+      <!-- Ventas Hoy -->
       <div class="kpi-card">
         <div class="kpi-icon" style="background: linear-gradient(135deg, rgba(111,92,56,0.1), rgba(111,92,56,0.05)); color: var(--primary);">
           <i class="bi bi-currency-dollar"></i>
@@ -547,6 +567,7 @@ const views = {
         </div>
       </div>
 
+      <!-- Pedidos Hoy -->
       <div class="kpi-card">
         <div class="kpi-icon" style="background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(16,185,129,0.05)); color: var(--success);">
           <i class="bi bi-cart-check"></i>
@@ -558,6 +579,7 @@ const views = {
         </div>
       </div>
 
+      <!-- ChatBot IA -->
       <div class="kpi-card">
         <div class="kpi-icon" style="background: linear-gradient(135deg, rgba(59,130,246,0.1), rgba(59,130,246,0.05)); color: var(--info);">
           <i class="bi bi-robot"></i>
@@ -569,6 +591,7 @@ const views = {
         </div>
       </div>
 
+      <!-- Productos Total -->
       <div class="kpi-card">
         <div class="kpi-icon" style="background: linear-gradient(135deg, rgba(245,158,11,0.1), rgba(245,158,11,0.05)); color: var(--warning);">
           <i class="bi bi-box-seam"></i>
@@ -581,6 +604,7 @@ const views = {
       </div>
     </div>
 
+    <!-- Gráfico de Tendencia -->
     <div class="chart-container">
       <div class="chart-header">
         <h3 class="chart-title">
@@ -593,6 +617,7 @@ const views = {
       </div>
     </div>
 
+    <!-- Performance Semanal -->
     <div class="chart-container">
       <div class="chart-header">
         <h3 class="chart-title">
@@ -608,6 +633,7 @@ const views = {
       </div>
     </div>
 
+    <!-- Insights en Tiempo Real -->
     <div class="chart-container">
       <div class="chart-header">
         <h3 class="chart-title">
@@ -616,6 +642,7 @@ const views = {
         </h3>
       </div>
       <div class="insights-grid">
+        <!-- Top Producto -->
         <div class="insight-card">
           <div class="insight-icon">🏆</div>
           <div class="insight-content">
@@ -625,6 +652,7 @@ const views = {
           </div>
         </div>
 
+        <!-- ChatBot IA Stats -->
         <div class="insight-card">
           <div class="insight-icon">🤖</div>
           <div class="insight-content">
@@ -634,6 +662,7 @@ const views = {
           </div>
         </div>
 
+        <!-- Catering Automatizado -->
         <div class="insight-card">
           <div class="insight-icon">🎉</div>
           <div class="insight-content">
@@ -645,6 +674,7 @@ const views = {
       </div>
     </div>
 
+    <!-- Impacto de Promociones -->
     <div class="promo-analysis">
       <div class="chart-header">
         <h3 class="chart-title">
@@ -681,6 +711,7 @@ const views = {
       </button>
     </div>
 
+    <!-- Filtros y Búsqueda -->
     <div class="card" style="margin-bottom: 1.5rem;">
       <div style="display: grid; grid-template-columns: 1fr auto auto; gap: 1rem; align-items: center;">
         <div style="position: relative;">
@@ -706,6 +737,7 @@ const views = {
       </div>
     </div>
 
+    <!-- Tabla de Productos -->
     <div class="card" id="productosTableContainer">
       <div style="overflow-x: auto;">
         <table style="width: 100%; border-collapse: collapse;">
@@ -764,6 +796,7 @@ const views = {
       </button>
     </div>
 
+    <!-- Estadísticas -->
     <div class="grid-4" style="margin-bottom: 2rem;">
       <div class="card" style="border-top: 3px solid var(--primary);">
         <div style="display: flex; align-items: center; gap: 1rem;">
@@ -814,194 +847,18 @@ const views = {
       </div>
     </div>
 
-    <div class="card">
-      <div style="margin-bottom: 1.5rem;">
-        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-          <div style="flex: 1; min-width: 200px;">
-            <input type="search" id="searchClientes" placeholder="Buscar clientes..." 
-                   style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
-          </div>
-          <select id="filterCiudad" style="padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
-            <option value="">Todas las ciudades</option>
-          </select>
-        </div>
-      </div>
-
-      <div style="overflow-x: auto;">
-        <table style="width: 100%; border-collapse: collapse;">
-          <thead>
-            <tr style="border-bottom: 2px solid var(--border);">
-              <th style="padding: 1rem; text-align: left;">Cliente</th>
-              <th style="padding: 1rem; text-align: left;">Contacto</th>
-              <th style="padding: 1rem; text-align: left;">Ubicación</th>
-              <th style="padding: 1rem; text-align: center;">RUC</th>
-              <th style="padding: 1rem; text-align: center;">Registro</th>
-              <th style="padding: 1rem; text-align: center;">Acciones</th>
-            </tr>
-          </thead>
-          <tbody id="clientesTableBody">
-            <tr>
-              <td colspan="6" style="padding: 3rem; text-align: center;">
-                <div class="spinner"></div>
-                <p style="margin-top: 1rem;">Cargando clientes...</p>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Modal Detalle Cliente -->
-    <div id="modalDetalleCliente" class="modal-overlay" style="display: none;">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2>Detalle del Cliente</h2>
-          <button id="closeModalDetalle" class="btn-close">×</button>
-        </div>
-        <div class="modal-body">
-          <div class="detail-grid">
-            <div class="detail-item">
-              <label>Razón Social:</label>
-              <span id="detalleRazon"></span>
-            </div>
-            <div class="detail-item">
-              <label>RUC:</label>
-              <span id="detalleRuc"></span>
-            </div>
-            <div class="detail-item">
-              <label>Teléfono:</label>
-              <span id="detalleTel"></span>
-            </div>
-            <div class="detail-item">
-              <label>Email:</label>
-              <span id="detalleMail"></span>
-            </div>
-            <div class="detail-item">
-              <label>Contacto:</label>
-              <span id="detalleContacto"></span>
-            </div>
-            <div class="detail-item">
-              <label>Dirección:</label>
-              <span id="detalleDireccion"></span>
-            </div>
-            <div class="detail-item">
-              <label>Código Postal:</label>
-              <span id="detallePostal"></span>
-            </div>
-            <div class="detail-item">
-              <label>Fecha Creación:</label>
-              <span id="detalleFechaCreacion"></span>
-            </div>
-            <div class="detail-item">
-              <label>Última Actualización:</label>
-              <span id="detalleFechaActualizacion"></span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Modal Editar Cliente -->
-    <div id="modalEditarCliente" class="modal-overlay" style="display: none;">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2>Editar Cliente</h2>
-          <button id="closeModalEditar" class="btn-close">×</button>
-        </div>
-        <div class="modal-body">
-          <form id="formEditarCliente">
-            <input type="hidden" id="editClienteId">
-            
-            <div class="form-grid">
-              <div class="form-group">
-                <label for="editRazon">Razón Social</label>
-                <input type="text" id="editRazon" required>
-              </div>
-              
-              <div class="form-group">
-                <label for="editRuc">RUC</label>
-                <input type="text" id="editRuc">
-              </div>
-              
-              <div class="form-group">
-                <label for="editTel">Teléfono</label>
-                <input type="text" id="editTel">
-              </div>
-              
-              <div class="form-group">
-                <label for="editMail">Email</label>
-                <input type="email" id="editMail">
-              </div>
-              
-              <div class="form-group">
-                <label for="editContacto">Contacto</label>
-                <input type="text" id="editContacto">
-              </div>
-              
-              <div class="form-group">
-                <label for="editCalle1">Calle Principal</label>
-                <input type="text" id="editCalle1">
-              </div>
-              
-              <div class="form-group">
-                <label for="editCalle2">Calle Secundaria</label>
-                <input type="text" id="editCalle2">
-              </div>
-              
-              <div class="form-group">
-                <label for="editNro">Número</label>
-                <input type="text" id="editNro">
-              </div>
-              
-              <div class="form-group">
-                <label for="editBarrio">Barrio</label>
-                <input type="text" id="editBarrio">
-              </div>
-              
-              <div class="form-group">
-                <label for="editCiudad">Ciudad</label>
-                <input type="text" id="editCiudad">
-              </div>
-              
-              <div class="form-group">
-                <label for="editDepto">Departamento</label>
-                <input type="text" id="editDepto">
-              </div>
-              
-              <div class="form-group">
-                <label for="editPostal">Código Postal</label>
-                <input type="text" id="editPostal">
-              </div>
-            </div>
-            
-            <div class="modal-footer">
-              <button type="button" id="btnCancelarEditar" class="btn-secondary">Cancelar</button>
-              <button type="submit" class="btn-primary">
-                <i class="bi bi-check-lg"></i> Guardar Cambios
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
+    <!-- El resto del contenido se carga dinámicamente -->
   `,
 
-  configuracion: `
-    <div class="card" style="padding: 3rem; text-align: center;">
-      <i class="bi bi-tools" style="font-size: 4rem; color: var(--warning); opacity: 0.5;"></i>
-      <h2 style="margin-top: 1.5rem; font-size: 1.5rem; font-weight: 700;">Sección en Mantenimiento</h2>
-      <p style="color: var(--text-secondary); margin-top: 1rem;">La página de configuración está siendo actualizada. Volverá pronto.</p>
-    </div>
-  `
+  configuracion: configuracionView
 };
-
-console.log('✅ Vistas definidas');
 
 // ========== INICIALIZACIÓN DEL DASHBOARD ==========
 async function initDashboard() {
-  console.log('📊 Inicializando Dashboard...');
+  console.log('🚀 Inicializando Dashboard Intelligence...');
 
   try {
+    // 1. Usar la vista v_resumen_hoy
     const { data: resumenHoy, error: errorResumen } = await supa
       .from('v_resumen_hoy')
       .select('*')
@@ -1024,6 +881,7 @@ async function initDashboard() {
       setDefaultValues();
     }
 
+    // 2. Cargar datos de ventas por día
     const { data: ventasSemana } = await supa
       .from('v_ventas_por_dia')
       .select('*')
@@ -1039,6 +897,7 @@ async function initDashboard() {
       initWeekGrid(diasVacios);
     }
 
+    // 3. Cargar métricas del chatbot
     const { data: chatbotMetrics } = await supa
       .from('v_chatbot_metricas_hoy')
       .select('*')
@@ -1050,6 +909,7 @@ async function initDashboard() {
       document.getElementById('chatbotCarrito').textContent = chatbotMetrics.productos_agregados_bot || 0;
     }
 
+    // 4. Cargar top productos
     const { data: topProductos } = await supa
       .from('v_top_productos_hoy')
       .select('*')
@@ -1061,6 +921,7 @@ async function initDashboard() {
       document.getElementById('topProductoVentas').textContent = `${topProductos.cantidad_vendida || 0} unidades vendidas`;
     }
 
+    // 5. Cargar stats de catering
     const { data: cateringStats } = await supa
       .from('v_catering_bot_vs_manual')
       .select('*')
@@ -1072,6 +933,7 @@ async function initDashboard() {
         `${cateringStats.catering_bot || 0} de ${cateringStats.total_catering || 0} via ChatBot`;
     }
 
+    // 6. Cargar impacto de promociones
     const { data: promos } = await supa
       .from('v_impacto_promos_semana')
       .select('*')
@@ -1083,6 +945,7 @@ async function initDashboard() {
       document.getElementById('promoUplift').textContent = `+${promos.incremento_porcentaje || 0}%`;
     }
 
+    // 7. Cargar total productos
     const { count: totalProductos } = await supa
       .from('productos')
       .select('*', { count: 'exact', head: true });
@@ -1234,7 +1097,6 @@ function initWeekGrid(data) {
 
 // ========== NAVEGACIÓN ==========
 function navigateTo(viewName) {
-  console.log(`📍 Navegando a: ${viewName}`);
   const contentArea = document.getElementById('contentArea');
   const pageTitle = document.getElementById('pageTitle');
   
@@ -1266,6 +1128,7 @@ function navigateTo(viewName) {
       }
     });
 
+    // Mostrar/ocultar chatbot widget según la vista
     const chatWidget = document.getElementById('chatbotWidget');
     if (chatWidget) {
       chatWidget.style.display = viewName === 'dashboard' ? 'block' : 'none';
@@ -1282,9 +1145,9 @@ function navigateTo(viewName) {
         case 'clientes':
           if (typeof initClientes === 'function') initClientes();
           break;
-        // case 'configuracion':
-        //   if (typeof initConfiguracion === 'function') initConfiguracion();
-        //   break;
+        case 'configuracion':
+          if (typeof initConfiguracion === 'function') initConfiguracion();
+          break;
       }
     }, 100);
   }
@@ -1306,6 +1169,7 @@ export async function crearNotificacionGlobal(tipo, titulo, mensaje) {
     if (error) throw error;
     console.log('✅ Notificación creada:', titulo);
     
+    // Recargar notificaciones si el sistema está inicializado
     if (notificationSystem) {
       notificationSystem.loadNotifications();
     }
@@ -1318,10 +1182,12 @@ export async function crearNotificacionGlobal(tipo, titulo, mensaje) {
 document.addEventListener('DOMContentLoaded', () => {
   console.log('🚀 Inicializando Admin Dashboard Final...');
   
+  // Limpiar modales al inicio
   document.querySelectorAll('.modal-overlay').forEach(modal => {
     modal.style.display = 'none';
   });
   
+  // Inicializar sistemas
   notificationSystem = new NotificationSystem();
   notificationSystem.init();
   
@@ -1331,6 +1197,7 @@ document.addEventListener('DOMContentLoaded', () => {
   maintenanceMode = new MaintenanceMode();
   maintenanceMode.init();
   
+  // Sidebar toggle
   const sidebar = document.getElementById('sidebar');
   const sidebarToggle = document.getElementById('sidebarToggle');
   const mobileMenuBtn = document.getElementById('mobileMenuBtn');
@@ -1343,6 +1210,7 @@ document.addEventListener('DOMContentLoaded', () => {
     sidebar.classList.toggle('mobile-open');
   });
 
+  // Navigation links
   document.querySelectorAll('.nav-link').forEach(link => {
     link.addEventListener('click', (e) => {
       e.preventDefault();
@@ -1355,6 +1223,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // Botón de acciones rápidas
   document.getElementById('quickAddBtn')?.addEventListener('click', () => {
     const menu = document.createElement('div');
     menu.style.cssText = `
@@ -1393,6 +1262,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 100);
   });
 
+  // Logout
   const logoutBtn = document.getElementById('logoutBtn');
   logoutBtn?.addEventListener('click', async () => {
     const ok = confirm('¿Seguro que querés cerrar sesión?');
@@ -1408,12 +1278,11 @@ document.addEventListener('DOMContentLoaded', () => {
     window.location.href = 'loginAdmin.html';
   });
 
-  console.log('✅ Event listeners configurados');
-
+  // Cargar vista inicial
   const hash = window.location.hash.replace('#', '') || 'dashboard';
-  console.log(`📍 Hash inicial: ${hash}`);
   navigateTo(hash);
 
+  // Handle browser back/forward
   window.addEventListener('hashchange', () => {
     const view = window.location.hash.replace('#', '') || 'dashboard';
     navigateTo(view);
@@ -1422,6 +1291,7 @@ document.addEventListener('DOMContentLoaded', () => {
   console.log('✅ Admin Dashboard inicializado correctamente');
 });
 
+// Agregar estilos CSS para botones de acción rápida
 const style = document.createElement('style');
 style.textContent = `
   .quick-action-btn {
@@ -1447,124 +1317,5 @@ style.textContent = `
     color: var(--primary);
     font-size: 1.1rem;
   }
-  
-  .modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 9999;
-  }
-  
-  .modal-content {
-    background: white;
-    border-radius: 12px;
-    width: 90%;
-    max-width: 600px;
-    max-height: 90vh;
-    overflow-y: auto;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  }
-  
-  .modal-header {
-    padding: 1.5rem;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  
-  .modal-header h2 {
-    margin: 0;
-    font-size: 1.5rem;
-  }
-  
-  .btn-close {
-    background: none;
-    border: none;
-    font-size: 1.5rem;
-    cursor: pointer;
-    color: var(--text-muted);
-  }
-  
-  .modal-body {
-    padding: 1.5rem;
-  }
-  
-  .modal-footer {
-    padding: 1.5rem;
-    border-top: 1px solid var(--border);
-    display: flex;
-    justify-content: flex-end;
-    gap: 1rem;
-  }
-  
-  .form-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
-  }
-  
-  .form-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-  
-  .form-group label {
-    font-weight: 600;
-    font-size: 0.9rem;
-  }
-  
-  .form-group input,
-  .form-group select {
-    padding: 0.75rem;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    font-size: 0.95rem;
-  }
-  
-  .detail-grid {
-    display: grid;
-    gap: 1rem;
-  }
-  
-  .detail-item {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-  
-  .detail-item label {
-    font-weight: 600;
-    font-size: 0.85rem;
-    color: var(--text-muted);
-  }
-  
-  .detail-item span {
-    font-size: 1rem;
-  }
-  
-  .btn-secondary {
-    padding: 0.75rem 1.5rem;
-    background: var(--bg-secondary);
-    color: var(--text);
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 0.95rem;
-    font-weight: 600;
-  }
-  
-  .btn-secondary:hover {
-    background: var(--bg-hover);
-  }
 `;
 document.head.appendChild(style);
-
-console.log('✅ Admin Dashboard JS cargado completamente');
