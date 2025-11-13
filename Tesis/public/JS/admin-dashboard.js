@@ -278,21 +278,6 @@ class ChatBotSystem {
     `;
     
     widget.innerHTML = `
-      <button id="chatbotToggle" style="
-        width: 60px;
-        height: 60px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, var(--primary), var(--primary-light));
-        border: none;
-        color: white;
-        font-size: 1.5rem;
-        cursor: pointer;
-        box-shadow: 0 4px 20px rgba(111,92,56,0.3);
-        transition: transform 0.3s, box-shadow 0.3s;
-      ">
-        <i class="bi bi-robot"></i>
-      </button>
-      
       <div id="chatbotPanel" style="
         position: absolute;
         bottom: 80px;
