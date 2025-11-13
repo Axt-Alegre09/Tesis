@@ -1,14 +1,13 @@
 // ==================== SUPABASE CONFIG ====================
 // Configuración centralizada de Supabase para todo el dashboard
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { supa } from '../supabase-client.js';
 
-// Credenciales
+// Exportar el cliente para compatibilidad con código antiguo
+export const supabase = supa;
+
+// Credenciales (solo para referencia, no se usan)
 const SUPABASE_URL = 'https://jyygevitfnbwrvxrjexp.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5eWdldml0Zm5id3J2eHJqZXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2OTQ2OTYsImV4cCI6MjA3MTI3MDY5Nn0.St0IiSZSeELESshctneazCJHXCDBi9wrZ28UkiEDXYo';
-
-// Crear cliente de Supabase
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ==================== HELPERS ====================
 
