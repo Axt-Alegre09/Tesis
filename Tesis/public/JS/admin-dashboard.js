@@ -1,6 +1,7 @@
 // ==================== ADMIN DASHBOARD JS (MODULAR) ====================
 // Sistema de navegación SPA (Single Page Application)
 
+import { configuracionView, initConfiguracion } from './modules/configuracion-complete.js';
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { initProductos } from './modules/productos.js';
 import { initClientes } from './clientes.js';
@@ -667,12 +668,8 @@ const views = {
     </div>
   `,
 
-  configuracion: `
-    <h2 style="font-size: 1.75rem; font-weight: 700; margin-bottom: 2rem;">Configuración</h2>
-    <div class="card">
-      <p style="color: var(--text-secondary); text-align: center; padding: 3rem;">Vista de configuración en desarrollo...</p>
-    </div>
-  `
+  // ✅ Integrado desde el módulo externo
+  configuracion: configuracionView
 };
 
 // ========== INICIALIZACIÓN DEL DASHBOARD ==========
@@ -681,7 +678,7 @@ async function initDashboard() {
 
   try {
     // 1. Cargar resumen del día
-    const { data: resumenHoy, error: errorResumen } = await supa
+    const { data: resumenHoy } = await supa
       .from('v_resumen_hoy')
       .select('*')
       .single();
@@ -699,7 +696,7 @@ async function initDashboard() {
     }
 
     // 2. Cargar ventas últimos 7 días
-    const { data: ventasSemana, error: errorVentas } = await supa
+    const { data: ventasSemana } = await supa
       .from('v_ventas_por_dia')
       .select('*')
       .order('dia', { ascending: true })
@@ -711,7 +708,7 @@ async function initDashboard() {
     }
 
     // 3. Cargar métricas del ChatBot
-    const { data: chatbotMetrics, error: errorChatbot } = await supa
+    const { data: chatbotMetrics } = await supa
       .from('v_chatbot_metricas_hoy')
       .select('*')
       .single();
@@ -723,7 +720,7 @@ async function initDashboard() {
     }
 
     // 4. Cargar top producto
-    const { data: topProductos, error: errorTop } = await supa
+    const { data: topProductos } = await supa
       .from('v_top_productos_hoy')
       .select('*')
       .limit(1)
@@ -738,7 +735,7 @@ async function initDashboard() {
     }
 
     // 5. Cargar comparación catering
-    const { data: cateringStats, error: errorCatering } = await supa
+    const { data: cateringStats } = await supa
       .from('v_catering_bot_vs_manual')
       .select('*')
       .single();
@@ -750,7 +747,7 @@ async function initDashboard() {
     }
 
     // 6. Cargar impacto promos
-    const { data: promos, error: errorPromos } = await supa
+    const { data: promos } = await supa
       .from('v_impacto_promos_semana')
       .select('*')
       .single();
@@ -762,11 +759,11 @@ async function initDashboard() {
     }
 
     // 7. Cargar total productos
-    const { count: totalProductos, error: errorProductos } = await supa
+    const { count: totalProductos } = await supa
       .from('productos')
       .select('*', { count: 'exact', head: true });
 
-    const { count: productosActivos, error: errorActivos } = await supa
+    const { count: productosActivos } = await supa
       .from('productos')
       .select('*', { count: 'exact', head: true })
       .eq('activo', true);
@@ -890,6 +887,9 @@ function navigateTo(viewName) {
     pageTitle.textContent = viewName === 'dashboard' 
       ? 'Dashboard' 
       : viewName.charAt(0).toUpperCase() + viewName.slice(1);
+
+    // Actualizar hash para permitir back/forward
+    try { window.location.hash = viewName; } catch {}
     
     // Actualizar nav activo
     document.querySelectorAll('.nav-link').forEach(link => {
@@ -919,6 +919,11 @@ function navigateTo(viewName) {
     } else if (viewName === 'clientes') {
       setTimeout(() => {
         initClientes();
+      }, 100);
+    } else if (viewName === 'configuracion') {
+      // ✅ Inicializa el módulo de configuración al entrar a la vista
+      setTimeout(() => {
+        initConfiguracion();
       }, 100);
     }
   }
@@ -976,7 +981,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const hash = window.location.hash.replace('#', '') || 'dashboard';
   navigateTo(hash);
 
-  // Handle browser back/forward
+  // Handle browser back/forward´å
   window.addEventListener('hashchange', () => {
     const view = window.location.hash.replace('#', '') || 'dashboard';
     navigateTo(view);
@@ -984,3 +989,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
   console.log('✅ Admin Dashboard inicializado correctamente');
 });
+
+// ========== HELPER GLOBAL DE NOTIFICACIONES (opcional) ==========
+// Permite crear notificaciones desde otros módulos importando esta función
+export async function crearNotificacionGlobal(tipo, titulo, mensaje) {
+  try {
+    const { error } = await supa
+      .from('notificaciones')
+      .insert({
+        tipo,
+        titulo,
+        mensaje,
+        leida: false,
+        created_at: new Date().toISOString()
+      });
+    if (error) throw error;
+    console.log('✅ Notificación creada:', titulo);
+  } catch (error) {
+    console.error('Error creando notificación:', error);
+  }
+}
