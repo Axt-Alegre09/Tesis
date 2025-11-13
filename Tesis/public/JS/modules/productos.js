@@ -315,3 +315,5 @@ function setupEventListeners() {
 }
 
 console.log('📦 Módulo de Productos cargado');
+
+
