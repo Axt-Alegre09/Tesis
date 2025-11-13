@@ -1,5 +1,5 @@
 // JS/cart-api.js
-// CartAPI CON SOPORTE DE PROMOS
+// CartAPI CON SOPORTE COMPLETO DE PROMOS
 import { supabase } from "./ScriptLogin.js";
 
 // ---------- Utils ----------
@@ -20,30 +20,76 @@ async function getUserId() {
   return data?.user?.id || null;
 }
 
-// ---------- Local (storage) ----------
+// ---------- Local (storage) con tracking de promos ----------
 function _readLocal() {
   try { return JSON.parse(localStorage.getItem("productos-en-carrito") || "[]"); }
   catch { return []; }
 }
+
 function _writeLocal(cart) {
   localStorage.setItem("productos-en-carrito", JSON.stringify(cart || []));
+  
+  // IMPORTANTE: También guardar en formato "carrito" para checkout
+  const cartData = {
+    items: cart,
+    total: _totalLocal(cart)
+  };
+  localStorage.setItem("carrito", JSON.stringify(cartData));
+  
+  console.log("🛒 Carrito guardado:", {
+    items: cart.length,
+    conPromo: cart.filter(p => p.tienePromo).length,
+    sinPromo: cart.filter(p => !p.tienePromo).length
+  });
+  
   refreshBadge();
 }
+
 function _totalLocal(cart) {
   return (cart || []).reduce((a,p) => {
-    // Usar precio con promo si existe, sino precio normal
-    const precio = p.tienePromo ? (p.precioConPromo || p.precio) : p.precio;
-    return a + Number(precio||0) * Number(p.cantidad||1);
+    const precio = p.tienePromo && p.precioConPromo 
+      ? Number(p.precioConPromo) 
+      : Number(p.precio);
+    return a + precio * Number(p.cantidad||1);
   }, 0);
 }
+
 function _addLocal(prod, qty=1) {
   qty = Math.max(1, Number(qty));
   const cart = _readLocal();
   const id = String(prod.id);
   const i = cart.findIndex(p => String(p.id) === id);
   
-  // Usar precio con promo si existe
-  const precioFinal = prod.tienePromo ? (prod.precioConPromo || prod.precio) : prod.precio;
+  // Detectar si el título indica promoción (fallback)
+  const tituloIndicaPromo = prod.titulo && (
+    prod.titulo.includes('% OFF') || 
+    prod.titulo.includes('descuento') ||
+    prod.titulo.includes('promo')
+  );
+  
+  // Determinar si tiene promo
+  const tienePromo = prod.tienePromo || tituloIndicaPromo || false;
+  
+  // Calcular precios
+  const precioOriginal = Number(prod.precioOriginal || prod.precio || 0);
+  const precioConPromo = tienePromo && prod.precioConPromo 
+    ? Number(prod.precioConPromo) 
+    : Number(prod.precio);
+  const precioFinal = tienePromo ? precioConPromo : precioOriginal;
+  
+  // Calcular descuento
+  let descuentoPorcentaje = Number(prod.descuentoPorcentaje || 0);
+  if (tienePromo && !descuentoPorcentaje && precioOriginal > precioFinal) {
+    descuentoPorcentaje = Math.round(((precioOriginal - precioFinal) / precioOriginal) * 100);
+  }
+  
+  console.log("➕ Agregando producto:", {
+    nombre: prod.titulo || prod.nombre,
+    tienePromo,
+    precioOriginal,
+    precioFinal,
+    descuentoPorcentaje: descuentoPorcentaje + "%"
+  });
   
   if (i >= 0) {
     cart[i].cantidad = Number(cart[i].cantidad||1) + qty;
@@ -51,17 +97,20 @@ function _addLocal(prod, qty=1) {
     cart.push({
       id,
       titulo: prod.titulo || prod.nombre || "",
-      precio: Number(precioFinal||0),
-      precioOriginal: Number(prod.precio || prod.precioOriginal || 0),
-      tienePromo: prod.tienePromo || false,
-      descuentoPorcentaje: Number(prod.descuentoPorcentaje || 0),
+      precio: precioFinal,
+      precioOriginal: precioOriginal,
+      precioConPromo: precioFinal,
+      tienePromo: tienePromo,
+      descuentoPorcentaje: descuentoPorcentaje,
       cantidad: qty,
       imagen: prod.imagen ? toImg(prod.imagen) : null
     });
   }
+  
   _writeLocal(cart);
   return true;
 }
+
 function _setQtyLocal(id, qty) {
   qty = Math.max(1, Number(qty));
   const cart = _readLocal();
@@ -72,13 +121,16 @@ function _setQtyLocal(id, qty) {
   }
   return true;
 }
+
 function _removeLocal(id) {
   const cart = _readLocal().filter(p => String(p.id) !== String(id));
   _writeLocal(cart);
   return true;
 }
+
 function _emptyLocal() {
   _writeLocal([]);
+  localStorage.removeItem("carrito"); // También limpiar el snapshot
   return true;
 }
 
@@ -86,7 +138,7 @@ function _emptyLocal() {
 async function _asegurarCarrito() {
   const { data, error } = await supabase.rpc("asegurar_carrito");
   if (error) throw error;
-  return data; // carrito_id (uuid)
+  return data;
 }
 
 async function _addRemote(productoId, qty=1) {
@@ -141,16 +193,19 @@ async function _fetchRemoteItems() {
   
   return items.map(i => {
     const p = map.get(i.producto_id);
-    const precioFinal = p?.tiene_promo 
-      ? parseFloat(p.precio_con_promo) 
-      : parseFloat(p?.precio_original || 0);
+    const tienePromo = p?.tiene_promo || false;
+    const precioOriginal = parseFloat(p?.precio_original || 0);
+    const precioFinal = tienePromo 
+      ? parseFloat(p?.precio_con_promo) 
+      : precioOriginal;
     
     return {
       id: i.producto_id,
       titulo: p?.nombre || "Producto",
       precio: precioFinal,
-      precioOriginal: parseFloat(p?.precio_original || 0),
-      tienePromo: p?.tiene_promo || false,
+      precioOriginal: precioOriginal,
+      precioConPromo: precioFinal,
+      tienePromo: tienePromo,
       descuentoPorcentaje: parseFloat(p?.descuento_porcentaje || 0),
       cantidad: Number(i.cantidad || 1),
       imagen: toImg(p?.imagen || ""),
@@ -188,37 +243,74 @@ async function getSnapshot() {
     try {
       const items = await _fetchRemoteItems();
       const total = items.reduce((a,p)=> {
-        const precio = p.tienePromo ? p.precio : p.precioOriginal;
+        const precio = p.tienePromo ? p.precioConPromo : p.precioOriginal;
         return a + Number(precio) * Number(p.cantidad||1);
       }, 0);
+      
+      console.log("📊 Snapshot remoto:", {
+        items: items.length,
+        conPromo: items.filter(i => i.tienePromo).length,
+        total
+      });
+      
       return { mode: "remote", items, total };
     } catch {
       // fallback local si falla
     }
   }
+  
   const cart = _readLocal();
+  const total = _totalLocal(cart);
+  
+  console.log("📊 Snapshot local:", {
+    items: cart.length,
+    conPromo: cart.filter(i => i.tienePromo).length,
+    total
+  });
+  
   return {
     mode: "local",
     items: cart.map(p => ({ ...p, imagen: toImg(p.imagen) })),
-    total: _totalLocal(cart)
+    total: total
   };
 }
 
 async function addById(productoId, qty=1) {
   const uid = await getUserId();
   if (uid) return _addRemote(productoId, qty);
-  // invitado: intentar tener el objeto desde __PRODUCTS__
+  
   const all = window.__PRODUCTS__ || [];
   const prod = all.find(p => String(p.id) === String(productoId));
-  if (!prod) throw new Error("Producto no encontrado para invitado; usa addProduct(obj, qty).");
+  if (!prod) throw new Error("Producto no encontrado");
   return _addLocal(prod, qty);
 }
 
-// USAR SIEMPRE DESDE UI (decide local/remote solo)
+// FUNCIÓN PRINCIPAL - con soporte completo de promos
 async function addProduct(productObj, qty=1) {
   const uid = await getUserId();
-  if (uid && productObj?.id) return _addRemote(String(productObj.id), qty);
-  return _addLocal(productObj, qty);
+  
+  // Asegurar que el objeto tenga toda la info de promo
+  const productoCompleto = {
+    ...productObj,
+    tienePromo: productObj.tienePromo || false,
+    descuentoPorcentaje: Number(productObj.descuentoPorcentaje || 0),
+    precioOriginal: Number(productObj.precioOriginal || productObj.precio || 0),
+    precioConPromo: productObj.tienePromo 
+      ? Number(productObj.precio) 
+      : Number(productObj.precioOriginal || productObj.precio)
+  };
+  
+  console.log("🛒 CartAPI.addProduct:", {
+    nombre: productoCompleto.titulo || productoCompleto.nombre,
+    tienePromo: productoCompleto.tienePromo,
+    descuento: productoCompleto.descuentoPorcentaje + "%"
+  });
+  
+  if (uid && productObj?.id) {
+    return _addRemote(String(productObj.id), qty);
+  }
+  
+  return _addLocal(productoCompleto, qty);
 }
 
 async function setQty({ itemId, id }, qty) {
@@ -249,9 +341,41 @@ async function refreshBadge() {
   el.textContent = String(totalQty);
 }
 
+// Función de verificación para debugging
+function verificarCarrito() {
+  const cart = _readLocal();
+  const conPromo = cart.filter(p => p.tienePromo);
+  const sinPromo = cart.filter(p => !p.tienePromo);
+  
+  console.log("🔍 Estado del carrito:");
+  console.log(`   Total: ${cart.length} productos`);
+  console.log(`   Con promoción: ${conPromo.length}`);
+  console.log(`   Sin promoción: ${sinPromo.length}`);
+  
+  if (conPromo.length > 0) {
+    console.log("📦 Productos con descuento:");
+    conPromo.forEach(p => {
+      console.log(`   - ${p.titulo}: ${p.descuentoPorcentaje}% OFF`);
+      console.log(`     Original: ${fmtGs(p.precioOriginal)}`);
+      console.log(`     Final: ${fmtGs(p.precio)}`);
+    });
+  }
+}
+
 window.CartAPI = {
   // core
-  getSnapshot, addById, addProduct, setQty, remove, empty,
+  getSnapshot, 
+  addById, 
+  addProduct, 
+  setQty, 
+  remove, 
+  empty,
   // helpers UI
   refreshBadge,
+  // debugging
+  verificarCarrito
 };
+
+// Auto-verificar al cargar
+console.log("✅ CartAPI cargado con soporte de promociones");
+console.log("   Usa CartAPI.verificarCarrito() para ver el estado actual");
