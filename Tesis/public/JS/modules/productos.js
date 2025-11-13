@@ -331,51 +331,23 @@ export async function editProducto(id) {
 
     currentProductId = id;
     
-    // Verificar que los elementos existan
     const modal = document.getElementById('modalProducto');
     const title = document.getElementById('modalProductoTitle');
     const previewArea = document.getElementById('previewArea');
     
-    if (!modal || !title) {
-      console.error('Modal de productos no encontrado en el DOM');
-      showToast('Error: Modal no encontrado', 'error');
-      return;
-    }
-    
     title.textContent = 'Editar Producto';
-    
-    // Verificar cada campo antes de asignar valor
-    const campos = {
-      'productoId': data.id,
-      'productoNombre': data.nombre,
-      'productoPrecio': parseFloat(data.precio),
-      'productoCategoria': data.categoria_id || '',
-      'productoDescripcion': data.descripcion || ''
-    };
-    
-    for (const [id, valor] of Object.entries(campos)) {
-      const elemento = document.getElementById(id);
-      if (elemento) {
-        elemento.value = valor;
-      } else {
-        console.warn(`Elemento ${id} no encontrado`);
-      }
-    }
-    
-    // Checkbox
-    const checkbox = document.getElementById('productoDisponible');
-    if (checkbox) {
-      checkbox.checked = data.activo;
-    }
+    document.getElementById('productoId').value = data.id;
+    document.getElementById('productoNombre').value = data.nombre;
+    document.getElementById('productoPrecio').value = parseFloat(data.precio);
+    document.getElementById('productoCategoria').value = data.categoria_id || '';
+    document.getElementById('productoDescripcion').value = data.descripcion || '';
+    document.getElementById('productoDisponible').checked = data.activo;
 
-    // Preview de imagen
-    if (data.imagen && previewArea) {
+    if (data.imagen) {
       const imagenUrl = getImageUrl(data.imagen);
       previewArea.innerHTML = `
-        <img src="${imagenUrl}" style="max-width: 100%; max-height: 200px; border-radius: 8px;">
-        <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.5rem;">
-          Haz clic para cambiar la imagen
-        </p>
+        <img src="${imagenUrl}" style="max-width: 100%; max-height: 200px; border-radius: 8px; margin-bottom: 0.5rem;" onerror="this.src='https://via.placeholder.com/300x200?text=Error'">
+        <p style="color: var(--text-secondary); font-size: 0.85rem;">Haz clic para cambiar la imagen</p>
       `;
     }
 
@@ -393,26 +365,12 @@ export async function editProducto(id) {
  */
 export async function deleteProducto(id, nombre) {
   const confirmado = confirm(
-    `¿Estás seguro de eliminar "${nombre}"?\n\n` +
-    `⚠️ Esta acción eliminará:\n` +
-    `• El producto\n` +
-    `• Sus referencias en carritos activos\n` +
-    `• Esta acción no se puede deshacer`
+    `¿Estás seguro de eliminar "${nombre}"?\n\n⚠️ Esta acción no se puede deshacer.`
   );
   
   if (!confirmado) return;
 
   try {
-    // Primero eliminar referencias en carrito_items
-    const { error: errorCarrito } = await supabase
-      .from('carrito_items')
-      .delete()
-      .eq('producto_id', id);
-    
-    if (errorCarrito) {
-      console.warn('Advertencia limpiando carrito:', errorCarrito);
-    }
-
     // Obtener datos del producto para eliminar imagen
     const { data: producto } = await supabase
       .from('productos')
@@ -420,7 +378,7 @@ export async function deleteProducto(id, nombre) {
       .eq('id', id)
       .single();
     
-    // Ahora sí eliminar el producto
+    // Eliminar producto de la BD
     const { error } = await supabase
       .from('productos')
       .delete()
@@ -428,7 +386,7 @@ export async function deleteProducto(id, nombre) {
 
     if (error) throw error;
     
-    // Eliminar imagen del storage si existe
+    // Eliminar imagen del storage
     if (producto?.imagen) {
       await deleteImage(producto.imagen);
     }

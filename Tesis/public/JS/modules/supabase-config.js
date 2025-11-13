@@ -1,103 +1,202 @@
-// ==================== SUPABASE CONFIG ====================
-// Configuración centralizada de Supabase para todo el dashboard
+// ==================== SUPABASE CONFIG Y UTILIDADES ====================
+// Este archivo contiene la configuración y funciones auxiliares para Supabase
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { supa } from './supabase-client.js';
 
-// Credenciales
-const SUPABASE_URL = 'https://jyygevitfnbwrvxrjexp.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5eWdldml0Zm5id3J2eHJqZXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2OTQ2OTYsImV4cCI6MjA3MTI3MDY5Nn0.St0IiSZSeELESshctneazCJHXCDBi9wrZ28UkiEDXYo';
+// Re-exportar supabase para compatibilidad
+export const supabase = supa;
 
-// Crear cliente de Supabase
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-// ==================== HELPERS ====================
+// ==================== FUNCIONES DE IMÁGENES ====================
 
 /**
- * Construir URL completa de imagen desde Storage
- * @param {string} imagenNombre - Nombre del archivo en storage o URL completa
+ * Obtener URL completa de imagen
+ * @param {string} imagePath - Ruta de la imagen
  * @returns {string} URL completa de la imagen
  */
-export function getImageUrl(imagenNombre) {
-  if (!imagenNombre) {
-    return 'https://via.placeholder.com/300x300?text=Sin+Imagen';
+export function getImageUrl(imagePath) {
+  if (!imagePath) {
+    return 'https://via.placeholder.com/300x200?text=Sin+Imagen';
   }
   
-  // Si ya es una URL completa, retornarla
-  if (imagenNombre.startsWith('http')) {
-    return imagenNombre;
+  // Si ya es una URL completa, devolverla tal cual
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+    return imagePath;
   }
   
-  // Construir URL del storage
-  return `${SUPABASE_URL}/storage/v1/object/public/productos/${imagenNombre}`;
+  // Construir URL del storage de Supabase
+  return `https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/${imagePath}`;
 }
 
 /**
- * Formatear precio en guaraníes
- * @param {number|string} precio - Precio a formatear
+ * Subir imagen al storage
+ * @param {File} file - Archivo a subir
+ * @returns {Promise<string>} Nombre del archivo subido
+ */
+export async function uploadImage(file) {
+  try {
+    // Generar nombre único
+    const timestamp = Date.now();
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${timestamp}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+    
+    // Subir al bucket 'productos'
+    const { data, error } = await supa.storage
+      .from('productos')
+      .upload(fileName, file, {
+        contentType: file.type,
+        cacheControl: '3600',
+        upsert: false
+      });
+    
+    if (error) throw error;
+    
+    console.log('✅ Imagen subida:', fileName);
+    return fileName;
+    
+  } catch (error) {
+    console.error('Error subiendo imagen:', error);
+    throw error;
+  }
+}
+
+/**
+ * Eliminar imagen del storage
+ * @param {string} fileName - Nombre del archivo a eliminar
+ */
+export async function deleteImage(fileName) {
+  if (!fileName) return;
+  
+  try {
+    // No eliminar si es URL externa
+    if (fileName.startsWith('http://') || fileName.startsWith('https://')) {
+      return;
+    }
+    
+    const { error } = await supa.storage
+      .from('productos')
+      .remove([fileName]);
+    
+    if (error) throw error;
+    console.log('✅ Imagen eliminada:', fileName);
+    
+  } catch (error) {
+    console.error('Error eliminando imagen:', error);
+  }
+}
+
+// ==================== FUNCIONES DE FORMATO ====================
+
+/**
+ * Formatear precio en Guaraníes
+ * @param {number} precio - Precio a formatear
  * @returns {string} Precio formateado
  */
 export function formatPrice(precio) {
-  const precioNumerico = parseFloat(precio);
-  
-  if (isNaN(precioNumerico)) return '0';
-  
   return new Intl.NumberFormat('es-PY', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0
-  }).format(precioNumerico);
+  }).format(precio);
 }
 
-/**
- * Formatear fecha/hora
- * @param {string} fecha - Fecha en formato ISO
- * @returns {string} Fecha formateada
- */
-export function formatDate(fecha) {
-  if (!fecha) return '-';
-  
-  return new Date(fecha).toLocaleDateString('es-PY', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-}
+// ==================== FUNCIONES DE UI ====================
 
 /**
  * Mostrar notificación toast
  * @param {string} message - Mensaje a mostrar
- * @param {string} type - Tipo: 'success', 'error', 'info', 'warning'
+ * @param {string} type - Tipo: success, error, warning, info
  */
 export function showToast(message, type = 'info') {
-  // Crear elemento toast
+  // Crear toast si no existe
+  let toastContainer = document.getElementById('toastContainer');
+  
+  if (!toastContainer) {
+    toastContainer = document.createElement('div');
+    toastContainer.id = 'toastContainer';
+    toastContainer.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    `;
+    document.body.appendChild(toastContainer);
+  }
+  
+  // Crear toast
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
+  
+  const colors = {
+    success: '#10b981',
+    error: '#ef4444',
+    warning: '#f59e0b',
+    info: '#3b82f6'
+  };
+  
+  const icons = {
+    success: '✓',
+    error: '✕',
+    warning: '⚠',
+    info: 'ℹ'
+  };
+  
   toast.style.cssText = `
-    position: fixed;
-    top: 2rem;
-    right: 2rem;
-    background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
-    color: white;
+    background: white;
     padding: 1rem 1.5rem;
     border-radius: 8px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-    z-index: 9999;
-    animation: slideIn 0.3s ease-out;
-    font-weight: 600;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    max-width: 400px;
+    min-width: 300px;
+    max-width: 500px;
+    animation: slideIn 0.3s ease;
+    border-left: 4px solid ${colors[type]};
   `;
   
-  const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : 'ℹ️';
-  toast.innerHTML = `<span style="font-size: 1.25rem;">${icon}</span> ${message}`;
+  toast.innerHTML = `
+    <span style="
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: ${colors[type]}15;
+      color: ${colors[type]};
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      flex-shrink: 0;
+    ">${icons[type]}</span>
+    <span style="flex: 1; color: #1f2937;">${message}</span>
+  `;
   
-  document.body.appendChild(toast);
+  toastContainer.appendChild(toast);
   
-  // Agregar animación
+  // Auto eliminar después de 5 segundos
+  setTimeout(() => {
+    toast.style.animation = 'slideOut 0.3s ease';
+    setTimeout(() => toast.remove(), 300);
+  }, 5000);
+}
+
+/**
+ * Manejar errores de forma consistente
+ * @param {Error} error - Error a manejar
+ * @param {string} context - Contexto del error
+ */
+export function handleError(error, context = 'Error') {
+  console.error(`${context}:`, error);
+  showToast(`${context}: ${error.message || 'Error desconocido'}`, 'error');
+}
+
+// ==================== ESTILOS GLOBALES ====================
+
+// Agregar estilos para animaciones si no existen
+if (!document.getElementById('toastStyles')) {
   const style = document.createElement('style');
+  style.id = 'toastStyles';
   style.textContent = `
     @keyframes slideIn {
       from {
@@ -109,6 +208,7 @@ export function showToast(message, type = 'info') {
         opacity: 1;
       }
     }
+    
     @keyframes slideOut {
       from {
         transform: translateX(0);
@@ -119,104 +219,21 @@ export function showToast(message, type = 'info') {
         opacity: 0;
       }
     }
+    
+    .spinner {
+      width: 3rem;
+      height: 3rem;
+      border: 4px solid var(--border);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
   `;
   document.head.appendChild(style);
-  
-  // Remover después de 3 segundos
-  setTimeout(() => {
-    toast.style.animation = 'slideOut 0.3s ease-in';
-    setTimeout(() => toast.remove(), 300);
-  }, 3000);
 }
-
-/**
- * Manejar errores de forma consistente
- * @param {Error} error - Error capturado
- * @param {string} contexto - Contexto donde ocurrió el error
- */
-export function handleError(error, contexto = 'Operación') {
-  console.error(`❌ Error en ${contexto}:`, error);
-  
-  let mensaje = error.message || 'Error desconocido';
-  
-  // Mensajes específicos para errores comunes
-  if (error.code === 'PGRST301') {
-    mensaje = 'No tienes permisos para realizar esta acción';
-  } else if (error.message?.includes('JWT')) {
-    mensaje = 'Error de autenticación. Por favor, recarga la página';
-  } else if (error.message?.includes('policies')) {
-    mensaje = 'Error de permisos. Verifica las políticas RLS en Supabase';
-  }
-  
-  showToast(`${contexto}: ${mensaje}`, 'error');
-}
-
-/**
- * Validar archivo de imagen
- * @param {File} file - Archivo a validar
- * @returns {Object} { valid: boolean, error: string }
- */
-export function validateImageFile(file) {
-  const maxSize = 5 * 1024 * 1024; // 5MB
-  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-  
-  if (!file) {
-    return { valid: false, error: 'No se seleccionó ningún archivo' };
-  }
-  
-  if (file.size > maxSize) {
-    return { valid: false, error: 'La imagen es muy grande. Máximo 5MB' };
-  }
-  
-  if (!allowedTypes.includes(file.type)) {
-    return { valid: false, error: 'Formato no permitido. Usa JPG, PNG o WEBP' };
-  }
-  
-  return { valid: true };
-}
-
-/**
- * Subir imagen a Supabase Storage
- * @param {File} file - Archivo a subir
- * @param {string} bucket - Nombre del bucket (default: 'productos')
- * @returns {Promise<string>} Nombre del archivo subido
- */
-export async function uploadImage(file, bucket = 'productos') {
-  const validation = validateImageFile(file);
-  if (!validation.valid) {
-    throw new Error(validation.error);
-  }
-  
-  const fileExt = file.name.split('.').pop();
-  const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-  
-  const { data, error } = await supabase.storage
-    .from(bucket)
-    .upload(fileName, file, {
-      cacheControl: '3600',
-      upsert: false
-    });
-  
-  if (error) throw error;
-  
-  return fileName;
-}
-
-/**
- * Eliminar imagen de Supabase Storage
- * @param {string} fileName - Nombre del archivo a eliminar
- * @param {string} bucket - Nombre del bucket (default: 'productos')
- */
-export async function deleteImage(fileName, bucket = 'productos') {
-  if (!fileName || fileName.startsWith('http')) return;
-  
-  const { error } = await supabase.storage
-    .from(bucket)
-    .remove([fileName]);
-  
-  if (error) {
-    console.warn('⚠️ No se pudo eliminar la imagen:', error);
-  }
-}
-
-console.log('✅ Supabase config cargado');
