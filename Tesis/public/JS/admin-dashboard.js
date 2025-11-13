@@ -1,12 +1,13 @@
-// ==================== ADMIN DASHBOARD JS - VERSIÓN FINAL ====================
+// ==================== ADMIN DASHBOARD JS - VERSIÓN CORREGIDA ====================
 // ✅ Tabla usuarios → perfiles_usuarios
 // ✅ Implementación de modo mantenimiento
 // ✅ Integración de ChatBot
 // ✅ Sistema de notificaciones completo
 // ✅ Instancia única de Supabase
+// ✅ RUTAS CORREGIDAS
 
 import { supa } from './supabase-client.js';
-import { configuracionView, initConfiguracion } from './modules/configuracion-complete.js';
+// import { configuracionView, initConfiguracion } from './modules/configuracion-complete.js'; // ⚠️ COMENTADO - TIENE ERROR
 import { initProductos } from './modules/productos.js';
 import { initClientes } from './clientes.js';
 
@@ -812,9 +813,186 @@ const views = {
         </div>
       </div>
     </div>
+
+    <div class="card">
+      <div style="margin-bottom: 1.5rem;">
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+          <div style="flex: 1; min-width: 200px;">
+            <input type="search" id="searchClientes" placeholder="Buscar clientes..." 
+                   style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
+          </div>
+          <select id="filterCiudad" style="padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
+            <option value="">Todas las ciudades</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr style="border-bottom: 2px solid var(--border);">
+              <th style="padding: 1rem; text-align: left;">Cliente</th>
+              <th style="padding: 1rem; text-align: left;">Contacto</th>
+              <th style="padding: 1rem; text-align: left;">Ubicación</th>
+              <th style="padding: 1rem; text-align: center;">RUC</th>
+              <th style="padding: 1rem; text-align: center;">Registro</th>
+              <th style="padding: 1rem; text-align: center;">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="clientesTableBody">
+            <tr>
+              <td colspan="6" style="padding: 3rem; text-align: center;">
+                <div class="spinner"></div>
+                <p style="margin-top: 1rem;">Cargando clientes...</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Modal Detalle Cliente -->
+    <div id="modalDetalleCliente" class="modal-overlay" style="display: none;">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Detalle del Cliente</h2>
+          <button id="closeModalDetalle" class="btn-close">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="detail-grid">
+            <div class="detail-item">
+              <label>Razón Social:</label>
+              <span id="detalleRazon"></span>
+            </div>
+            <div class="detail-item">
+              <label>RUC:</label>
+              <span id="detalleRuc"></span>
+            </div>
+            <div class="detail-item">
+              <label>Teléfono:</label>
+              <span id="detalleTel"></span>
+            </div>
+            <div class="detail-item">
+              <label>Email:</label>
+              <span id="detalleMail"></span>
+            </div>
+            <div class="detail-item">
+              <label>Contacto:</label>
+              <span id="detalleContacto"></span>
+            </div>
+            <div class="detail-item">
+              <label>Dirección:</label>
+              <span id="detalleDireccion"></span>
+            </div>
+            <div class="detail-item">
+              <label>Código Postal:</label>
+              <span id="detallePostal"></span>
+            </div>
+            <div class="detail-item">
+              <label>Fecha Creación:</label>
+              <span id="detalleFechaCreacion"></span>
+            </div>
+            <div class="detail-item">
+              <label>Última Actualización:</label>
+              <span id="detalleFechaActualizacion"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Editar Cliente -->
+    <div id="modalEditarCliente" class="modal-overlay" style="display: none;">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Editar Cliente</h2>
+          <button id="closeModalEditar" class="btn-close">×</button>
+        </div>
+        <div class="modal-body">
+          <form id="formEditarCliente">
+            <input type="hidden" id="editClienteId">
+            
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="editRazon">Razón Social</label>
+                <input type="text" id="editRazon" required>
+              </div>
+              
+              <div class="form-group">
+                <label for="editRuc">RUC</label>
+                <input type="text" id="editRuc">
+              </div>
+              
+              <div class="form-group">
+                <label for="editTel">Teléfono</label>
+                <input type="text" id="editTel">
+              </div>
+              
+              <div class="form-group">
+                <label for="editMail">Email</label>
+                <input type="email" id="editMail">
+              </div>
+              
+              <div class="form-group">
+                <label for="editContacto">Contacto</label>
+                <input type="text" id="editContacto">
+              </div>
+              
+              <div class="form-group">
+                <label for="editCalle1">Calle Principal</label>
+                <input type="text" id="editCalle1">
+              </div>
+              
+              <div class="form-group">
+                <label for="editCalle2">Calle Secundaria</label>
+                <input type="text" id="editCalle2">
+              </div>
+              
+              <div class="form-group">
+                <label for="editNro">Número</label>
+                <input type="text" id="editNro">
+              </div>
+              
+              <div class="form-group">
+                <label for="editBarrio">Barrio</label>
+                <input type="text" id="editBarrio">
+              </div>
+              
+              <div class="form-group">
+                <label for="editCiudad">Ciudad</label>
+                <input type="text" id="editCiudad">
+              </div>
+              
+              <div class="form-group">
+                <label for="editDepto">Departamento</label>
+                <input type="text" id="editDepto">
+              </div>
+              
+              <div class="form-group">
+                <label for="editPostal">Código Postal</label>
+                <input type="text" id="editPostal">
+              </div>
+            </div>
+            
+            <div class="modal-footer">
+              <button type="button" id="btnCancelarEditar" class="btn-secondary">Cancelar</button>
+              <button type="submit" class="btn-primary">
+                <i class="bi bi-check-lg"></i> Guardar Cambios
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
   `,
 
-  configuracion: configuracionView
+  configuracion: `
+    <div class="card" style="padding: 3rem; text-align: center;">
+      <i class="bi bi-tools" style="font-size: 4rem; color: var(--warning); opacity: 0.5;"></i>
+      <h2 style="margin-top: 1.5rem; font-size: 1.5rem; font-weight: 700;">Sección en Mantenimiento</h2>
+      <p style="color: var(--text-secondary); margin-top: 1rem;">La página de configuración está siendo actualizada. Volverá pronto.</p>
+    </div>
+  `
 };
 
 console.log('✅ Vistas definidas');
@@ -1104,9 +1282,9 @@ function navigateTo(viewName) {
         case 'clientes':
           if (typeof initClientes === 'function') initClientes();
           break;
-        case 'configuracion':
-          if (typeof initConfiguracion === 'function') initConfiguracion();
-          break;
+        // case 'configuracion':
+        //   if (typeof initConfiguracion === 'function') initConfiguracion();
+        //   break;
       }
     }, 100);
   }
@@ -1268,6 +1446,123 @@ style.textContent = `
   .quick-action-btn i {
     color: var(--primary);
     font-size: 1.1rem;
+  }
+  
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+  }
+  
+  .modal-content {
+    background: white;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  }
+  
+  .modal-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .modal-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+  }
+  
+  .btn-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-muted);
+  }
+  
+  .modal-body {
+    padding: 1.5rem;
+  }
+  
+  .modal-footer {
+    padding: 1.5rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+  }
+  
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+  }
+  
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .form-group label {
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+  
+  .form-group input,
+  .form-group select {
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.95rem;
+  }
+  
+  .detail-grid {
+    display: grid;
+    gap: 1rem;
+  }
+  
+  .detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  
+  .detail-item label {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+  
+  .detail-item span {
+    font-size: 1rem;
+  }
+  
+  .btn-secondary {
+    padding: 0.75rem 1.5rem;
+    background: var(--bg-secondary);
+    color: var(--text);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+  
+  .btn-secondary:hover {
+    background: var(--bg-hover);
   }
 `;
 document.head.appendChild(style);

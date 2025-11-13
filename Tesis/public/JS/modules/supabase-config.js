@@ -161,7 +161,7 @@ export function validateImageFile(file) {
   
   if (!file) {
     return { valid: false, error: 'No se seleccionó ningún archivo' };
-  }
+    }
   
   if (file.size > maxSize) {
     return { valid: false, error: 'La imagen es muy grande. Máximo 5MB' };
@@ -189,7 +189,7 @@ export async function uploadImage(file, bucket = 'productos') {
   const fileExt = file.name.split('.').pop();
   const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
   
-  const { data, error } = await supabase.storage
+  const { data, error } = await supa.storage
     .from(bucket)
     .upload(fileName, file, {
       cacheControl: '3600',
@@ -201,7 +201,7 @@ export async function uploadImage(file, bucket = 'productos') {
   return fileName;
 }
 
-/**
+/** 
  * Eliminar imagen de Supabase Storage
  * @param {string} fileName - Nombre del archivo a eliminar
  * @param {string} bucket - Nombre del bucket (default: 'productos')
@@ -209,7 +209,7 @@ export async function uploadImage(file, bucket = 'productos') {
 export async function deleteImage(fileName, bucket = 'productos') {
   if (!fileName || fileName.startsWith('http')) return;
   
-  const { error } = await supabase.storage
+  const { error } = await supa.storage
     .from(bucket)
     .remove([fileName]);
   
