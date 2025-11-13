@@ -1,19 +1,56 @@
-// ==================== MÓDULO DE PRODUCTOS CORREGIDO ====================
-// Importar desde supabase-config.js que ya tiene todos los helpers necesarios
-import { 
-  supabase, 
-  getImageUrl, 
-  formatPrice, 
-  showToast, 
-  handleError,
-  uploadImage,
-  deleteImage
-} from './supabase-config.js';
+// ==================== MÓDULO DE PRODUCTOS - VERSIÓN FINAL CORREGIDA ====================
+
+import { supa } from '../supabase-client.js';
 
 // ==================== ESTADO ====================
 let productosData = [];
 let categoriasData = [];
 let currentProductId = null;
+let currentImageUrl = null;
+
+// ==================== FUNCIONES AUXILIARES ====================
+function getImageUrl(imagePath) {
+  if (!imagePath) return 'https://via.placeholder.com/300x300?text=Sin+Imagen';
+  if (imagePath.startsWith('http')) return imagePath;
+  
+  const { data } = supa.storage
+    .from('productos')
+    .getPublicUrl(imagePath);
+  
+  return data.publicUrl;
+}
+
+function formatPrice(precio) {
+  return new Intl.NumberFormat('es-PY', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(precio);
+}
+
+function showToast(message, type = 'success') {
+  const bgColor = type === 'success' ? 'rgb(16, 185, 129)' : 'rgb(239, 68, 68)';
+  const toast = document.createElement('div');
+  toast.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: ${bgColor};
+    color: white;
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 10000;
+    font-weight: 500;
+  `;
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transition = 'opacity 0.3s';
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
 
 // ==================== INICIALIZACIÓN ====================
 export async function initProductos() {
@@ -34,7 +71,6 @@ export async function initProductos() {
 
 // ==================== CREAR MODAL ====================
 function createProductModal() {
-  // Si el modal ya existe, no lo creamos de nuevo
   if (document.getElementById('modalProducto')) return;
 
   const modalHTML = `
@@ -144,7 +180,7 @@ export async function loadProductos() {
   `;
   
   try {
-    const { data, error } = await supabase
+    const { data, error } = await supa
       .from('productos')
       .select(`
         *,
@@ -183,7 +219,7 @@ export async function loadCategorias() {
   console.log('🔄 Cargando categorías...');
   
   try {
-    const { data, error } = await supabase
+    const { data, error } = await supa
       .from('categorias')
       .select('id, nombre')
       .order('nombre');
@@ -246,7 +282,7 @@ function renderProductosTable(filteredData = null) {
             src="${getImageUrl(producto.imagen)}" 
             alt="${producto.nombre}"
             style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px;"
-            onerror="this.src='https://via.placeholder.com/60x60?text=Error'"
+            onerror="this.src='https://via.placeholder.com/60x60?text=Sin+Imagen'"
           >
           <div>
             <div style="font-weight: 600;">${producto.nombre}</div>
@@ -289,7 +325,9 @@ function renderProductosTable(filteredData = null) {
 
 // ==================== MODAL FUNCTIONS ====================
 export function openNewProductoModal() {
+  console.log('📝 Abriendo modal para nuevo producto');
   currentProductId = null;
+  currentImageUrl = null;
   
   const modal = document.getElementById('modalProducto');
   const form = document.getElementById('formProducto');
@@ -318,12 +356,15 @@ export function closeProductoModal() {
   if (modal) {
     modal.style.display = 'none';
     currentProductId = null;
+    currentImageUrl = null;
   }
 }
 
 export async function editProducto(id) {
+  console.log('✏️ Editando producto:', id);
+  
   try {
-    const { data, error } = await supabase
+    const { data, error } = await supa
       .from('productos')
       .select('*')
       .eq('id', id)
@@ -332,6 +373,7 @@ export async function editProducto(id) {
     if (error) throw error;
 
     currentProductId = id;
+    currentImageUrl = data.imagen;
     
     const modal = document.getElementById('modalProducto');
     const title = document.getElementById('modalProductoTitle');
@@ -361,21 +403,25 @@ export async function editProducto(id) {
     
   } catch (error) {
     console.error('Error al cargar producto:', error);
-    alert('Error al cargar el producto');
+    showToast('Error al cargar el producto', 'error');
   }
 }
 
 export async function deleteProducto(id, nombre) {
-  // Primero verificar si el producto está en uso
+  console.log('🗑️ Intentando eliminar producto:', id, nombre);
+  
+  // ✅ CORRECCIÓN: Verificar si el producto está en uso
   try {
-    const { data: detalles, error: errorDetalles } = await supabase
+    const { data: detalles, error: errorDetalles } = await supa
       .from('detalles_pedido')
       .select('id')
       .eq('producto_id', id)
       .limit(1);
 
+    if (errorDetalles) throw errorDetalles;
+
     if (detalles && detalles.length > 0) {
-      alert(`No se puede eliminar "${nombre}" porque está siendo usado en pedidos existentes.\n\nPuedes desactivar el producto en su lugar.`);
+      alert(`❌ No se puede eliminar "${nombre}"\n\nMotivo: Este producto está siendo usado en pedidos existentes.\n\n💡 Sugerencia: En su lugar, puedes DESACTIVAR el producto editándolo y desmarcando "Producto disponible".`);
       return;
     }
 
@@ -383,23 +429,25 @@ export async function deleteProducto(id, nombre) {
     
     if (!confirmado) return;
 
-    const { error } = await supabase
+    const { error } = await supa
       .from('productos')
       .delete()
       .eq('id', id);
 
     if (error) throw error;
     
-    showToast('Producto eliminado exitosamente', 'success');
+    showToast('✅ Producto eliminado exitosamente', 'success');
     await loadProductos();
     
   } catch (error) {
-    handleError(error, 'Error al eliminar producto');
+    console.error('Error al eliminar producto:', error);
+    showToast('❌ Error al eliminar producto', 'error');
   }
 }
 
 export async function saveProducto(e) {
   e.preventDefault();
+  console.log('💾 Guardando producto...');
   
   const formData = {
     nombre: document.getElementById('productoNombre').value.trim(),
@@ -414,52 +462,54 @@ export async function saveProducto(e) {
     // Manejar la imagen si hay una nueva
     const fileInput = document.getElementById('productoImagen');
     if (fileInput.files.length > 0) {
-      const fileName = await uploadImage(fileInput.files[0]);
+      const file = fileInput.files[0];
+      const fileName = `${Date.now()}_${file.name}`;
+      
+      const { error: uploadError } = await supa.storage
+        .from('productos')
+        .upload(fileName, file);
+      
+      if (uploadError) throw uploadError;
+      
       formData.imagen = fileName;
+    } else if (currentImageUrl) {
+      // Mantener la imagen existente
+      formData.imagen = currentImageUrl;
     }
 
     if (currentProductId) {
-      // ACTUALIZAR
-      if (!formData.imagen) {
-        const { data: current } = await supabase
-          .from('productos')
-          .select('imagen')
-          .eq('id', currentProductId)
-          .single();
-        
-        formData.imagen = current?.imagen;
-      }
-
+      // ✅ ACTUALIZAR
       formData.actualizado_en = new Date().toISOString();
       
-      const { error } = await supabase
+      const { error } = await supa
         .from('productos')
         .update(formData)
         .eq('id', currentProductId);
 
       if (error) throw error;
       
-      showToast('Producto actualizado exitosamente', 'success');
+      showToast('✅ Producto actualizado exitosamente', 'success');
       
     } else {
-      // CREAR NUEVO
+      // ✅ CREAR NUEVO
       formData.creado_en = new Date().toISOString();
       formData.actualizado_en = new Date().toISOString();
       
-      const { error } = await supabase
+      const { error } = await supa
         .from('productos')
         .insert([formData]);
 
       if (error) throw error;
       
-      showToast('Producto creado exitosamente', 'success');
+      showToast('✅ Producto creado exitosamente', 'success');
     }
 
     closeProductoModal();
     await loadProductos();
     
   } catch (error) {
-    handleError(error, 'Error al guardar producto');
+    console.error('Error al guardar producto:', error);
+    showToast('❌ Error al guardar producto', 'error');
   }
 }
 
@@ -478,7 +528,7 @@ export function filterProductos() {
   }
   
   if (categoriaId) {
-    filtered = filtered.filter(p => p.categoria_id === categoriaId);
+    filtered = filtered.filter(p => p.categoria_id === parseInt(categoriaId));
   }
   
   renderProductosTable(filtered);
@@ -486,15 +536,42 @@ export function filterProductos() {
 
 // ==================== EVENT LISTENERS ====================
 function setupEventListeners() {
+  console.log('🎧 Configurando event listeners de productos...');
+  
   // Búsqueda y filtros
-  document.getElementById('searchProductos')?.addEventListener('input', filterProductos);
-  document.getElementById('filterCategoria')?.addEventListener('change', filterProductos);
+  const searchInput = document.getElementById('searchProductos');
+  const filterSelect = document.getElementById('filterCategoria');
+  
+  if (searchInput) {
+    searchInput.addEventListener('input', filterProductos);
+  }
+  
+  if (filterSelect) {
+    filterSelect.addEventListener('change', filterProductos);
+  }
+  
+  // ✅ CORRECCIÓN: Botón nuevo producto
+  const btnNuevo = document.getElementById('btnNuevoProducto');
+  if (btnNuevo) {
+    // Remover listeners anteriores
+    const newBtn = btnNuevo.cloneNode(true);
+    btnNuevo.parentNode.replaceChild(newBtn, btnNuevo);
+    
+    // Agregar nuevo listener
+    newBtn.addEventListener('click', () => {
+      console.log('🆕 Click en botón Nuevo Producto');
+      openNewProductoModal();
+    });
+  }
   
   // Modal
-  document.getElementById('btnNuevoProducto')?.addEventListener('click', openNewProductoModal);
   document.getElementById('closeModalProducto')?.addEventListener('click', closeProductoModal);
   document.getElementById('btnCancelarProducto')?.addEventListener('click', closeProductoModal);
-  document.getElementById('formProducto')?.addEventListener('submit', saveProducto);
+  
+  const form = document.getElementById('formProducto');
+  if (form) {
+    form.addEventListener('submit', saveProducto);
+  }
   
   // Upload de imagen
   const uploadArea = document.getElementById('uploadArea');
@@ -523,6 +600,8 @@ function setupEventListeners() {
       reader.readAsDataURL(file);
     });
   }
+  
+  console.log('✅ Event listeners de productos configurados');
 }
 
 // ==================== EXPORTAR PARA USO GLOBAL ====================
@@ -540,4 +619,4 @@ if (typeof window !== 'undefined') {
   };
 }
 
-console.log('📦 Módulo de Productos cargado');
+console.log('📦 Módulo de Productos cargado (versión corregida)');
