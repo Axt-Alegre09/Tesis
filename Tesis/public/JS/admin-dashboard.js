@@ -10,6 +10,10 @@ import { configuracionView, initConfiguracion } from './modules/configuracion-co
 import { initProductos } from './modules/productos.js';
 import { initClientes } from './clientes.js';
 
+// ⚠️ DEBUG LOGS ⚠️
+console.log('🚀 Script admin-dashboard.js ejecutándose...');
+console.log('✅ Imports completados');
+
 // ========== SISTEMA DE NOTIFICACIONES ==========
 class NotificationSystem {
   constructor() {
@@ -19,6 +23,7 @@ class NotificationSystem {
   }
 
   init() {
+    console.log('🔔 Inicializando sistema de notificaciones...');
     this.badge = document.getElementById('notificationsBadge');
     
     if (!document.getElementById('notificationsContainer')) {
@@ -246,6 +251,7 @@ class ChatBotSystem {
   }
 
   init() {
+    console.log('🤖 Inicializando ChatBot...');
     this.createWidget();
     this.loadChatBotMetrics();
   }
@@ -452,6 +458,7 @@ class MaintenanceMode {
   }
 
   async init() {
+    console.log('🔧 Inicializando modo mantenimiento...');
     await this.checkStatus();
   }
 
@@ -810,9 +817,11 @@ const views = {
   configuracion: configuracionView
 };
 
+console.log('✅ Vistas definidas');
+
 // ========== INICIALIZACIÓN DEL DASHBOARD ==========
 async function initDashboard() {
-  console.log('🚀 Inicializando Dashboard Intelligence...');
+  console.log('📊 Inicializando Dashboard...');
 
   try {
     const { data: resumenHoy, error: errorResumen } = await supa
@@ -1047,6 +1056,7 @@ function initWeekGrid(data) {
 
 // ========== NAVEGACIÓN ==========
 function navigateTo(viewName) {
+  console.log(`📍 Navegando a: ${viewName}`);
   const contentArea = document.getElementById('contentArea');
   const pageTitle = document.getElementById('pageTitle');
   
@@ -1220,7 +1230,10 @@ document.addEventListener('DOMContentLoaded', () => {
     window.location.href = 'loginAdmin.html';
   });
 
+  console.log('✅ Event listeners configurados');
+
   const hash = window.location.hash.replace('#', '') || 'dashboard';
+  console.log(`📍 Hash inicial: ${hash}`);
   navigateTo(hash);
 
   window.addEventListener('hashchange', () => {
@@ -1258,3 +1271,5 @@ style.textContent = `
   }
 `;
 document.head.appendChild(style);
+
+console.log('✅ Admin Dashboard JS cargado completamente');
