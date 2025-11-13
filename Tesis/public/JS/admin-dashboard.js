@@ -1180,7 +1180,7 @@ async function checkAuth() {
   // Prevenir verificaciones múltiples simultáneas
   if (isCheckingAuth) {
     console.log('⏳ Verificación de autenticación en progreso...');
-    return true; // Asumir que está ok mientras se verifica
+    return true;
   }
 
   isCheckingAuth = true;
@@ -1197,20 +1197,21 @@ async function checkAuth() {
     
     if (!user) {
       console.log('❌ Usuario no autenticado');
-      // Usar replace en lugar de href para evitar bucle en historial
       window.location.replace('login.html');
       return false;
     }
     
-    // Verificar si tiene rol de admin
+    // ✅ CORRECCIÓN: Buscar en tabla 'profiles' con campo 'role' y 'id'
     const { data: perfil, error } = await supa
-      .from('perfiles_usuarios')
-      .select('rol')
-      .eq('user_id', user.id)
+      .from('profiles')  // ✅ Tu tabla real
+      .select('role')    // ✅ Campo 'role' (no 'rol')
+      .eq('id', user.id) // ✅ Campo 'id' (no 'user_id')
       .single();
 
-    if (error || !perfil || perfil.rol !== 'admin') {
+    if (error || !perfil || perfil.role !== 'admin') {
       console.log('❌ Usuario sin permisos de administrador');
+      console.log('Perfil encontrado:', perfil);
+      console.log('Error:', error);
       window.location.replace('login.html');
       return false;
     }

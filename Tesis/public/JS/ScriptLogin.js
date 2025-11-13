@@ -1,4 +1,4 @@
-// JS/ScriptLogin.js - VERSIÓN CORREGIDA SIN BUCLES
+// JS/ScriptLogin.js - VERSIÓN FINAL CORREGIDA PARA TUS TABLAS REALES
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 /* ========= Config ========= */
@@ -12,14 +12,11 @@ const LOGIN_URL = "login.html";
 const HOME_CLIENTE = "index.html";
 const HOME_ADMIN = "admin-dashboard.html";
 
-// CORRECCIÓN: Variable para prevenir bucles
 let isRedirecting = false;
 
 function go(path) {
-  if (isRedirecting) return; // Prevenir redirecciones múltiples
+  if (isRedirecting) return;
   isRedirecting = true;
-  
-  // Usar replace para no crear historial
   window.location.replace(new URL(path, window.location.href).href);
 }
 
@@ -36,22 +33,20 @@ export async function getUser() {
 }
 
 /* ========= Perfiles =========
-   - profiles: rol/nombre base del sistema
-   - clientes_perfil: datos comerciales del cliente (usa razon)
+   CORRECCIÓN: Usar tabla 'profiles' con campo 'role' y 'id'
 */
 export async function getProfile() {
   const user = await getUser();
   if (!user) return null;
   
-  // CORRECCIÓN: Usar perfiles_usuarios en lugar de profiles
   const { data, error } = await supabase
-    .from("perfiles_usuarios")
-    .select("user_id, email, nombre, rol")
-    .eq("user_id", user.id)
+    .from("profiles")  // ✅ Tu tabla real
+    .select("id, email, nombre, role")  // ✅ Campo 'role' (no 'rol')
+    .eq("id", user.id)  // ✅ Campo 'id' (no 'user_id')
     .maybeSingle();
     
   if (error) { 
-    console.error("[perfiles_usuarios]", error); 
+    console.error("[profiles]", error); 
     return null; 
   }
   return data;
@@ -74,9 +69,7 @@ export async function getClientePerfil() {
   return data;
 }
 
-/* ========= Nombre visible en el chip =========
-   Prioridad: clientes_perfil.razon  >  perfiles_usuarios.nombre  >  user_metadata.nombre
-*/
+/* ========= Nombre visible en el chip ========= */
 async function getDisplayName() {
   const user = await getUser();
   if (!user) return "";
@@ -97,7 +90,7 @@ async function getDisplayName() {
 
 /* ========= Navegación por rol ========= */
 export async function goByRole() {
-  if (isRedirecting) return; // Prevenir múltiples redirecciones
+  if (isRedirecting) return;
   
   const p = await getProfile();
   if (!p) {
@@ -105,10 +98,10 @@ export async function goByRole() {
     return;
   }
   
-  console.log('🔄 Redirigiendo según rol:', p.rol);
+  console.log('🔄 Redirigiendo según rol:', p.role);
   
-  // CORRECCIÓN: Usar 'rol' en lugar de 'role'
-  if (p.rol === "admin") {
+  // ✅ CORRECCIÓN: Usar 'role' en lugar de 'rol'
+  if (p.role === "admin") {
     go(HOME_ADMIN);
   } else {
     go(HOME_CLIENTE);
@@ -123,7 +116,7 @@ export async function requireRole(roleNeeded = "cliente") {
   }
   
   const p = await getProfile();
-  if (!p || p.rol !== roleNeeded) {
+  if (!p || p.role !== roleNeeded) {
     if (roleNeeded === "admin") {
       go("loginAdmin.html");
     } else {
@@ -158,7 +151,6 @@ export async function logout(ev) {
   try { localStorage.clear(); } catch {}
   try { sessionStorage.clear(); } catch {}
   
-  // CORRECCIÓN: Usar replace en lugar de go
   window.location.replace(LOGIN_URL);
 }
 
@@ -198,11 +190,10 @@ async function wireLoginPage() {
   const registerBtn = document.querySelector(".register-btn");
   const forgot = document.getElementById("forgotLink");
 
-  // Toggle
   registerBtn?.addEventListener("click", () => wrapper?.classList.add("active"));
   loginBtn?.addEventListener("click", () => wrapper?.classList.remove("active"));
 
-  // CORRECCIÓN: Verificar sesión CON TIMEOUT para evitar bloqueos
+  // Verificar sesión con timeout
   try {
     const timeoutPromise = new Promise((_, reject) => 
       setTimeout(() => reject(new Error('Timeout')), 3000)
@@ -215,11 +206,10 @@ async function wireLoginPage() {
     if (data?.session) {
       console.log('✅ Sesión existente detectada, redirigiendo...');
       await goByRole();
-      return; // Importante: detener la ejecución aquí
+      return;
     }
   } catch (error) {
     console.log('⚠️ Error verificando sesión:', error.message);
-    // Continuar con el formulario de login
   }
 
   // Login
@@ -239,10 +229,7 @@ async function wireLoginPage() {
     }
     
     showMsg("✅ Bienvenido. Verificando rol…", "success");
-    
-    // Pequeño delay para que el mensaje se vea
     await new Promise(resolve => setTimeout(resolve, 500));
-    
     await goByRole();
   });
 
@@ -293,14 +280,12 @@ async function wireLoginPage() {
 /* ========= Auto-init ========= */
 (async function init() {
   try {
-    // Solo ejecutar autoWireAuthMenu si NO estamos en login.html
     const isLoginPage = document.getElementById("loginForm") || document.getElementById("registerForm");
     
     if (!isLoginPage) {
       await autoWireAuthMenu();
     }
 
-    // Si estamos en login.html, ejecutar lógica específica
     if (isLoginPage) {
       console.log('📄 Inicializando página de login...');
       await wireLoginPage();
@@ -310,7 +295,6 @@ async function wireLoginPage() {
   }
 })();
 
-// Exportar para uso externo
 export async function requireAuth() {
   const { data } = await supabase.auth.getSession();
   if (!data?.session) {
@@ -322,4 +306,4 @@ export async function requireAuth() {
 
 window.supabase = supabase;
 
-console.log('✅ ScriptLogin.js cargado (versión sin bucles)');
+console.log('✅ ScriptLogin.js cargado (versión para tabla profiles)');
