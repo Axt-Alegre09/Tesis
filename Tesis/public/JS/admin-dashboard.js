@@ -651,6 +651,11 @@ function navigateTo(viewName) {
 document.addEventListener('DOMContentLoaded', () => {
   console.log('🚀 Inicializando Admin Dashboard Final...');
   
+  // LIMPIAR CUALQUIER MODAL AL INICIO
+  document.querySelectorAll('.modal-overlay').forEach(modal => {
+    modal.style.display = 'none';
+  });
+  
   // Sidebar toggle
   const sidebar = document.getElementById('sidebar');
   const sidebarToggle = document.getElementById('sidebarToggle');

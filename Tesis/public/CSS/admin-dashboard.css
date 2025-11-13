@@ -721,7 +721,8 @@ body {
   color: white;
 }
 
-/* ========== MODALS ========== */
+/* ========== MODALS (CORREGIDO) ========== */
+/* Todos los modales ocultos por defecto */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -730,11 +731,31 @@ body {
   bottom: 0;
   background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(4px);
-  display: flex;
+  display: none !important; /* OCULTO por defecto */
   align-items: center;
   justify-content: center;
   z-index: 1000;
   animation: fadeIn 0.3s;
+}
+
+/* Solo mostrar cuando tiene clase .active */
+.modal-overlay.active {
+  display: flex !important;
+}
+
+/* Arreglar modales específicos */
+#modalProducto,
+#modalDetalleCliente,
+#modalEditarCliente,
+#modalUsuario {
+  display: none !important;
+}
+
+#modalProducto.active,
+#modalDetalleCliente.active,
+#modalEditarCliente.active,
+#modalUsuario.active {
+  display: flex !important;
 }
 
 /* ========== BADGES ========== */
