@@ -1,19 +1,18 @@
-// ==================== ADMIN DASHBOARD JS - VERSIÓN COMPLETAMENTE CORREGIDA ====================
-// Correcciones aplicadas:
-// 1. ✅ Tabla usuarios → perfiles_usuarios
-// 2. ✅ Implementación de modo mantenimiento
-// 3. ✅ Integración de ChatBot
-// 4. ✅ Sistema de notificaciones completo
-// 5. ✅ Instancia única de Supabase
-// 6. ✅ Función initWeekGrid mejorada con días ordenados correctamente
-// 7. ✅ Función initChartVentas mejorada con ordenamiento correcto
-// 8. ✅ Sistema de autenticación y logout corregido
-// 9. ✅ Verificación de permisos de administrador
+// ==================== ADMIN DASHBOARD JS - VERSIÓN SIN BUCLE DE REDIRECCIÓN ====================
+// Correcciones:
+// 1. ✅ Evitar bucle infinito de redirección
+// 2. ✅ Verificación de autenticación mejorada con timeout
+// 3. ✅ Manejo de sesiones más robusto
+// 4. ✅ Prevención de múltiples verificaciones simultáneas
 
 import { supa } from './supabase-client.js';
 import { configuracionView, initConfiguracion } from './modules/configuracion-complete.js';
 import { initProductos } from './modules/productos.js';
 import { initClientes } from './clientes.js';
+
+// ========== CONTROL DE VERIFICACIÓN DE AUTENTICACIÓN ==========
+let isCheckingAuth = false;
+let authCheckTimeout = null;
 
 // ========== SISTEMA DE NOTIFICACIONES ==========
 class NotificationSystem {
@@ -277,7 +276,7 @@ class ChatBotSystem {
       position: fixed;
       bottom: 30px;
       right: 30px;
-      z-index: 1000;
+      z-index: hygiene1000;
       display: none;
     `;
     
@@ -884,7 +883,8 @@ function setDefaultValues() {
   document.getElementById('promoUplift').textContent = '+0%';
 }
 
-// ========== CORRECCIÓN 1: initWeekGrid MEJORADA ==========
+// ========== FUNCIONES CORREGIDAS DE VISUALIZACIÓN ==========
+
 function initWeekGrid(data) {
   const grid = document.getElementById('weekGrid');
   if (!grid) return;
@@ -935,7 +935,6 @@ function initWeekGrid(data) {
   }).join('');
 }
 
-// ========== CORRECCIÓN 2: initChartVentas MEJORADA ==========
 function initChartVentas(data) {
   const ctx = document.getElementById('chartVentasTendencia');
   if (!ctx) return;
@@ -1176,14 +1175,30 @@ function navigateTo(viewName) {
   }
 }
 
-// ========== CORRECCIÓN 3: Verificación de Autenticación ==========
+// ========== CORRECCIÓN CRÍTICA: Verificación de Autenticación Mejorada ==========
 async function checkAuth() {
+  // Prevenir verificaciones múltiples simultáneas
+  if (isCheckingAuth) {
+    console.log('⏳ Verificación de autenticación en progreso...');
+    return true; // Asumir que está ok mientras se verifica
+  }
+
+  isCheckingAuth = true;
+
   try {
-    const { data: { user } } = await supa.auth.getUser();
+    // Timeout de 5 segundos para la verificación
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Timeout de verificación')), 5000)
+    );
+
+    const authPromise = supa.auth.getUser();
+
+    const { data: { user } } = await Promise.race([authPromise, timeoutPromise]);
     
     if (!user) {
       console.log('❌ Usuario no autenticado');
-      window.location.href = 'login.html';
+      // Usar replace en lugar de href para evitar bucle en historial
+      window.location.replace('login.html');
       return false;
     }
     
@@ -1196,21 +1211,27 @@ async function checkAuth() {
 
     if (error || !perfil || perfil.rol !== 'admin') {
       console.log('❌ Usuario sin permisos de administrador');
-      window.location.href = 'login.html';
+      window.location.replace('login.html');
       return false;
     }
     
     console.log('✅ Usuario autenticado como admin');
+    isCheckingAuth = false;
     return true;
     
   } catch (error) {
     console.error('❌ Error verificando autenticación:', error);
-    window.location.href = 'login.html';
+    isCheckingAuth = false;
+    
+    // Solo redirigir si no es un error de timeout
+    if (error.message !== 'Timeout de verificación') {
+      window.location.replace('login.html');
+    }
     return false;
   }
 }
 
-// ========== CORRECCIÓN 4: Función Logout Mejorada ==========
+// ========== Función Logout Mejorada ==========
 function setupLogout() {
   const logoutBtn = document.getElementById('logoutBtn');
   logoutBtn?.addEventListener('click', async () => {
@@ -1223,13 +1244,18 @@ function setupLogout() {
       
       console.log('✅ Sesión cerrada correctamente');
       
-      // Redireccionar a login.html
-      window.location.href = 'login.html';
+      // Limpiar cualquier timeout pendiente
+      if (authCheckTimeout) {
+        clearTimeout(authCheckTimeout);
+      }
+      
+      // Usar replace para evitar bucle en el historial
+      window.location.replace('login.html');
       
     } catch (error) {
       console.error('❌ Error al cerrar sesión:', error);
       // Redireccionar de todas formas
-      window.location.href = 'login.html';
+      window.location.replace('login.html');
     }
   });
 }
@@ -1263,9 +1289,12 @@ export async function crearNotificacionGlobal(tipo, titulo, mensaje) {
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('🚀 Inicializando Admin Dashboard Final...');
   
-  // CORRECCIÓN: Verificar autenticación PRIMERO
+  // CORRECCIÓN: Verificar autenticación PRIMERO con timeout
   const isAuth = await checkAuth();
-  if (!isAuth) return;
+  if (!isAuth) {
+    console.log('⚠️ Deteniendo inicialización - no autenticado');
+    return;
+  }
   
   // Limpiar modales al inicio
   document.querySelectorAll('.modal-overlay').forEach(modal => {
@@ -1347,7 +1376,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, 100);
   });
 
-  // CORRECCIÓN: Usar setupLogout() en lugar del código anterior
+  // Setup logout
   setupLogout();
 
   // Cargar vista inicial
@@ -1359,6 +1388,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     const view = window.location.hash.replace('#', '') || 'dashboard';
     navigateTo(view);
   });
+
+  // IMPORTANTE: Verificar auth periódicamente (cada 30 segundos)
+  // pero con protección contra bucles
+  authCheckTimeout = setInterval(async () => {
+    if (!isCheckingAuth) {
+      const stillAuth = await checkAuth();
+      if (!stillAuth) {
+        clearInterval(authCheckTimeout);
+      }
+    }
+  }, 30000);
 
   console.log('✅ Admin Dashboard inicializado correctamente');
 });
