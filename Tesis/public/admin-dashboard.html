@@ -123,7 +123,10 @@
 
     <!-- Content Area (donde se cargan las vistas) -->
     <div class="content-area" id="contentArea">
-      <!-- Las vistas se cargan aquí dinámicamente -->
+      <div style="padding: 3rem; text-align: center;">
+        <div class="spinner"></div>
+        <p style="margin-top: 1rem; color: var(--text-muted);">Cargando dashboard...</p>
+      </div>
     </div>
 
   </main>
@@ -134,36 +137,47 @@
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
 
-  <!-- Admin Dashboard JS - CON MANEJO DE ERRORES -->
+  <!-- Admin Dashboard JS -->
   <script type="module">
-    console.log('🔍 Intentando cargar admin-dashboard.js...');
+    console.log('🔍 Iniciando carga del dashboard...');
     
-    try {
-      // Intenta importar el módulo
-      const module = await import('./JS/admin-dashboard.js');
-      console.log('✅ admin-dashboard.js cargado correctamente');
-    } catch (error) {
-      console.error('❌ Error cargando admin-dashboard.js:', error);
-      console.error('Detalles del error:', error.message);
-      console.error('Stack:', error.stack);
+    import('./JS/admin-dashboard.js').then(() => {
+      console.log('✅ Módulo admin-dashboard.js cargado');
       
-      // Mostrar error al usuario
+      // Dar tiempo a que se inicialice todo
+      setTimeout(() => {
+        console.log('🚀 Intentando navegar al dashboard...');
+        
+        if (typeof window.navigateTo === 'function') {
+          const hash = window.location.hash.replace('#', '') || 'dashboard';
+          console.log(`📍 Navegando a: ${hash}`);
+          window.navigateTo(hash);
+        } else {
+          console.warn('⚠️ navigateTo no disponible aún, esperando...');
+          
+          // Reintentar después de 1 segundo
+          setTimeout(() => {
+            if (typeof window.navigateTo === 'function') {
+              const hash = window.location.hash.replace('#', '') || 'dashboard';
+              window.navigateTo(hash);
+            } else {
+              console.error('❌ navigateTo nunca se inicializó');
+              alert('Error: No se pudo inicializar el dashboard. Recarga la página (F5)');
+            }
+          }, 1000);
+        }
+      }, 300);
+    }).catch(error => {
+      console.error('❌ Error crítico cargando el módulo:', error);
       document.getElementById('contentArea').innerHTML = `
         <div style="padding: 3rem; text-align: center;">
           <div style="font-size: 3rem; margin-bottom: 1rem;">⚠️</div>
-          <h2 style="color: var(--danger); margin-bottom: 1rem;">Error Cargando Dashboard</h2>
-          <p style="color: var(--text-secondary); margin-bottom: 1rem;">No se pudo cargar el archivo JavaScript principal.</p>
-          <pre style="background: #f5f5f5; padding: 1rem; border-radius: 8px; text-align: left; max-width: 600px; margin: 0 auto; overflow-x: auto;">
-${error.message}
-
-Verifica:
-1. Que el archivo JS/admin-dashboard.js exista
-2. Que las rutas de importación sean correctas
-3. Que no haya errores de sintaxis en el archivo
-          </pre>
+          <h2 style="color: var(--danger); margin-bottom: 1rem;">Error al Cargar el Dashboard</h2>
+          <p style="color: var(--text-secondary);">Por favor, recarga la página (F5)</p>
+          <pre style="background: #f5f5f5; padding: 1rem; border-radius: 8px; text-align: left; max-width: 600px; margin: 1rem auto; overflow-x: auto; font-size: 0.85rem;">${error.message}</pre>
         </div>
       `;
-    }
+    });
   </script>
 
 </body>

@@ -1152,7 +1152,7 @@ function navigateTo(viewName) {
     }, 100);
   }
 }
-
+window.navigateTo = navigateTo;
 // ========== FUNCIÓN PARA CREAR NOTIFICACIONES ==========
 export async function crearNotificacionGlobal(tipo, titulo, mensaje) {
   try {
@@ -1289,7 +1289,22 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   console.log('✅ Admin Dashboard inicializado correctamente');
+  
+  // Exportar navigateTo globalmente
+  window.navigateTo = navigateTo;
 });
+
+// ✅ AGREGAR ESTO DESPUÉS DEL ÚLTIMO });
+// Forzar carga si el documento ya está listo
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+  console.log('⚡ Documento ya listo, iniciando inmediatamente...');
+  setTimeout(() => {
+    const hash = window.location.hash.replace('#', '') || 'dashboard';
+    if (typeof window.navigateTo === 'function') {
+      window.navigateTo(hash);
+    }
+  }, 100);
+}
 
 // Agregar estilos CSS para botones de acción rápida
 const style = document.createElement('style');
