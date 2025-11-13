@@ -98,27 +98,27 @@ function calcularDescuentos(items) {
 
   (items || []).forEach(item => {
     const cantidad = Number(item.cantidad || 1);
+    const precio = Number(item.precio);
     
-    if (item.tienePromo && item.precioOriginal) {
-      // Item con promoción
-      const precioOrig = Number(item.precioOriginal);
-      const precioFinal = Number(item.precio);
-      
-      totalSinDescuento += precioOrig * cantidad;
-      totalConDescuento += precioFinal * cantidad;
-      
-      const descuentoItem = (precioOrig - precioFinal) * cantidad;
+    // NUEVO: Calcular precio original si tiene descuento
+    let precioOriginal = precio;
+    if (item.tienePromo && item.descuentoPorcentaje > 0) {
+      // Si tiene 5% de descuento, el precio actual es el 95% del original
+      // precio_original = precio_actual / (1 - descuento/100)
+      precioOriginal = precio / (1 - item.descuentoPorcentaje/100);
+    }
+    
+    totalSinDescuento += precioOriginal * cantidad;
+    totalConDescuento += precio * cantidad;
+    
+    if (item.tienePromo) {
+      const descuentoItem = (precioOriginal - precio) * cantidad;
       descuentoTotal += descuentoItem;
       
       console.log(`   📦 ${item.titulo}: ${item.descuentoPorcentaje}% OFF`);
-      console.log(`      Original: ${precioOrig} x ${cantidad} = ${precioOrig * cantidad}`);
-      console.log(`      Final: ${precioFinal} x ${cantidad} = ${precioFinal * cantidad}`);
+      console.log(`      Original calculado: ${precioOriginal} x ${cantidad}`);
+      console.log(`      Final: ${precio} x ${cantidad}`);
       console.log(`      Ahorro: ${descuentoItem}`);
-    } else {
-      // Item sin promoción
-      const precio = Number(item.precio);
-      totalSinDescuento += precio * cantidad;
-      totalConDescuento += precio * cantidad;
     }
   });
 
@@ -405,4 +405,3 @@ document.addEventListener("DOMContentLoaded", () => {
 
   console.log("✅ Módulo listo");
 });
-  
