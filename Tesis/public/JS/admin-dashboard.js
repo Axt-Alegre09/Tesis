@@ -1,10 +1,9 @@
-// ==================== ADMIN DASHBOARD JS - VERSIÓN CORREGIDA ====================
-// Correcciones:
-// 1. ✅ Tabla usuarios → perfiles_usuarios
-// 2. ✅ Implementación de modo mantenimiento
-// 3. ✅ Integración de ChatBot
-// 4. ✅ Sistema de notificaciones completo
-// 5. ✅ Instancia única de Supabase
+// ==================== ADMIN DASHBOARD JS - VERSIÓN FINAL ====================
+// ✅ Tabla usuarios → perfiles_usuarios
+// ✅ Implementación de modo mantenimiento
+// ✅ Integración de ChatBot
+// ✅ Sistema de notificaciones completo
+// ✅ Instancia única de Supabase
 
 import { supa } from './supabase-client.js';
 import { configuracionView, initConfiguracion } from './modules/configuracion-complete.js';
@@ -20,23 +19,16 @@ class NotificationSystem {
   }
 
   init() {
-    // Crear badge de notificaciones
     this.badge = document.getElementById('notificationsBadge');
     
-    // Crear contenedor de notificaciones si no existe
     if (!document.getElementById('notificationsContainer')) {
       this.createNotificationsContainer();
     }
     
     this.container = document.getElementById('notificationsContainer');
-    
-    // Cargar notificaciones iniciales
     this.loadNotifications();
-    
-    // Suscribirse a cambios en tiempo real
     this.subscribeToNotifications();
     
-    // Event listener para el botón
     document.getElementById('notificationsBtn')?.addEventListener('click', () => {
       this.togglePanel();
     });
@@ -80,7 +72,6 @@ class NotificationSystem {
     
     document.body.appendChild(container);
     
-    // Cerrar al hacer click fuera
     document.addEventListener('click', (e) => {
       if (!container.contains(e.target) && 
           !document.getElementById('notificationsBtn')?.contains(e.target)) {
@@ -88,7 +79,6 @@ class NotificationSystem {
       }
     });
     
-    // Marcar todas como leídas
     document.getElementById('markAllReadBtn')?.addEventListener('click', () => {
       this.markAllAsRead();
     });
@@ -115,7 +105,6 @@ class NotificationSystem {
 
       const unreadCount = data.filter(n => !n.leida).length;
       
-      // Actualizar badge
       if (this.badge) {
         if (unreadCount > 0) {
           this.badge.textContent = unreadCount > 99 ? '99+' : unreadCount;
@@ -125,7 +114,6 @@ class NotificationSystem {
         }
       }
 
-      // Renderizar lista
       this.renderNotifications(data);
 
     } catch (error) {
@@ -195,7 +183,6 @@ class NotificationSystem {
       `;
     }).join('');
 
-    // Event listeners para marcar como leída
     list.querySelectorAll('.notification-item').forEach(item => {
       item.addEventListener('click', () => {
         const id = item.dataset.id;
@@ -231,7 +218,6 @@ class NotificationSystem {
   }
 
   subscribeToNotifications() {
-    // Suscribirse a cambios en tiempo real
     this.subscription = supa
       .channel('notificaciones-changes')
       .on('postgres_changes', 
@@ -250,7 +236,6 @@ class NotificationSystem {
   }
 }
 
-// Instancia global del sistema de notificaciones
 let notificationSystem = null;
 
 // ========== SISTEMA DE CHATBOT ==========
@@ -266,7 +251,6 @@ class ChatBotSystem {
   }
 
   createWidget() {
-    // Crear widget flotante del chatbot
     const widget = document.createElement('div');
     widget.id = 'chatbotWidget';
     widget.style.cssText = `
@@ -339,7 +323,6 @@ class ChatBotSystem {
     document.body.appendChild(widget);
     this.widget = widget;
     
-    // Event listeners
     document.getElementById('chatbotToggle')?.addEventListener('click', () => {
       this.toggle();
     });
@@ -358,7 +341,6 @@ class ChatBotSystem {
       }
     });
     
-    // Mostrar widget en dashboard
     if (window.location.hash === '#dashboard' || !window.location.hash) {
       widget.style.display = 'block';
     }
@@ -392,16 +374,13 @@ class ChatBotSystem {
     
     if (!message) return;
     
-    // Agregar mensaje del usuario
     this.addMessage(message, 'user');
     input.value = '';
     
-    // Simular respuesta del bot (aquí conectarías con tu API real)
     setTimeout(() => {
       this.addMessage('Gracias por tu mensaje. Estoy procesando tu solicitud...', 'bot');
     }, 500);
     
-    // Registrar interacción en la base de datos
     try {
       await supa.from('chatbot_interacciones').insert({
         mensaje_usuario: message,
@@ -441,7 +420,6 @@ class ChatBotSystem {
   }
 
   async loadChatBotMetrics() {
-    // Cargar métricas del chatbot cada 30 segundos
     setInterval(async () => {
       if (window.location.hash === '#dashboard' || !window.location.hash) {
         try {
@@ -465,7 +443,6 @@ class ChatBotSystem {
   }
 }
 
-// Instancia global del chatbot
 let chatBotSystem = null;
 
 // ========== MODO MANTENIMIENTO ==========
@@ -508,7 +485,6 @@ class MaintenanceMode {
       this.isActive = newStatus;
       this.updateUI();
 
-      // Crear notificación
       await crearNotificacionGlobal(
         'sistema',
         'Modo Mantenimiento',
@@ -528,7 +504,6 @@ class MaintenanceMode {
       badge.style.display = this.isActive ? 'inline-block' : 'none';
     }
 
-    // Actualizar botón en configuración si existe
     const btn = document.getElementById('btnModoMantenimiento');
     if (btn) {
       btn.textContent = this.isActive ? 'Desactivar Mantenimiento' : 'Activar Mantenimiento';
@@ -537,7 +512,6 @@ class MaintenanceMode {
   }
 }
 
-// Instancia global del modo mantenimiento
 let maintenanceMode = null;
 
 // ========== VISTAS (Templates HTML) ==========
@@ -550,9 +524,7 @@ const views = {
       <p style="color: var(--text-secondary); font-size: 1.1rem;">Intelligence Center - Análisis en Tiempo Real</p>
     </div>
 
-    <!-- KPIs Principales -->
     <div class="grid-4" style="margin-bottom: 2rem;">
-      <!-- Ventas Hoy -->
       <div class="kpi-card">
         <div class="kpi-icon" style="background: linear-gradient(135deg, rgba(111,92,56,0.1), rgba(111,92,56,0.05)); color: var(--primary);">
           <i class="bi bi-currency-dollar"></i>
@@ -567,7 +539,6 @@ const views = {
         </div>
       </div>
 
-      <!-- Pedidos Hoy -->
       <div class="kpi-card">
         <div class="kpi-icon" style="background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(16,185,129,0.05)); color: var(--success);">
           <i class="bi bi-cart-check"></i>
@@ -579,7 +550,6 @@ const views = {
         </div>
       </div>
 
-      <!-- ChatBot IA -->
       <div class="kpi-card">
         <div class="kpi-icon" style="background: linear-gradient(135deg, rgba(59,130,246,0.1), rgba(59,130,246,0.05)); color: var(--info);">
           <i class="bi bi-robot"></i>
@@ -591,7 +561,6 @@ const views = {
         </div>
       </div>
 
-      <!-- Productos Total -->
       <div class="kpi-card">
         <div class="kpi-icon" style="background: linear-gradient(135deg, rgba(245,158,11,0.1), rgba(245,158,11,0.05)); color: var(--warning);">
           <i class="bi bi-box-seam"></i>
@@ -604,7 +573,6 @@ const views = {
       </div>
     </div>
 
-    <!-- Gráfico de Tendencia -->
     <div class="chart-container">
       <div class="chart-header">
         <h3 class="chart-title">
@@ -617,7 +585,6 @@ const views = {
       </div>
     </div>
 
-    <!-- Performance Semanal -->
     <div class="chart-container">
       <div class="chart-header">
         <h3 class="chart-title">
@@ -633,7 +600,6 @@ const views = {
       </div>
     </div>
 
-    <!-- Insights en Tiempo Real -->
     <div class="chart-container">
       <div class="chart-header">
         <h3 class="chart-title">
@@ -642,7 +608,6 @@ const views = {
         </h3>
       </div>
       <div class="insights-grid">
-        <!-- Top Producto -->
         <div class="insight-card">
           <div class="insight-icon">🏆</div>
           <div class="insight-content">
@@ -652,7 +617,6 @@ const views = {
           </div>
         </div>
 
-        <!-- ChatBot IA Stats -->
         <div class="insight-card">
           <div class="insight-icon">🤖</div>
           <div class="insight-content">
@@ -662,7 +626,6 @@ const views = {
           </div>
         </div>
 
-        <!-- Catering Automatizado -->
         <div class="insight-card">
           <div class="insight-icon">🎉</div>
           <div class="insight-content">
@@ -674,7 +637,6 @@ const views = {
       </div>
     </div>
 
-    <!-- Impacto de Promociones -->
     <div class="promo-analysis">
       <div class="chart-header">
         <h3 class="chart-title">
@@ -711,7 +673,6 @@ const views = {
       </button>
     </div>
 
-    <!-- Filtros y Búsqueda -->
     <div class="card" style="margin-bottom: 1.5rem;">
       <div style="display: grid; grid-template-columns: 1fr auto auto; gap: 1rem; align-items: center;">
         <div style="position: relative;">
@@ -737,7 +698,6 @@ const views = {
       </div>
     </div>
 
-    <!-- Tabla de Productos -->
     <div class="card" id="productosTableContainer">
       <div style="overflow-x: auto;">
         <table style="width: 100%; border-collapse: collapse;">
@@ -796,7 +756,6 @@ const views = {
       </button>
     </div>
 
-    <!-- Estadísticas -->
     <div class="grid-4" style="margin-bottom: 2rem;">
       <div class="card" style="border-top: 3px solid var(--primary);">
         <div style="display: flex; align-items: center; gap: 1rem;">
@@ -846,8 +805,6 @@ const views = {
         </div>
       </div>
     </div>
-
-    <!-- El resto del contenido se carga dinámicamente -->
   `,
 
   configuracion: configuracionView
@@ -858,7 +815,6 @@ async function initDashboard() {
   console.log('🚀 Inicializando Dashboard Intelligence...');
 
   try {
-    // 1. Usar la vista v_resumen_hoy
     const { data: resumenHoy, error: errorResumen } = await supa
       .from('v_resumen_hoy')
       .select('*')
@@ -881,7 +837,6 @@ async function initDashboard() {
       setDefaultValues();
     }
 
-    // 2. Cargar datos de ventas por día
     const { data: ventasSemana } = await supa
       .from('v_ventas_por_dia')
       .select('*')
@@ -897,7 +852,6 @@ async function initDashboard() {
       initWeekGrid(diasVacios);
     }
 
-    // 3. Cargar métricas del chatbot
     const { data: chatbotMetrics } = await supa
       .from('v_chatbot_metricas_hoy')
       .select('*')
@@ -909,7 +863,6 @@ async function initDashboard() {
       document.getElementById('chatbotCarrito').textContent = chatbotMetrics.productos_agregados_bot || 0;
     }
 
-    // 4. Cargar top productos
     const { data: topProductos } = await supa
       .from('v_top_productos_hoy')
       .select('*')
@@ -921,7 +874,6 @@ async function initDashboard() {
       document.getElementById('topProductoVentas').textContent = `${topProductos.cantidad_vendida || 0} unidades vendidas`;
     }
 
-    // 5. Cargar stats de catering
     const { data: cateringStats } = await supa
       .from('v_catering_bot_vs_manual')
       .select('*')
@@ -933,7 +885,6 @@ async function initDashboard() {
         `${cateringStats.catering_bot || 0} de ${cateringStats.total_catering || 0} via ChatBot`;
     }
 
-    // 6. Cargar impacto de promociones
     const { data: promos } = await supa
       .from('v_impacto_promos_semana')
       .select('*')
@@ -945,7 +896,6 @@ async function initDashboard() {
       document.getElementById('promoUplift').textContent = `+${promos.incremento_porcentaje || 0}%`;
     }
 
-    // 7. Cargar total productos
     const { count: totalProductos } = await supa
       .from('productos')
       .select('*', { count: 'exact', head: true });
@@ -1128,7 +1078,6 @@ function navigateTo(viewName) {
       }
     });
 
-    // Mostrar/ocultar chatbot widget según la vista
     const chatWidget = document.getElementById('chatbotWidget');
     if (chatWidget) {
       chatWidget.style.display = viewName === 'dashboard' ? 'block' : 'none';
@@ -1152,7 +1101,7 @@ function navigateTo(viewName) {
     }, 100);
   }
 }
-window.navigateTo = navigateTo;
+
 // ========== FUNCIÓN PARA CREAR NOTIFICACIONES ==========
 export async function crearNotificacionGlobal(tipo, titulo, mensaje) {
   try {
@@ -1169,7 +1118,6 @@ export async function crearNotificacionGlobal(tipo, titulo, mensaje) {
     if (error) throw error;
     console.log('✅ Notificación creada:', titulo);
     
-    // Recargar notificaciones si el sistema está inicializado
     if (notificationSystem) {
       notificationSystem.loadNotifications();
     }
@@ -1182,12 +1130,10 @@ export async function crearNotificacionGlobal(tipo, titulo, mensaje) {
 document.addEventListener('DOMContentLoaded', () => {
   console.log('🚀 Inicializando Admin Dashboard Final...');
   
-  // Limpiar modales al inicio
   document.querySelectorAll('.modal-overlay').forEach(modal => {
     modal.style.display = 'none';
   });
   
-  // Inicializar sistemas
   notificationSystem = new NotificationSystem();
   notificationSystem.init();
   
@@ -1197,7 +1143,6 @@ document.addEventListener('DOMContentLoaded', () => {
   maintenanceMode = new MaintenanceMode();
   maintenanceMode.init();
   
-  // Sidebar toggle
   const sidebar = document.getElementById('sidebar');
   const sidebarToggle = document.getElementById('sidebarToggle');
   const mobileMenuBtn = document.getElementById('mobileMenuBtn');
@@ -1210,7 +1155,6 @@ document.addEventListener('DOMContentLoaded', () => {
     sidebar.classList.toggle('mobile-open');
   });
 
-  // Navigation links
   document.querySelectorAll('.nav-link').forEach(link => {
     link.addEventListener('click', (e) => {
       e.preventDefault();
@@ -1223,7 +1167,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Botón de acciones rápidas
   document.getElementById('quickAddBtn')?.addEventListener('click', () => {
     const menu = document.createElement('div');
     menu.style.cssText = `
@@ -1262,7 +1205,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 100);
   });
 
-  // Logout
   const logoutBtn = document.getElementById('logoutBtn');
   logoutBtn?.addEventListener('click', async () => {
     const ok = confirm('¿Seguro que querés cerrar sesión?');
@@ -1278,35 +1220,17 @@ document.addEventListener('DOMContentLoaded', () => {
     window.location.href = 'loginAdmin.html';
   });
 
-  // Cargar vista inicial
   const hash = window.location.hash.replace('#', '') || 'dashboard';
   navigateTo(hash);
 
-  // Handle browser back/forward
   window.addEventListener('hashchange', () => {
     const view = window.location.hash.replace('#', '') || 'dashboard';
     navigateTo(view);
   });
 
   console.log('✅ Admin Dashboard inicializado correctamente');
-  
-  // Exportar navigateTo globalmente
-  window.navigateTo = navigateTo;
 });
 
-// ✅ AGREGAR ESTO DESPUÉS DEL ÚLTIMO });
-// Forzar carga si el documento ya está listo
-if (document.readyState === 'complete' || document.readyState === 'interactive') {
-  console.log('⚡ Documento ya listo, iniciando inmediatamente...');
-  setTimeout(() => {
-    const hash = window.location.hash.replace('#', '') || 'dashboard';
-    if (typeof window.navigateTo === 'function') {
-      window.navigateTo(hash);
-    }
-  }, 100);
-}
-
-// Agregar estilos CSS para botones de acción rápida
 const style = document.createElement('style');
 style.textContent = `
   .quick-action-btn {
