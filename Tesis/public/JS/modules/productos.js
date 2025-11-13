@@ -1,6 +1,5 @@
-// ==================== MÓDULO DE PRODUCTOS ====================
-// Gestión completa de productos: CRUD + UI
-
+// ==================== MÓDULO DE PRODUCTOS CORREGIDO ====================
+// Importar desde supabase-config.js que ya tiene todos los helpers necesarios
 import { 
   supabase, 
   getImageUrl, 
@@ -17,12 +16,11 @@ let categoriasData = [];
 let currentProductId = null;
 
 // ==================== INICIALIZACIÓN ====================
-
-/**
- * Inicializar el módulo de productos
- */
 export async function initProductos() {
   console.log('🔄 Inicializando módulo de productos...');
+  
+  // Crear modal si no existe
+  createProductModal();
   
   // Cargar datos
   await loadCategorias();
@@ -34,22 +32,112 @@ export async function initProductos() {
   console.log('✅ Módulo de productos inicializado');
 }
 
-// ==================== CARGAR DATOS ====================
+// ==================== CREAR MODAL ====================
+function createProductModal() {
+  // Si el modal ya existe, no lo creamos de nuevo
+  if (document.getElementById('modalProducto')) return;
 
-/**
- * Cargar productos desde Supabase
- */
+  const modalHTML = `
+    <div id="modalProducto" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
+      <div class="modal-content" style="background: white; border-radius: 16px; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+        
+        <div class="modal-header" style="padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+          <h2 id="modalProductoTitle" style="margin: 0; font-size: 1.5rem; font-weight: 700;">Nuevo Producto</h2>
+          <button id="closeModalProducto" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary);">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+
+        <form id="formProducto" style="padding: 1.5rem;">
+          <input type="hidden" id="productoId">
+          
+          <div style="margin-bottom: 1.5rem;">
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">
+              Nombre del Producto <span style="color: var(--danger);">*</span>
+            </label>
+            <input type="text" id="productoNombre" required 
+              style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem;">
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+            <div>
+              <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">
+                Precio (Gs) <span style="color: var(--danger);">*</span>
+              </label>
+              <input type="number" id="productoPrecio" required min="0"
+                style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem;">
+            </div>
+            
+            <div>
+              <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">
+                Categoría <span style="color: var(--danger);">*</span>
+              </label>
+              <select id="productoCategoria" required
+                style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; background: white;">
+                <option value="">Selecciona una categoría</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="margin-bottom: 1.5rem;">
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">
+              Descripción
+            </label>
+            <textarea id="productoDescripcion" rows="3"
+              style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; resize: vertical;">
+            </textarea>
+          </div>
+
+          <div style="margin-bottom: 1.5rem;">
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">
+              Imagen del Producto
+            </label>
+            <div id="uploadArea" style="border: 2px dashed var(--border); border-radius: 12px; padding: 2rem; text-align: center; cursor: pointer; transition: all 0.3s;">
+              <input type="file" id="productoImagen" accept="image/*" style="display: none;">
+              <div id="previewArea">
+                <i class="bi bi-cloud-upload" style="font-size: 3rem; color: var(--text-muted); display: block; margin-bottom: 0.5rem;"></i>
+                <p style="color: var(--text-secondary); margin: 0;">Haz clic o arrastra una imagen aquí</p>
+                <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.25rem;">PNG, JPG o WEBP (máx. 5MB)</p>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-bottom: 1.5rem;">
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+              <input type="checkbox" id="productoDisponible" checked style="width: 18px; height: 18px;">
+              <span style="font-weight: 600;">Producto disponible</span>
+            </label>
+          </div>
+
+          <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+            <button type="button" id="btnCancelarProducto" 
+              style="padding: 0.75rem 1.5rem; border: 1px solid var(--border); background: white; border-radius: 8px; font-weight: 600; cursor: pointer;">
+              Cancelar
+            </button>
+            <button type="submit" 
+              style="padding: 0.75rem 1.5rem; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
+              <i class="bi bi-check-lg"></i> Guardar Producto
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  document.body.insertAdjacentHTML('beforeend', modalHTML);
+}
+
+// ==================== CARGAR DATOS ====================
 export async function loadProductos() {
   console.log('🔄 Cargando productos...');
   
   const tbody = document.getElementById('productosTableBody');
   if (!tbody) return;
   
-  // Mostrar loading
   tbody.innerHTML = `
     <tr>
       <td colspan="5" style="padding: 3rem; text-align: center; color: var(--text-muted);">
-        <div style="width: 3rem; height: 3rem; border: 4px solid var(--border); border-top-color: var(--primary); border-radius: 50%; margin: 0 auto 1rem; animation: spin 1s linear infinite;"></div>
+        <div class="spinner"></div>
         <p>Cargando productos...</p>
       </td>
     </tr>
@@ -71,37 +159,26 @@ export async function loadProductos() {
     
     console.log(`✅ ${data.length} productos cargados`);
     
-    // Procesar datos
     productosData = data.map(producto => ({
       ...producto,
       categoria_nombre: producto.categorias?.nombre || 'Sin categoría'
     }));
     
     renderProductosTable();
-    updateDashboardStats();
     
   } catch (error) {
-    handleError(error, 'Error cargando productos');
-    
+    console.error('Error cargando productos:', error);
     tbody.innerHTML = `
       <tr>
         <td colspan="5" style="padding: 2rem; text-align: center; color: var(--danger);">
-          <i class="bi bi-exclamation-triangle" style="font-size: 2rem; display: block; margin-bottom: 0.5rem;"></i>
-          <strong>Error cargando productos</strong>
-          <p style="margin-top: 0.5rem; color: var(--text-secondary);">${error.message}</p>
-          <button onclick="window.productosModule.loadProductos()" class="btn-primary" style="margin-top: 1rem; display: inline-flex; gap: 0.5rem;">
-            <i class="bi bi-arrow-clockwise"></i>
-            Reintentar
-          </button>
+          <i class="bi bi-exclamation-triangle" style="font-size: 2rem;"></i>
+          <p>Error cargando productos</p>
         </td>
       </tr>
     `;
   }
 }
 
-/**
- * Cargar categorías desde Supabase
- */
 export async function loadCategorias() {
   console.log('🔄 Cargando categorías...');
   
@@ -113,20 +190,14 @@ export async function loadCategorias() {
 
     if (error) throw error;
     
-    console.log(`✅ ${data.length} categorías cargadas`);
     categoriasData = data;
-    
-    // Llenar selects
     populateCategoriaSelects();
     
   } catch (error) {
-    handleError(error, 'Error cargando categorías');
+    console.error('Error cargando categorías:', error);
   }
 }
 
-/**
- * Llenar los selects de categoría
- */
 function populateCategoriaSelects() {
   const selects = document.querySelectorAll('#productoCategoria, #filterCategoria');
   
@@ -149,153 +220,91 @@ function populateCategoriaSelects() {
 }
 
 // ==================== RENDERIZADO ====================
-
-/**
- * Renderizar tabla de productos
- * @param {Array} filteredData - Datos filtrados (opcional)
- */
 function renderProductosTable(filteredData = null) {
   const tbody = document.getElementById('productosTableBody');
   if (!tbody) return;
   
   const data = filteredData || productosData;
-
+  
   if (!data || data.length === 0) {
     tbody.innerHTML = `
       <tr>
         <td colspan="5" style="padding: 3rem; text-align: center; color: var(--text-muted);">
-          <i class="bi bi-inbox" style="font-size: 3rem; display: block; margin-bottom: 1rem; opacity: 0.3;"></i>
-          <p style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem;">No hay productos para mostrar</p>
-          <button onclick="window.productosModule.openNewProductoModal()" class="btn-primary" style="margin-top: 1rem;">
-            <i class="bi bi-plus-lg"></i>
-            Agregar primer producto
-          </button>
+          <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+          <p>No hay productos para mostrar</p>
         </td>
       </tr>
     `;
     return;
   }
 
-  tbody.innerHTML = data.map(producto => {
-    const precioFormateado = formatPrice(producto.precio);
-    const imagenUrl = getImageUrl(producto.imagen);
-    
-    return `
-    <tr style="border-bottom: 1px solid var(--border); transition: all 0.2s;" onmouseenter="this.style.background='var(--bg-main)'" onmouseleave="this.style.background='transparent'">
+  tbody.innerHTML = data.map(producto => `
+    <tr style="border-bottom: 1px solid var(--border);">
       <td style="padding: 1rem;">
         <div style="display: flex; align-items: center; gap: 1rem;">
           <img 
-            src="${imagenUrl}" 
+            src="${getImageUrl(producto.imagen)}" 
             alt="${producto.nombre}"
-            style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border);"
-            onerror="this.src='https://via.placeholder.com/60x60?text=❌'"
+            style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px;"
+            onerror="this.src='https://via.placeholder.com/60x60?text=Error'"
           >
           <div>
-            <div style="font-weight: 600; margin-bottom: 0.25rem;">${producto.nombre}</div>
+            <div style="font-weight: 600;">${producto.nombre}</div>
             <div style="font-size: 0.85rem; color: var(--text-muted);">
-              <i class="bi bi-box"></i> Stock: ${producto.stock}
+              Stock: ${producto.stock || 0}
             </div>
           </div>
         </div>
       </td>
       <td style="padding: 1rem;">
-        <span style="background: var(--bg-main); padding: 0.4rem 0.75rem; border-radius: 6px; font-size: 0.85rem; font-weight: 500;">
+        <span style="background: var(--bg-main); padding: 0.4rem 0.75rem; border-radius: 6px; font-size: 0.85rem;">
           ${producto.categoria_nombre}
         </span>
       </td>
-      <td style="padding: 1rem; text-align: right; font-weight: 600; font-size: 1.05rem;">
-        ${precioFormateado} Gs
+      <td style="padding: 1rem; text-align: right; font-weight: 600;">
+        ${formatPrice(producto.precio)} Gs
       </td>
       <td style="padding: 1rem; text-align: center;">
         <span style="
           padding: 0.4rem 0.75rem; 
           border-radius: 6px; 
-          font-size: 0.85rem; 
-          font-weight: 600;
-          background: ${producto.activo ? 'var(--success-light)' : 'var(--danger-light)'};
-          color: ${producto.activo ? 'var(--success)' : 'var(--danger)'};
+          font-size: 0.85rem;
+          background: ${producto.activo ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)'};
+          color: ${producto.activo ? 'rgb(16,185,129)' : 'rgb(239,68,68)'};
         ">
           ${producto.activo ? '✓ Disponible' : '✗ No disponible'}
         </span>
       </td>
       <td style="padding: 1rem; text-align: center;">
-        <div style="display: flex; gap: 0.5rem; justify-content: center;">
-          <button 
-            class="icon-btn" 
-            onclick="window.productosModule.editProducto('${producto.id}')"
-            title="Editar"
-            style="background: var(--info-light); color: var(--info);"
-          >
-            <i class="bi bi-pencil"></i>
-          </button>
-          <button 
-            class="icon-btn" 
-            onclick="window.productosModule.deleteProducto('${producto.id}', '${producto.nombre.replace(/'/g, "\\'")}')"
-            title="Eliminar"
-            style="background: var(--danger-light); color: var(--danger);"
-          >
-            <i class="bi bi-trash"></i>
-          </button>
-        </div>
+        <button class="icon-btn" onclick="window.productosModule.editProducto('${producto.id}')" title="Editar">
+          <i class="bi bi-pencil"></i>
+        </button>
+        <button class="icon-btn" onclick="window.productosModule.deleteProducto('${producto.id}', '${producto.nombre.replace(/'/g, "\\'")}')" title="Eliminar" style="background: rgba(239,68,68,0.1); color: rgb(239,68,68);">
+          <i class="bi bi-trash"></i>
+        </button>
       </td>
     </tr>
-  `}).join('');
+  `).join('');
 }
 
-// ==================== FILTROS ====================
-
-/**
- * Filtrar productos por búsqueda y categoría
- */
-export function filterProductos() {
-  const searchTerm = document.getElementById('searchProductos')?.value.toLowerCase() || '';
-  const categoriaId = document.getElementById('filterCategoria')?.value || '';
-
-  let filtered = [...productosData];
-
-  if (searchTerm) {
-    filtered = filtered.filter(p => 
-      p.nombre.toLowerCase().includes(searchTerm) ||
-      p.descripcion?.toLowerCase().includes(searchTerm)
-    );
-  }
-
-  if (categoriaId) {
-    filtered = filtered.filter(p => p.categoria_id === categoriaId);
-  }
-
-  renderProductosTable(filtered);
-  
-  // Mostrar contador de resultados
-  const count = filtered.length;
-  const total = productosData.length;
-  
-  if (searchTerm || categoriaId) {
-    console.log(`🔍 Mostrando ${count} de ${total} productos`);
-  }
-}
-
-// ==================== MODAL ====================
-
-/**
- * Abrir modal para nuevo producto
- */
+// ==================== MODAL FUNCTIONS ====================
 export function openNewProductoModal() {
   currentProductId = null;
   
   const modal = document.getElementById('modalProducto');
   const form = document.getElementById('formProducto');
   const title = document.getElementById('modalProductoTitle');
-  const previewArea = document.getElementById('previewArea');
   
-  if (!modal || !form) return;
+  if (!modal || !form) {
+    console.error('Modal no encontrado');
+    return;
+  }
   
   title.textContent = 'Nuevo Producto';
   form.reset();
-  document.getElementById('productoId').value = '';
   document.getElementById('productoDisponible').checked = true;
   
-  previewArea.innerHTML = `
+  document.getElementById('previewArea').innerHTML = `
     <i class="bi bi-cloud-upload" style="font-size: 3rem; color: var(--text-muted); display: block; margin-bottom: 0.5rem;"></i>
     <p style="color: var(--text-secondary); margin: 0;">Haz clic o arrastra una imagen aquí</p>
     <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.25rem;">PNG, JPG o WEBP (máx. 5MB)</p>
@@ -304,9 +313,6 @@ export function openNewProductoModal() {
   modal.style.display = 'flex';
 }
 
-/**
- * Cerrar modal de producto
- */
 export function closeProductoModal() {
   const modal = document.getElementById('modalProducto');
   if (modal) {
@@ -315,10 +321,6 @@ export function closeProductoModal() {
   }
 }
 
-/**
- * Editar producto existente
- * @param {string} id - ID del producto
- */
 export async function editProducto(id) {
   try {
     const { data, error } = await supabase
@@ -333,7 +335,11 @@ export async function editProducto(id) {
     
     const modal = document.getElementById('modalProducto');
     const title = document.getElementById('modalProductoTitle');
-    const previewArea = document.getElementById('previewArea');
+    
+    if (!modal) {
+      console.error('Modal no encontrado');
+      return;
+    }
     
     title.textContent = 'Editar Producto';
     document.getElementById('productoId').value = data.id;
@@ -344,41 +350,39 @@ export async function editProducto(id) {
     document.getElementById('productoDisponible').checked = data.activo;
 
     if (data.imagen) {
-      const imagenUrl = getImageUrl(data.imagen);
-      previewArea.innerHTML = `
-        <img src="${imagenUrl}" style="max-width: 100%; max-height: 200px; border-radius: 8px; margin-bottom: 0.5rem;" onerror="this.src='https://via.placeholder.com/300x200?text=Error'">
-        <p style="color: var(--text-secondary); font-size: 0.85rem;">Haz clic para cambiar la imagen</p>
+      document.getElementById('previewArea').innerHTML = `
+        <img src="${getImageUrl(data.imagen)}" 
+             style="max-width: 100%; max-height: 200px; border-radius: 8px;">
+        <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.5rem;">Haz clic para cambiar la imagen</p>
       `;
     }
 
     modal.style.display = 'flex';
     
   } catch (error) {
-    handleError(error, 'Error al cargar producto');
+    console.error('Error al cargar producto:', error);
+    alert('Error al cargar el producto');
   }
 }
 
-/**
- * Eliminar producto
- * @param {string} id - ID del producto
- * @param {string} nombre - Nombre del producto
- */
 export async function deleteProducto(id, nombre) {
-  const confirmado = confirm(
-    `¿Estás seguro de eliminar "${nombre}"?\n\n⚠️ Esta acción no se puede deshacer.`
-  );
-  
-  if (!confirmado) return;
-
+  // Primero verificar si el producto está en uso
   try {
-    // Obtener datos del producto para eliminar imagen
-    const { data: producto } = await supabase
-      .from('productos')
-      .select('imagen')
-      .eq('id', id)
-      .single();
+    const { data: detalles, error: errorDetalles } = await supabase
+      .from('detalles_pedido')
+      .select('id')
+      .eq('producto_id', id)
+      .limit(1);
+
+    if (detalles && detalles.length > 0) {
+      alert(`No se puede eliminar "${nombre}" porque está siendo usado en pedidos existentes.\n\nPuedes desactivar el producto en su lugar.`);
+      return;
+    }
+
+    const confirmado = confirm(`¿Estás seguro de eliminar "${nombre}"?\n\nEsta acción no se puede deshacer.`);
     
-    // Eliminar producto de la BD
+    if (!confirmado) return;
+
     const { error } = await supabase
       .from('productos')
       .delete()
@@ -386,11 +390,6 @@ export async function deleteProducto(id, nombre) {
 
     if (error) throw error;
     
-    // Eliminar imagen del storage
-    if (producto?.imagen) {
-      await deleteImage(producto.imagen);
-    }
-
     showToast('Producto eliminado exitosamente', 'success');
     await loadProductos();
     
@@ -399,26 +398,20 @@ export async function deleteProducto(id, nombre) {
   }
 }
 
-// ==================== GUARDAR ====================
-
-/**
- * Guardar producto (crear o actualizar)
- * @param {Event} e - Evento del formulario
- */
 export async function saveProducto(e) {
   e.preventDefault();
-
+  
   const formData = {
     nombre: document.getElementById('productoNombre').value.trim(),
     precio: parseFloat(document.getElementById('productoPrecio').value),
     categoria_id: document.getElementById('productoCategoria').value || null,
     descripcion: document.getElementById('productoDescripcion').value.trim() || null,
     activo: document.getElementById('productoDisponible').checked,
-    stock: 0 // Por ahora siempre 0
+    stock: 0
   };
 
   try {
-    // Subir imagen si hay una nueva
+    // Manejar la imagen si hay una nueva
     const fileInput = document.getElementById('productoImagen');
     if (fileInput.files.length > 0) {
       const fileName = await uploadImage(fileInput.files[0]);
@@ -426,21 +419,19 @@ export async function saveProducto(e) {
     }
 
     if (currentProductId) {
-      // ACTUALIZAR producto existente
-      
-      // Si no hay nueva imagen, mantener la anterior
+      // ACTUALIZAR
       if (!formData.imagen) {
-        const { data: currentData } = await supabase
+        const { data: current } = await supabase
           .from('productos')
           .select('imagen')
           .eq('id', currentProductId)
           .single();
         
-        formData.imagen = currentData?.imagen;
+        formData.imagen = current?.imagen;
       }
 
       formData.actualizado_en = new Date().toISOString();
-
+      
       const { error } = await supabase
         .from('productos')
         .update(formData)
@@ -451,10 +442,10 @@ export async function saveProducto(e) {
       showToast('Producto actualizado exitosamente', 'success');
       
     } else {
-      // CREAR nuevo producto
+      // CREAR NUEVO
       formData.creado_en = new Date().toISOString();
       formData.actualizado_en = new Date().toISOString();
-
+      
       const { error } = await supabase
         .from('productos')
         .insert([formData]);
@@ -472,25 +463,40 @@ export async function saveProducto(e) {
   }
 }
 
-// ==================== EVENT LISTENERS ====================
+// ==================== FILTROS ====================
+export function filterProductos() {
+  const searchTerm = document.getElementById('searchProductos')?.value.toLowerCase() || '';
+  const categoriaId = document.getElementById('filterCategoria')?.value || '';
+  
+  let filtered = [...productosData];
+  
+  if (searchTerm) {
+    filtered = filtered.filter(p => 
+      p.nombre.toLowerCase().includes(searchTerm) ||
+      p.descripcion?.toLowerCase().includes(searchTerm)
+    );
+  }
+  
+  if (categoriaId) {
+    filtered = filtered.filter(p => p.categoria_id === categoriaId);
+  }
+  
+  renderProductosTable(filtered);
+}
 
-/**
- * Configurar event listeners
- */
+// ==================== EVENT LISTENERS ====================
 function setupEventListeners() {
   // Búsqueda y filtros
-  const searchInput = document.getElementById('searchProductos');
-  const filterSelect = document.getElementById('filterCategoria');
+  document.getElementById('searchProductos')?.addEventListener('input', filterProductos);
+  document.getElementById('filterCategoria')?.addEventListener('change', filterProductos);
   
-  if (searchInput) {
-    searchInput.addEventListener('input', filterProductos);
-  }
+  // Modal
+  document.getElementById('btnNuevoProducto')?.addEventListener('click', openNewProductoModal);
+  document.getElementById('closeModalProducto')?.addEventListener('click', closeProductoModal);
+  document.getElementById('btnCancelarProducto')?.addEventListener('click', closeProductoModal);
+  document.getElementById('formProducto')?.addEventListener('submit', saveProducto);
   
-  if (filterSelect) {
-    filterSelect.addEventListener('change', filterProductos);
-  }
-  
-  // Preview de imagen
+  // Upload de imagen
   const uploadArea = document.getElementById('uploadArea');
   const fileInput = document.getElementById('productoImagen');
   
@@ -501,9 +507,8 @@ function setupEventListeners() {
       const file = e.target.files[0];
       if (!file) return;
       
-      // Validar tamaño
       if (file.size > 5 * 1024 * 1024) {
-        showToast('La imagen es muy grande. Máximo 5MB', 'error');
+        alert('La imagen es muy grande. Máximo 5MB');
         e.target.value = '';
         return;
       }
@@ -511,57 +516,16 @@ function setupEventListeners() {
       const reader = new FileReader();
       reader.onload = (e) => {
         document.getElementById('previewArea').innerHTML = `
-          <img src="${e.target.result}" style="max-width: 100%; max-height: 200px; border-radius: 8px; margin-bottom: 0.5rem;">
-          <p style="color: var(--text-secondary); font-size: 0.85rem;">Haz clic para cambiar la imagen</p>
+          <img src="${e.target.result}" style="max-width: 100%; max-height: 200px; border-radius: 8px;">
+          <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.5rem;">Haz clic para cambiar la imagen</p>
         `;
       };
       reader.readAsDataURL(file);
     });
   }
-  
-  // Botones del modal
-  const btnNuevoProducto = document.getElementById('btnNuevoProducto');
-  const closeModalBtn = document.getElementById('closeModalProducto');
-  const btnCancelar = document.getElementById('btnCancelarProducto');
-  const formProducto = document.getElementById('formProducto');
-  
-  if (btnNuevoProducto) {
-    btnNuevoProducto.addEventListener('click', openNewProductoModal);
-  }
-  
-  if (closeModalBtn) {
-    closeModalBtn.addEventListener('click', closeProductoModal);
-  }
-  
-  if (btnCancelar) {
-    btnCancelar.addEventListener('click', closeProductoModal);
-  }
-  
-  if (formProducto) {
-    formProducto.addEventListener('submit', saveProducto);
-  }
-}
-
-// ==================== UTILS ====================
-
-/**
- * Actualizar estadísticas del dashboard
- */
-function updateDashboardStats() {
-  const totalProductos = document.getElementById('productosTotal');
-  if (totalProductos) {
-    totalProductos.textContent = productosData.length;
-  }
-  
-  // Actualizar badge en sidebar
-  const productosBadge = document.querySelector('[data-view="productos"] .nav-badge');
-  if (productosBadge) {
-    productosBadge.textContent = productosData.length;
-  }
 }
 
 // ==================== EXPORTAR PARA USO GLOBAL ====================
-// Hacer las funciones disponibles globalmente para onclick handlers
 if (typeof window !== 'undefined') {
   window.productosModule = {
     initProductos,
@@ -575,3 +539,5 @@ if (typeof window !== 'undefined') {
     saveProducto
   };
 }
+
+console.log('📦 Módulo de Productos cargado');

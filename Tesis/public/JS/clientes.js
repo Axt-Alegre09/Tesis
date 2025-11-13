@@ -1,13 +1,5 @@
-// ==================== MÓDULO CLIENTES ====================
-// Gestión completa de clientes para el dashboard admin
-
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const SUPABASE_URL = "https://jyygevitfnbwrvxrjexp.supabase.co";
-const SUPABASE_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5eWdldml0Zm5id3J2eHJqZXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2OTQ2OTYsImV4cCI6MjA3MTI3MDY5Nn0.St0IiSZSeELESshctneazCJHXCDBi9wrZ28UkiEDXYo";
-
-const supa = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// ==================== MÓDULO CLIENTES CORREGIDO ====================
+import { supa } from './supabase-client.js';
 
 let clientesData = [];
 let clientesFiltrados = [];
@@ -16,9 +8,234 @@ let clientesFiltrados = [];
 export async function initClientes() {
   console.log('🔵 Inicializando módulo de Clientes...');
   
+  // Actualizar el HTML con la tabla completa
+  updateClientesView();
+  
+  // Cargar datos
   await cargarClientes();
+  
+  // Setup event listeners
   setupEventListeners();
+  
+  // Actualizar estadísticas
   actualizarEstadisticas();
+}
+
+// ========== ACTUALIZAR VISTA HTML ==========
+function updateClientesView() {
+  const contentArea = document.getElementById('contentArea');
+  if (!contentArea) return;
+  
+  // Verificar si estamos en la vista de clientes
+  const pageTitle = document.getElementById('pageTitle');
+  if (pageTitle?.textContent !== 'Clientes') return;
+  
+  // Agregar la tabla completa después de las estadísticas
+  const estadisticasContainer = contentArea.querySelector('.grid-4');
+  if (!estadisticasContainer) return;
+  
+  // Crear contenedor de tabla si no existe
+  let tableContainer = document.getElementById('clientesTableContainer');
+  if (!tableContainer) {
+    tableContainer = document.createElement('div');
+    tableContainer.id = 'clientesTableContainer';
+    tableContainer.innerHTML = `
+      <!-- Filtros -->
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div style="display: grid; grid-template-columns: 1fr 200px auto; gap: 1rem; align-items: center;">
+          <div style="position: relative;">
+            <i class="bi bi-search" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
+            <input 
+              type="search" 
+              id="searchClientes" 
+              placeholder="Buscar por nombre, email, teléfono o RUC..." 
+              style="width: 100%; padding: 0.75rem 1rem 0.75rem 2.5rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem;"
+            >
+          </div>
+          <select id="filterCiudad" style="padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem;">
+            <option value="">Todas las ciudades</option>
+          </select>
+          <button id="btnRefreshClientes" class="icon-btn" style="background: var(--primary); color: white;" title="Actualizar">
+            <i class="bi bi-arrow-clockwise"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Tabla de Clientes -->
+      <div class="card">
+        <div style="overflow-x: auto;">
+          <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+              <tr style="border-bottom: 2px solid var(--border);">
+                <th style="padding: 1rem; text-align: left; font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase;">Cliente</th>
+                <th style="padding: 1rem; text-align: left; font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase;">Contacto</th>
+                <th style="padding: 1rem; text-align: left; font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase;">Ubicación</th>
+                <th style="padding: 1rem; text-align: center; font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase;">RUC</th>
+                <th style="padding: 1rem; text-align: center; font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase;">Registro</th>
+                <th style="padding: 1rem; text-align: center; font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase;">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="clientesTableBody">
+              <tr>
+                <td colspan="6" style="padding: 3rem; text-align: center; color: var(--text-muted);">
+                  <div class="spinner"></div>
+                  <p style="margin-top: 1rem;">Cargando clientes...</p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+    
+    estadisticasContainer.insertAdjacentElement('afterend', tableContainer);
+  }
+  
+  // Crear modales si no existen
+  createModals();
+}
+
+// ========== CREAR MODALES ==========
+function createModals() {
+  // Modal de detalle
+  if (!document.getElementById('modalDetalleCliente')) {
+    const modalDetalle = document.createElement('div');
+    modalDetalle.innerHTML = `
+      <div id="modalDetalleCliente" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
+        <div class="modal-content" style="background: white; border-radius: 16px; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+          <div class="modal-header" style="padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+            <h2 style="margin: 0; font-size: 1.5rem; font-weight: 700;">Detalle del Cliente</h2>
+            <button id="closeModalDetalle" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary);">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+          <div style="padding: 1.5rem;">
+            <div style="display: grid; gap: 1.5rem;">
+              <div>
+                <h3 style="font-size: 1.1rem; margin-bottom: 0.75rem; color: var(--primary);">
+                  <i class="bi bi-person-circle"></i> Información General
+                </h3>
+                <div style="display: grid; gap: 0.75rem; padding-left: 1.5rem;">
+                  <div><strong>Razón Social:</strong> <span id="detalleRazon"></span></div>
+                  <div><strong>RUC:</strong> <span id="detalleRuc"></span></div>
+                  <div><strong>Teléfono:</strong> <span id="detalleTel"></span></div>
+                  <div><strong>Email:</strong> <span id="detalleMail"></span></div>
+                  <div><strong>Contacto:</strong> <span id="detalleContacto"></span></div>
+                </div>
+              </div>
+              
+              <div>
+                <h3 style="font-size: 1.1rem; margin-bottom: 0.75rem; color: var(--primary);">
+                  <i class="bi bi-geo-alt"></i> Dirección
+                </h3>
+                <div style="display: grid; gap: 0.75rem; padding-left: 1.5rem;">
+                  <div><strong>Dirección:</strong> <span id="detalleDireccion"></span></div>
+                  <div><strong>Código Postal:</strong> <span id="detallePostal"></span></div>
+                </div>
+              </div>
+              
+              <div>
+                <h3 style="font-size: 1.1rem; margin-bottom: 0.75rem; color: var(--primary);">
+                  <i class="bi bi-clock"></i> Fechas
+                </h3>
+                <div style="display: grid; gap: 0.75rem; padding-left: 1.5rem;">
+                  <div><strong>Registrado:</strong> <span id="detalleFechaCreacion"></span></div>
+                  <div><strong>Última actualización:</strong> <span id="detalleFechaActualizacion"></span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modalDetalle);
+  }
+  
+  // Modal de edición
+  if (!document.getElementById('modalEditarCliente')) {
+    const modalEditar = document.createElement('div');
+    modalEditar.innerHTML = `
+      <div id="modalEditarCliente" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
+        <div class="modal-content" style="background: white; border-radius: 16px; width: 90%; max-width: 700px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+          <div class="modal-header" style="padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+            <h2 style="margin: 0; font-size: 1.5rem; font-weight: 700;">Editar Cliente</h2>
+            <button id="closeModalEditar" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary);">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+          
+          <form id="formEditarCliente" style="padding: 1.5rem;">
+            <input type="hidden" id="editClienteId">
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+              <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Razón Social</label>
+                <input type="text" id="editRazon" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
+              </div>
+              <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">RUC</label>
+                <input type="text" id="editRuc" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
+              </div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+              <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Teléfono</label>
+                <input type="text" id="editTel" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
+              </div>
+              <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Email</label>
+                <input type="email" id="editMail" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
+              </div>
+            </div>
+            
+            <div style="margin-bottom: 1.5rem;">
+              <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Contacto</label>
+              <input type="text" id="editContacto" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
+            </div>
+            
+            <h3 style="font-size: 1.1rem; margin-bottom: 1rem; color: var(--primary);">Dirección</h3>
+            
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+              <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Calle Principal</label>
+                <input type="text" id="editCalle1" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
+              </div>
+              <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Número</label>
+                <input type="text" id="editNro" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
+              </div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+              <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Barrio</label>
+                <input type="text" id="editBarrio" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
+              </div>
+              <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Ciudad</label>
+                <input type="text" id="editCiudad" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
+              </div>
+              <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Código Postal</label>
+                <input type="text" id="editPostal" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
+              </div>
+            </div>
+            
+            <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+              <button type="button" id="btnCancelarEditar" style="padding: 0.75rem 1.5rem; border: 1px solid var(--border); background: white; border-radius: 8px; font-weight: 600; cursor: pointer;">
+                Cancelar
+              </button>
+              <button type="submit" style="padding: 0.75rem 1.5rem; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
+                <i class="bi bi-check-lg"></i> Guardar Cambios
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modalEditar);
+  }
 }
 
 // ========== CARGAR CLIENTES ==========
@@ -38,6 +255,7 @@ async function cargarClientes() {
     
     renderizarTablaClientes();
     cargarCiudadesFiltro();
+    actualizarContador();
     
   } catch (error) {
     console.error('❌ Error al cargar clientes:', error);
@@ -48,12 +266,8 @@ async function cargarClientes() {
 // ========== RENDERIZAR TABLA ==========
 function renderizarTablaClientes() {
   const tbody = document.getElementById('clientesTableBody');
+  if (!tbody) return;
   
-  if (!tbody) {
-    console.warn('⚠️ No se encontró el tbody de clientes');
-    return;
-  }
-
   if (clientesFiltrados.length === 0) {
     tbody.innerHTML = `
       <tr>
@@ -68,72 +282,69 @@ function renderizarTablaClientes() {
 
   tbody.innerHTML = clientesFiltrados.map(cliente => {
     const fechaCreacion = new Date(cliente.created_at).toLocaleDateString('es-PY');
-    const esNuevo = (Date.now() - new Date(cliente.created_at)) < 7 * 24 * 60 * 60 * 1000; // Últimos 7 días
+    const esNuevo = (Date.now() - new Date(cliente.created_at)) < 7 * 24 * 60 * 60 * 1000;
     
     return `
       <tr style="border-bottom: 1px solid var(--border); transition: background 0.2s;" 
-          onmouseover="this.style.background='var(--bg-hover)'" 
+          onmouseover="this.style.background='rgba(111,92,56,0.02)'" 
           onmouseout="this.style.background='transparent'">
         
-        <!-- Cliente -->
         <td style="padding: 1rem;">
           <div style="display: flex; align-items: center; gap: 0.75rem;">
-            <div style="width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.1rem;">
-              ${cliente.razon.charAt(0).toUpperCase()}
+            <div style="width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), #8b7355); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700;">
+              ${(cliente.razon || 'S').charAt(0).toUpperCase()}
             </div>
             <div>
               <div style="font-weight: 600; margin-bottom: 0.2rem; display: flex; align-items: center; gap: 0.5rem;">
                 ${cliente.razon || 'Sin nombre'}
-                ${esNuevo ? '<span style="background: var(--success); color: white; font-size: 0.7rem; padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: 600;">NUEVO</span>' : ''}
+                ${esNuevo ? '<span style="background: var(--success); color: white; font-size: 0.7rem; padding: 0.15rem 0.4rem; border-radius: 4px;">NUEVO</span>' : ''}
               </div>
               <div style="font-size: 0.85rem; color: var(--text-muted);">
-                <i class="bi bi-envelope" style="margin-right: 0.25rem;"></i>
                 ${cliente.mail || 'Sin email'}
               </div>
             </div>
           </div>
         </td>
 
-        <!-- Contacto -->
         <td style="padding: 1rem;">
           <div style="font-size: 0.9rem;">
             <div style="margin-bottom: 0.3rem;">
               <i class="bi bi-telephone" style="color: var(--success); margin-right: 0.3rem;"></i>
               ${cliente.tel || 'Sin teléfono'}
             </div>
-            <div style="font-size: 0.85rem; color: var(--text-muted);">
-              <i class="bi bi-person" style="margin-right: 0.3rem;"></i>
-              ${cliente.contacto || 'Sin contacto'}
-            </div>
+            ${cliente.contacto ? `
+              <div style="font-size: 0.85rem; color: var(--text-muted);">
+                <i class="bi bi-person" style="margin-right: 0.3rem;"></i>
+                ${cliente.contacto}
+              </div>
+            ` : ''}
           </div>
         </td>
 
-        <!-- Ubicación -->
         <td style="padding: 1rem;">
           <div style="font-size: 0.9rem;">
-            <div style="font-weight: 600; margin-bottom: 0.2rem;">
+            <div style="font-weight: 500; margin-bottom: 0.2rem;">
               <i class="bi bi-geo-alt" style="color: var(--primary); margin-right: 0.3rem;"></i>
               ${cliente.ciudad || 'Sin ciudad'}
             </div>
-            <div style="font-size: 0.85rem; color: var(--text-muted);">
-              ${cliente.barrio || 'Sin barrio'}${cliente.depto ? `, ${cliente.depto}` : ''}
-            </div>
+            ${cliente.barrio ? `
+              <div style="font-size: 0.85rem; color: var(--text-muted);">
+                ${cliente.barrio}${cliente.depto ? `, ${cliente.depto}` : ''}
+              </div>
+            ` : ''}
           </div>
         </td>
 
-        <!-- RUC -->
         <td style="padding: 1rem; text-align: center;">
-          <span style="font-family: 'Courier New', monospace; background: var(--bg-secondary); padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.9rem;">
+          <span style="font-family: 'Courier New', monospace; background: var(--bg-main); padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.9rem;">
             ${cliente.ruc || 'Sin RUC'}
           </span>
         </td>
 
-        <!-- Fecha Registro -->
         <td style="padding: 1rem; text-align: center; color: var(--text-secondary); font-size: 0.9rem;">
           ${fechaCreacion}
         </td>
 
-        <!-- Acciones -->
         <td style="padding: 1rem; text-align: center;">
           <div style="display: flex; gap: 0.5rem; justify-content: center;">
             <button 
@@ -160,11 +371,9 @@ function renderizarTablaClientes() {
 // ========== ESTADÍSTICAS ==========
 async function actualizarEstadisticas() {
   try {
-    // Total de clientes
     const totalClientes = clientesData.length;
     document.getElementById('totalClientes').textContent = totalClientes;
 
-    // Clientes nuevos (últimos 30 días)
     const hace30Dias = new Date();
     hace30Dias.setDate(hace30Dias.getDate() - 30);
     const clientesNuevos = clientesData.filter(c => 
@@ -172,24 +381,24 @@ async function actualizarEstadisticas() {
     ).length;
     document.getElementById('clientesNuevos').textContent = clientesNuevos;
 
-    // Clientes por ciudad (usando la vista v_clientes_por_ciudad)
-    const { data: ciudades, error } = await supa
-      .from('v_clientes_por_ciudad')
-      .select('*')
-      .order('cantidad_clientes', { ascending: false })
-      .limit(1);
-
-    if (!error && ciudades && ciudades.length > 0) {
-      document.getElementById('ciudadTop').textContent = 
-        `${ciudades[0].ciudad} (${ciudades[0].cantidad_clientes})`;
+    // Ciudad principal
+    const ciudades = {};
+    clientesData.forEach(c => {
+      if (c.ciudad) {
+        ciudades[c.ciudad] = (ciudades[c.ciudad] || 0) + 1;
+      }
+    });
+    
+    const ciudadTop = Object.entries(ciudades).sort((a, b) => b[1] - a[1])[0];
+    if (ciudadTop) {
+      document.getElementById('ciudadTop').textContent = `${ciudadTop[0]} (${ciudadTop[1]})`;
     }
 
-    // Clientes con email válido
     const conEmail = clientesData.filter(c => 
       c.mail && c.mail !== 'sin@email.com' && c.mail.includes('@')
     ).length;
     document.getElementById('clientesConEmail').textContent = conEmail;
-
+    
   } catch (error) {
     console.error('❌ Error al actualizar estadísticas:', error);
   }
@@ -199,7 +408,7 @@ async function actualizarEstadisticas() {
 function cargarCiudadesFiltro() {
   const selectCiudad = document.getElementById('filterCiudad');
   if (!selectCiudad) return;
-
+  
   const ciudades = [...new Set(clientesData.map(c => c.ciudad).filter(Boolean))].sort();
   
   selectCiudad.innerHTML = '<option value="">Todas las ciudades</option>' +
@@ -209,44 +418,44 @@ function cargarCiudadesFiltro() {
 function aplicarFiltros() {
   const searchText = document.getElementById('searchClientes')?.value.toLowerCase() || '';
   const ciudadFilter = document.getElementById('filterCiudad')?.value || '';
-
+  
   clientesFiltrados = clientesData.filter(cliente => {
     const matchSearch = !searchText || 
       cliente.razon?.toLowerCase().includes(searchText) ||
       cliente.mail?.toLowerCase().includes(searchText) ||
       cliente.tel?.toLowerCase().includes(searchText) ||
       cliente.ruc?.toLowerCase().includes(searchText);
-
+    
     const matchCiudad = !ciudadFilter || cliente.ciudad === ciudadFilter;
-
+    
     return matchSearch && matchCiudad;
   });
-
-  renderizarTablaClientes();
   
-  // Actualizar contador
+  renderizarTablaClientes();
+  actualizarContador();
+}
+
+function actualizarContador() {
   const contador = document.getElementById('contadorClientes');
   if (contador) {
     contador.textContent = `Mostrando ${clientesFiltrados.length} de ${clientesData.length} clientes`;
   }
 }
 
-// ========== VER DETALLE CLIENTE ==========
+// ========== FUNCIONES DE MODAL ==========
 window.verDetalleCliente = function(clienteId) {
   const cliente = clientesData.find(c => c.id === clienteId);
   if (!cliente) return;
-
+  
   const modal = document.getElementById('modalDetalleCliente');
   if (!modal) return;
-
-  // Llenar datos del modal
+  
   document.getElementById('detalleRazon').textContent = cliente.razon || 'Sin nombre';
   document.getElementById('detalleRuc').textContent = cliente.ruc || 'Sin RUC';
   document.getElementById('detalleTel').textContent = cliente.tel || 'Sin teléfono';
   document.getElementById('detalleMail').textContent = cliente.mail || 'Sin email';
   document.getElementById('detalleContacto').textContent = cliente.contacto || 'Sin contacto';
   
-  // Dirección completa
   const direccionCompleta = [
     cliente.calle1,
     cliente.nro ? `N° ${cliente.nro}` : '',
@@ -259,24 +468,21 @@ window.verDetalleCliente = function(clienteId) {
   document.getElementById('detalleDireccion').textContent = direccionCompleta || 'Sin dirección';
   document.getElementById('detallePostal').textContent = cliente.postal || 'Sin código postal';
   
-  // Fechas
   document.getElementById('detalleFechaCreacion').textContent = 
     new Date(cliente.created_at).toLocaleString('es-PY');
   document.getElementById('detalleFechaActualizacion').textContent = 
     new Date(cliente.updated_at).toLocaleString('es-PY');
-
+  
   modal.style.display = 'flex';
 };
 
-// ========== EDITAR CLIENTE ==========
 window.editarCliente = function(clienteId) {
   const cliente = clientesData.find(c => c.id === clienteId);
   if (!cliente) return;
-
+  
   const modal = document.getElementById('modalEditarCliente');
   if (!modal) return;
-
-  // Llenar formulario
+  
   document.getElementById('editClienteId').value = cliente.id;
   document.getElementById('editRazon').value = cliente.razon || '';
   document.getElementById('editRuc').value = cliente.ruc || '';
@@ -284,26 +490,23 @@ window.editarCliente = function(clienteId) {
   document.getElementById('editMail').value = cliente.mail || '';
   document.getElementById('editContacto').value = cliente.contacto || '';
   document.getElementById('editCalle1').value = cliente.calle1 || '';
-  document.getElementById('editCalle2').value = cliente.calle2 || '';
   document.getElementById('editNro').value = cliente.nro || '';
   document.getElementById('editBarrio').value = cliente.barrio || '';
   document.getElementById('editCiudad').value = cliente.ciudad || '';
-  document.getElementById('editDepto').value = cliente.depto || '';
   document.getElementById('editPostal').value = cliente.postal || '';
-
+  
   modal.style.display = 'flex';
 };
 
-// ========== GUARDAR CAMBIOS CLIENTE ==========
 async function guardarCambiosCliente(e) {
   e.preventDefault();
-
+  
   const clienteId = document.getElementById('editClienteId').value;
   const btnGuardar = e.target.querySelector('button[type="submit"]');
   
   btnGuardar.disabled = true;
   btnGuardar.innerHTML = '<i class="bi bi-hourglass-split"></i> Guardando...';
-
+  
   try {
     const datosActualizados = {
       razon: document.getElementById('editRazon').value,
@@ -312,11 +515,9 @@ async function guardarCambiosCliente(e) {
       mail: document.getElementById('editMail').value,
       contacto: document.getElementById('editContacto').value,
       calle1: document.getElementById('editCalle1').value,
-      calle2: document.getElementById('editCalle2').value,
       nro: document.getElementById('editNro').value,
       barrio: document.getElementById('editBarrio').value,
       ciudad: document.getElementById('editCiudad').value,
-      depto: document.getElementById('editDepto').value,
       postal: document.getElementById('editPostal').value,
       updated_at: new Date().toISOString()
     };
@@ -331,7 +532,7 @@ async function guardarCambiosCliente(e) {
     mostrarExito('✅ Cliente actualizado correctamente');
     document.getElementById('modalEditarCliente').style.display = 'none';
     await cargarClientes();
-
+    
   } catch (error) {
     console.error('❌ Error al actualizar cliente:', error);
     mostrarError('No se pudo actualizar el cliente');
@@ -366,32 +567,33 @@ function exportarClientes() {
 // ========== EVENT LISTENERS ==========
 function setupEventListeners() {
   // Búsqueda
-  const searchInput = document.getElementById('searchClientes');
-  searchInput?.addEventListener('input', aplicarFiltros);
-
+  document.getElementById('searchClientes')?.addEventListener('input', aplicarFiltros);
+  
   // Filtro ciudad
-  const filterCiudad = document.getElementById('filterCiudad');
-  filterCiudad?.addEventListener('change', aplicarFiltros);
-
+  document.getElementById('filterCiudad')?.addEventListener('change', aplicarFiltros);
+  
+  // Botón refresh
+  document.getElementById('btnRefreshClientes')?.addEventListener('click', cargarClientes);
+  
   // Cerrar modales
   document.getElementById('closeModalDetalle')?.addEventListener('click', () => {
     document.getElementById('modalDetalleCliente').style.display = 'none';
   });
-
+  
   document.getElementById('closeModalEditar')?.addEventListener('click', () => {
     document.getElementById('modalEditarCliente').style.display = 'none';
   });
-
+  
   document.getElementById('btnCancelarEditar')?.addEventListener('click', () => {
     document.getElementById('modalEditarCliente').style.display = 'none';
   });
-
+  
   // Formulario editar
   document.getElementById('formEditarCliente')?.addEventListener('submit', guardarCambiosCliente);
-
+  
   // Exportar
   document.getElementById('btnExportarClientes')?.addEventListener('click', exportarClientes);
-
+  
   // Cerrar modal al hacer clic fuera
   window.addEventListener('click', (e) => {
     const modalDetalle = document.getElementById('modalDetalleCliente');

@@ -1,10 +1,14 @@
-// ==================== ADMIN DASHBOARD JS - VERSIÓN CORREGIDA ====================
-// Correcciones:
+// ==================== ADMIN DASHBOARD JS - VERSIÓN COMPLETAMENTE CORREGIDA ====================
+// Correcciones aplicadas:
 // 1. ✅ Tabla usuarios → perfiles_usuarios
 // 2. ✅ Implementación de modo mantenimiento
 // 3. ✅ Integración de ChatBot
 // 4. ✅ Sistema de notificaciones completo
 // 5. ✅ Instancia única de Supabase
+// 6. ✅ Función initWeekGrid mejorada con días ordenados correctamente
+// 7. ✅ Función initChartVentas mejorada con ordenamiento correcto
+// 8. ✅ Sistema de autenticación y logout corregido
+// 9. ✅ Verificación de permisos de administrador
 
 import { supa } from './supabase-client.js';
 import { configuracionView, initConfiguracion } from './modules/configuracion-complete.js';
@@ -838,6 +842,169 @@ const views = {
   configuracion: configuracionView
 };
 
+// ========== FUNCIONES AUXILIARES ==========
+
+function formatGs(valor) {
+  return new Intl.NumberFormat('es-PY', {
+    style: 'currency',
+    currency: 'PYG',
+    minimumFractionDigits: 0
+  }).format(valor).replace('PYG', 'Gs').trim();
+}
+
+function createEmptyWeekData() {
+  const dias = [];
+  for (let i = 6; i >= 0; i--) {
+    const fecha = new Date();
+    fecha.setDate(fecha.getDate() - i);
+    dias.push({
+      dia: fecha.toISOString().split('T')[0],
+      total_gs: 0,
+      pedidos: 0
+    });
+  }
+  return dias;
+}
+
+function setDefaultValues() {
+  document.getElementById('ventasHoy').textContent = formatGs(0);
+  document.getElementById('pedidosHoy').textContent = '0';
+  document.getElementById('ticketPromedio').textContent = formatGs(0);
+  document.getElementById('productosTotal').textContent = '0';
+  document.getElementById('productosActivos').textContent = '0';
+  document.getElementById('chatbotInteracciones').textContent = '0';
+  document.getElementById('chatbotTasa').textContent = '0%';
+  document.getElementById('chatbotCarrito').textContent = '0';
+  document.getElementById('topProducto').textContent = 'Sin datos';
+  document.getElementById('topProductoVentas').textContent = '0 unidades vendidas';
+  document.getElementById('cateringBot').textContent = '0%';
+  document.getElementById('cateringBotText').textContent = '0 de 0 via ChatBot';
+  document.getElementById('ventasSinPromo').textContent = formatGs(0);
+  document.getElementById('ventasConPromo').textContent = formatGs(0);
+  document.getElementById('promoUplift').textContent = '+0%';
+}
+
+// ========== CORRECCIÓN 1: initWeekGrid MEJORADA ==========
+function initWeekGrid(data) {
+  const grid = document.getElementById('weekGrid');
+  if (!grid) return;
+
+  // Crear array de 7 días hacia atrás desde hoy, en orden cronológico
+  const dias = [];
+  const diasNombres = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'];
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  
+  for (let i = 6; i >= 0; i--) {
+    const fecha = new Date(hoy);
+    fecha.setDate(hoy.getDate() - i);
+    dias.push({
+      fecha: fecha.toISOString().split('T')[0],
+      nombreCorto: diasNombres[fecha.getDay()],
+      esHoy: i === 0
+    });
+  }
+
+  // Renderizar el grid con los días ordenados
+  grid.innerHTML = dias.map(dia => {
+    const dataDelDia = data.find(d => d.dia === dia.fecha);
+    const ventas = formatGs(dataDelDia?.total_gs || 0);
+    const pedidos = dataDelDia?.pedidos || 0;
+
+    return `
+      <div class="day-cell ${dia.esHoy ? 'today' : ''}" 
+           style="text-align: center; padding: 1.5rem; border-radius: 12px; 
+                  background: ${dia.esHoy ? 'linear-gradient(135deg, var(--primary), #8b7355)' : 'var(--bg-main)'};
+                  ${dia.esHoy ? 'color: white;' : ''}
+                  transition: transform 0.2s, box-shadow 0.2s;
+                  cursor: pointer;"
+           onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'"
+           onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+        <div class="day-name" style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0.5rem; 
+                                      ${dia.esHoy ? 'opacity: 0.9;' : 'color: var(--text-muted);'}">
+          ${dia.nombreCorto}
+        </div>
+        <div class="day-sales" style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.25rem;">
+          ${ventas}
+        </div>
+        <div class="day-orders" style="font-size: 0.85rem; ${dia.esHoy ? 'opacity: 0.9;' : 'color: var(--text-secondary);'}">
+          ${pedidos} pedidos
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ========== CORRECCIÓN 2: initChartVentas MEJORADA ==========
+function initChartVentas(data) {
+  const ctx = document.getElementById('chartVentasTendencia');
+  if (!ctx) return;
+
+  if (window.dashboardChart) {
+    window.dashboardChart.destroy();
+  }
+
+  // Ordenar datos por fecha de manera ascendente
+  const datosOrdenados = [...data].sort((a, b) => new Date(a.dia) - new Date(b.dia));
+
+  // Crear labels con días de la semana
+  const labels = datosOrdenados.map(d => {
+    const fecha = new Date(d.dia + 'T00:00:00');
+    const diasNombres = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    return `${diasNombres[fecha.getDay()]} ${fecha.getDate()}`;
+  });
+
+  const valores = datosOrdenados.map(d => parseFloat(d.total_gs) || 0);
+
+  window.dashboardChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Ventas (Gs)',
+        data: valores,
+        borderColor: 'rgb(111, 92, 56)',
+        backgroundColor: 'rgba(111, 92, 56, 0.1)',
+        tension: 0.4,
+        fill: true,
+        pointRadius: 6,
+        pointHoverRadius: 8,
+        pointBackgroundColor: 'rgb(111, 92, 56)',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          padding: 12,
+          titleFont: { size: 14, weight: 'bold' },
+          bodyFont: { size: 13 },
+          callbacks: {
+            label: (context) => ` ${formatGs(context.parsed.y)}`
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            callback: (value) => formatGs(value)
+          },
+          grid: { color: 'rgba(0, 0, 0, 0.05)' }
+        },
+        x: {
+          grid: { display: false }
+        }
+      }
+    }
+  });
+}
+
 // ========== INICIALIZACIÓN DEL DASHBOARD ==========
 async function initDashboard() {
   console.log('🚀 Inicializando Dashboard Intelligence...');
@@ -951,135 +1118,6 @@ async function initDashboard() {
   }
 }
 
-function setDefaultValues() {
-  document.getElementById('ventasHoy').textContent = formatGs(0);
-  document.getElementById('pedidosHoy').textContent = '0';
-  document.getElementById('ticketPromedio').textContent = formatGs(0);
-  document.getElementById('productosTotal').textContent = '0';
-  document.getElementById('productosActivos').textContent = '0';
-  document.getElementById('chatbotInteracciones').textContent = '0';
-  document.getElementById('chatbotTasa').textContent = '0%';
-  document.getElementById('chatbotCarrito').textContent = '0';
-  document.getElementById('topProducto').textContent = 'Sin datos';
-  document.getElementById('topProductoVentas').textContent = '0 unidades vendidas';
-  document.getElementById('cateringBot').textContent = '0%';
-  document.getElementById('cateringBotText').textContent = '0 de 0 via ChatBot';
-  document.getElementById('ventasSinPromo').textContent = formatGs(0);
-  document.getElementById('ventasConPromo').textContent = formatGs(0);
-  document.getElementById('promoUplift').textContent = '+0%';
-}
-
-function createEmptyWeekData() {
-  const dias = [];
-  for (let i = 6; i >= 0; i--) {
-    const fecha = new Date();
-    fecha.setDate(fecha.getDate() - i);
-    dias.push({
-      dia: fecha.toISOString().split('T')[0],
-      total_gs: 0,
-      pedidos: 0
-    });
-  }
-  return dias;
-}
-
-function formatGs(valor) {
-  return new Intl.NumberFormat('es-PY', {
-    style: 'currency',
-    currency: 'PYG',
-    minimumFractionDigits: 0
-  }).format(valor).replace('PYG', 'Gs').trim();
-}
-
-function initChartVentas(data) {
-  const ctx = document.getElementById('chartVentasTendencia');
-  if (!ctx) return;
-
-  if (window.dashboardChart) {
-    window.dashboardChart.destroy();
-  }
-
-  const labels = data.map(d => {
-    const fecha = new Date(d.dia + 'T00:00:00');
-    return fecha.toLocaleDateString('es-PY', { weekday: 'short', day: 'numeric' });
-  });
-
-  const valores = data.map(d => parseFloat(d.total_gs) || 0);
-
-  window.dashboardChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        label: 'Ventas (Gs)',
-        data: valores,
-        borderColor: 'rgb(111, 92, 56)',
-        backgroundColor: 'rgba(111, 92, 56, 0.1)',
-        tension: 0.4,
-        fill: true,
-        pointRadius: 6,
-        pointHoverRadius: 8,
-        pointBackgroundColor: 'rgb(111, 92, 56)',
-        pointBorderColor: '#fff',
-        pointBorderWidth: 2,
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          backgroundColor: 'rgba(0, 0, 0, 0.8)',
-          padding: 12,
-          titleFont: { size: 14, weight: 'bold' },
-          bodyFont: { size: 13 },
-          callbacks: {
-            label: (context) => ` ${formatGs(context.parsed.y)}`
-          }
-        }
-      },
-      scales: {
-        y: {
-          beginAtZero: true,
-          ticks: {
-            callback: (value) => formatGs(value)
-          },
-          grid: { color: 'rgba(0, 0, 0, 0.05)' }
-        },
-        x: {
-          grid: { display: false }
-        }
-      }
-    }
-  });
-}
-
-function initWeekGrid(data) {
-  const grid = document.getElementById('weekGrid');
-  if (!grid) return;
-
-  const hoy = new Date().toISOString().split('T')[0];
-  const dias = createEmptyWeekData().map(d => d.dia);
-
-  grid.innerHTML = dias.map(dia => {
-    const dataDelDia = data.find(d => d.dia === dia);
-    const fecha = new Date(dia + 'T00:00:00');
-    const esHoy = dia === hoy;
-    const nombreDia = fecha.toLocaleDateString('es-PY', { weekday: 'short' });
-    const ventas = formatGs(dataDelDia?.total_gs || 0);
-    const pedidos = dataDelDia?.pedidos || 0;
-
-    return `
-      <div class="day-cell ${esHoy ? 'today' : ''}">
-        <div class="day-name">${nombreDia}</div>
-        <div class="day-sales">${ventas}</div>
-        <div class="day-orders">${pedidos} pedidos</div>
-      </div>
-    `;
-  }).join('');
-}
-
 // ========== NAVEGACIÓN ==========
 function navigateTo(viewName) {
   const contentArea = document.getElementById('contentArea');
@@ -1138,6 +1176,64 @@ function navigateTo(viewName) {
   }
 }
 
+// ========== CORRECCIÓN 3: Verificación de Autenticación ==========
+async function checkAuth() {
+  try {
+    const { data: { user } } = await supa.auth.getUser();
+    
+    if (!user) {
+      console.log('❌ Usuario no autenticado');
+      window.location.href = 'login.html';
+      return false;
+    }
+    
+    // Verificar si tiene rol de admin
+    const { data: perfil, error } = await supa
+      .from('perfiles_usuarios')
+      .select('rol')
+      .eq('user_id', user.id)
+      .single();
+
+    if (error || !perfil || perfil.rol !== 'admin') {
+      console.log('❌ Usuario sin permisos de administrador');
+      window.location.href = 'login.html';
+      return false;
+    }
+    
+    console.log('✅ Usuario autenticado como admin');
+    return true;
+    
+  } catch (error) {
+    console.error('❌ Error verificando autenticación:', error);
+    window.location.href = 'login.html';
+    return false;
+  }
+}
+
+// ========== CORRECCIÓN 4: Función Logout Mejorada ==========
+function setupLogout() {
+  const logoutBtn = document.getElementById('logoutBtn');
+  logoutBtn?.addEventListener('click', async () => {
+    const ok = confirm('¿Seguro que querés cerrar sesión?');
+    if (!ok) return;
+
+    try {
+      const { error } = await supa.auth.signOut();
+      if (error) throw error;
+      
+      console.log('✅ Sesión cerrada correctamente');
+      
+      // Redireccionar a login.html
+      window.location.href = 'login.html';
+      
+    } catch (error) {
+      console.error('❌ Error al cerrar sesión:', error);
+      // Redireccionar de todas formas
+      window.location.href = 'login.html';
+    }
+  });
+}
+
 // ========== FUNCIÓN PARA CREAR NOTIFICACIONES ==========
 export async function crearNotificacionGlobal(tipo, titulo, mensaje) {
   try {
@@ -1163,9 +1259,13 @@ export async function crearNotificacionGlobal(tipo, titulo, mensaje) {
   }
 }
 
-// ========== INICIALIZACIÓN ==========
-document.addEventListener('DOMContentLoaded', () => {
+// ========== INICIALIZACIÓN PRINCIPAL ==========
+document.addEventListener('DOMContentLoaded', async () => {
   console.log('🚀 Inicializando Admin Dashboard Final...');
+  
+  // CORRECCIÓN: Verificar autenticación PRIMERO
+  const isAuth = await checkAuth();
+  if (!isAuth) return;
   
   // Limpiar modales al inicio
   document.querySelectorAll('.modal-overlay').forEach(modal => {
@@ -1247,21 +1347,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 100);
   });
 
-  // Logout
-  const logoutBtn = document.getElementById('logoutBtn');
-  logoutBtn?.addEventListener('click', async () => {
-    const ok = confirm('¿Seguro que querés cerrar sesión?');
-    if (!ok) return;
-
-    try {
-      await supa.auth.signOut();
-      console.log('✅ Sesión cerrada correctamente');
-    } catch (error) {
-      console.error('❌ Error al cerrar sesión:', error);
-    }
-
-    window.location.href = 'loginAdmin.html';
-  });
+  // CORRECCIÓN: Usar setupLogout() en lugar del código anterior
+  setupLogout();
 
   // Cargar vista inicial
   const hash = window.location.hash.replace('#', '') || 'dashboard';
