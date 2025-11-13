@@ -134,8 +134,37 @@
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
 
-  <!-- Admin Dashboard JS -->
-  <script type="module" src="JS/admin-dashboard.js"></script>
+  <!-- Admin Dashboard JS - CON MANEJO DE ERRORES -->
+  <script type="module">
+    console.log('🔍 Intentando cargar admin-dashboard.js...');
+    
+    try {
+      // Intenta importar el módulo
+      const module = await import('./JS/admin-dashboard.js');
+      console.log('✅ admin-dashboard.js cargado correctamente');
+    } catch (error) {
+      console.error('❌ Error cargando admin-dashboard.js:', error);
+      console.error('Detalles del error:', error.message);
+      console.error('Stack:', error.stack);
+      
+      // Mostrar error al usuario
+      document.getElementById('contentArea').innerHTML = `
+        <div style="padding: 3rem; text-align: center;">
+          <div style="font-size: 3rem; margin-bottom: 1rem;">⚠️</div>
+          <h2 style="color: var(--danger); margin-bottom: 1rem;">Error Cargando Dashboard</h2>
+          <p style="color: var(--text-secondary); margin-bottom: 1rem;">No se pudo cargar el archivo JavaScript principal.</p>
+          <pre style="background: #f5f5f5; padding: 1rem; border-radius: 8px; text-align: left; max-width: 600px; margin: 0 auto; overflow-x: auto;">
+${error.message}
+
+Verifica:
+1. Que el archivo JS/admin-dashboard.js exista
+2. Que las rutas de importación sean correctas
+3. Que no haya errores de sintaxis en el archivo
+          </pre>
+        </div>
+      `;
+    }
+  </script>
 
 </body>
 </html>
