@@ -1,5 +1,5 @@
-// ==================== ADMIN DASHBOARD JS (OPTIMIZADO) ====================
-// Sistema de navegación SPA con cliente Supabase centralizado
+// ==================== ADMIN DASHBOARD JS - VERSIÓN FINAL ====================
+// Adaptado a tu estructura de base de datos existente
 
 import { supa } from './supabase-client.js';
 import { configuracionView, initConfiguracion } from './modules/configuracion-complete.js';
@@ -324,107 +324,122 @@ async function initDashboard() {
   console.log('🚀 Inicializando Dashboard Intelligence...');
 
   try {
-    // 1. Cargar datos básicos de ventas del día actual con query directa
-    const hoy = new Date().toISOString().split('T')[0];
-    
-    const { data: ventasHoy, error: errorVentas } = await supa
-      .from('pedido')
-      .select('total')
-      .eq('fecha', hoy)
-      .eq('estado', 'entregado');
-    
-    if (!errorVentas && ventasHoy) {
-      const totalHoy = ventasHoy.reduce((sum, p) => sum + (parseFloat(p.total) || 0), 0);
-      const pedidosHoy = ventasHoy.length;
-      const ticketPromedio = pedidosHoy > 0 ? totalHoy / pedidosHoy : 0;
+    // 1. Usar la vista v_resumen_hoy que YA EXISTE
+    const { data: resumenHoy, error: errorResumen } = await supa
+      .from('v_resumen_hoy')
+      .select('*')
+      .maybeSingle();  // Usar maybeSingle en lugar de single para evitar errores
+
+    if (resumenHoy) {
+      document.getElementById('ventasHoy').textContent = formatGs(resumenHoy.total_hoy || 0);
+      document.getElementById('pedidosHoy').textContent = resumenHoy.pedidos_hoy || 0;
+      document.getElementById('ticketPromedio').textContent = formatGs(resumenHoy.ticket_promedio_hoy || 0);
       
-      document.getElementById('ventasHoy').textContent = formatGs(totalHoy);
-      document.getElementById('pedidosHoy').textContent = pedidosHoy;
-      document.getElementById('ticketPromedio').textContent = formatGs(ticketPromedio);
+      // Calcular cambio porcentual si hay data de ayer
+      if (resumenHoy.total_ayer && resumenHoy.total_ayer > 0) {
+        const cambio = ((resumenHoy.total_hoy - resumenHoy.total_ayer) / resumenHoy.total_ayer * 100).toFixed(1);
+        const changeElem = document.getElementById('ventasChange');
+        if (changeElem) {
+          changeElem.querySelector('span').textContent = `${cambio > 0 ? '+' : ''}${cambio}%`;
+          changeElem.className = cambio > 0 ? 'kpi-change positive' : 'kpi-change negative';
+        }
+      }
+    } else {
+      // Valores por defecto si no hay datos
+      document.getElementById('ventasHoy').textContent = formatGs(0);
+      document.getElementById('pedidosHoy').textContent = '0';
+      document.getElementById('ticketPromedio').textContent = formatGs(0);
     }
 
-    // 2. Cargar ventas últimos 7 días
-    const hace7Dias = new Date();
-    hace7Dias.setDate(hace7Dias.getDate() - 6);
-    
+    // 2. Usar la vista v_ventas_por_dia que YA EXISTE
     const { data: ventasSemana, error: errorSemana } = await supa
-      .from('pedido')
-      .select('fecha, total')
-      .gte('fecha', hace7Dias.toISOString().split('T')[0])
-      .lte('fecha', hoy)
-      .eq('estado', 'entregado')
-      .order('fecha', { ascending: true });
+      .from('v_ventas_por_dia')
+      .select('*')
+      .order('dia', { ascending: true })
+      .limit(7);
 
-    if (!errorSemana && ventasSemana) {
-      // Agrupar por día
-      const ventasPorDia = {};
-      ventasSemana.forEach(venta => {
-        if (!ventasPorDia[venta.fecha]) {
-          ventasPorDia[venta.fecha] = { total_gs: 0, pedidos: 0, dia: venta.fecha };
-        }
-        ventasPorDia[venta.fecha].total_gs += parseFloat(venta.total) || 0;
-        ventasPorDia[venta.fecha].pedidos++;
-      });
-      
-      const datosGrafico = Object.values(ventasPorDia);
-      if (datosGrafico.length > 0) {
-        initChartVentas(datosGrafico);
-        initWeekGrid(datosGrafico);
+    if (ventasSemana && ventasSemana.length > 0) {
+      initChartVentas(ventasSemana);
+      initWeekGrid(ventasSemana);
+    } else {
+      // Mostrar gráfico vacío si no hay datos
+      const diasVacios = [];
+      for (let i = 6; i >= 0; i--) {
+        const fecha = new Date();
+        fecha.setDate(fecha.getDate() - i);
+        diasVacios.push({
+          dia: fecha.toISOString().split('T')[0],
+          total_gs: 0,
+          pedidos: 0
+        });
       }
+      initChartVentas(diasVacios);
+      initWeekGrid(diasVacios);
     }
 
-    // 3. Métricas simuladas del ChatBot (por ahora hardcoded)
-    document.getElementById('chatbotInteracciones').textContent = '42';
-    document.getElementById('chatbotTasa').textContent = '87%';
-    document.getElementById('chatbotCarrito').textContent = '15';
+    // 3. Usar la vista v_chatbot_metricas_hoy que YA EXISTE
+    const { data: chatbotMetrics } = await supa
+      .from('v_chatbot_metricas_hoy')
+      .select('*')
+      .maybeSingle();
 
-    // 4. Top producto del día (consulta simplificada)
-    const { data: ventasProductos } = await supa
-      .from('detalle_pedido')
-      .select('producto_id, cantidad')
-      .in('pedido_id', ventasHoy?.map(v => v.id) || []);
+    if (chatbotMetrics) {
+      document.getElementById('chatbotInteracciones').textContent = chatbotMetrics.total_interacciones || 0;
+      document.getElementById('chatbotTasa').textContent = `${chatbotMetrics.tasa_exito || 0}%`;
+      document.getElementById('chatbotCarrito').textContent = chatbotMetrics.productos_agregados_bot || 0;
+    } else {
+      document.getElementById('chatbotInteracciones').textContent = '0';
+      document.getElementById('chatbotTasa').textContent = '0%';
+      document.getElementById('chatbotCarrito').textContent = '0';
+    }
 
-    if (ventasProductos && ventasProductos.length > 0) {
-      // Agrupar y encontrar el más vendido
-      const productoConteo = {};
-      ventasProductos.forEach(vp => {
-        if (!productoConteo[vp.producto_id]) {
-          productoConteo[vp.producto_id] = 0;
-        }
-        productoConteo[vp.producto_id] += vp.cantidad;
-      });
-      
-      const topId = Object.keys(productoConteo).reduce((a, b) => 
-        productoConteo[a] > productoConteo[b] ? a : b
-      );
-      
-      // Obtener nombre del producto
-      const { data: producto } = await supa
-        .from('productos')
-        .select('nombre')
-        .eq('id', topId)
-        .single();
-      
-      if (producto) {
-        document.getElementById('topProducto').textContent = producto.nombre;
-        document.getElementById('topProductoVentas').textContent = 
-          `${productoConteo[topId]} unidades vendidas`;
-      }
+    // 4. Usar la vista v_top_productos_hoy que YA EXISTE
+    const { data: topProductos } = await supa
+      .from('v_top_productos_hoy')
+      .select('*')
+      .limit(1)
+      .maybeSingle();
+
+    if (topProductos) {
+      document.getElementById('topProducto').textContent = topProductos.nombre || '-';
+      document.getElementById('topProductoVentas').textContent = `${topProductos.cantidad_vendida || 0} unidades vendidas`;
     } else {
       document.getElementById('topProducto').textContent = 'Sin ventas hoy';
       document.getElementById('topProductoVentas').textContent = '0 unidades vendidas';
     }
 
-    // 5. Estadísticas de catering (simulado)
-    document.getElementById('cateringBot').textContent = '42.9%';
-    document.getElementById('cateringBotText').textContent = '6 de 14 via ChatBot';
+    // 5. Usar la vista v_catering_bot_vs_manual que YA EXISTE
+    const { data: cateringStats } = await supa
+      .from('v_catering_bot_vs_manual')
+      .select('*')
+      .maybeSingle();
 
-    // 6. Impacto de promociones (simulado)
-    document.getElementById('ventasSinPromo').textContent = formatGs(2247500);
-    document.getElementById('ventasConPromo').textContent = formatGs(0);
-    document.getElementById('promoUplift').textContent = '+0%';
+    if (cateringStats) {
+      document.getElementById('cateringBot').textContent = `${cateringStats.porcentaje_automatizado || 0}%`;
+      document.getElementById('cateringBotText').textContent = 
+        `${cateringStats.catering_bot || 0} de ${cateringStats.total_catering || 0} via ChatBot`;
+    } else {
+      document.getElementById('cateringBot').textContent = '0%';
+      document.getElementById('cateringBotText').textContent = '0 de 0 via ChatBot';
+    }
 
-    // 7. Total productos
+    // 6. Usar la vista v_impacto_promos_semana que YA EXISTE
+    const { data: promos } = await supa
+      .from('v_impacto_promos_semana')
+      .select('*')
+      .maybeSingle();
+
+    if (promos) {
+      document.getElementById('ventasSinPromo').textContent = formatGs(promos.ventas_sin_promo || 0);
+      document.getElementById('ventasConPromo').textContent = formatGs(promos.ventas_con_promo || 0);
+      document.getElementById('promoUplift').textContent = `+${promos.incremento_porcentaje || 0}%`;
+    } else {
+      document.getElementById('ventasSinPromo').textContent = formatGs(0);
+      document.getElementById('ventasConPromo').textContent = formatGs(0);
+      document.getElementById('promoUplift').textContent = '+0%';
+    }
+
+    // 7. Cargar total productos
     const { count: totalProductos } = await supa
       .from('productos')
       .select('*', { count: 'exact', head: true });
@@ -441,6 +456,23 @@ async function initDashboard() {
 
   } catch (error) {
     console.error('❌ Error cargando dashboard:', error);
+    
+    // Mostrar valores por defecto si hay error
+    document.getElementById('ventasHoy').textContent = formatGs(0);
+    document.getElementById('pedidosHoy').textContent = '0';
+    document.getElementById('ticketPromedio').textContent = formatGs(0);
+    document.getElementById('productosTotal').textContent = '0';
+    document.getElementById('productosActivos').textContent = '0';
+    document.getElementById('chatbotInteracciones').textContent = '0';
+    document.getElementById('chatbotTasa').textContent = '0%';
+    document.getElementById('chatbotCarrito').textContent = '0';
+    document.getElementById('topProducto').textContent = 'Sin datos';
+    document.getElementById('topProductoVentas').textContent = '0 unidades vendidas';
+    document.getElementById('cateringBot').textContent = '0%';
+    document.getElementById('cateringBotText').textContent = '0 de 0 via ChatBot';
+    document.getElementById('ventasSinPromo').textContent = formatGs(0);
+    document.getElementById('ventasConPromo').textContent = formatGs(0);
+    document.getElementById('promoUplift').textContent = '+0%';
   }
 }
 
@@ -617,7 +649,7 @@ function navigateTo(viewName) {
 
 // ========== INIT ==========
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('🚀 Inicializando Admin Dashboard Optimizado...');
+  console.log('🚀 Inicializando Admin Dashboard Final...');
   
   // Sidebar toggle
   const sidebar = document.getElementById('sidebar');
