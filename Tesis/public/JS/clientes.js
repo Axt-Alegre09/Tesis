@@ -1,616 +1,587 @@
-// ==================== MÓDULO CLIENTES CORREGIDO ====================
-import { supa } from './supabase-client.js';
+// JS/catering.js - VERSIÓN CORREGIDA MANTENIENDO RPC
+// Panel de Administración de Catering con funciones RPC
+import { supabase, requireAuth } from "./ScriptLogin.js";
 
-let clientesData = [];
-let clientesFiltrados = [];
+/* ========= Estado Global ========= */
+let allReservas = [];
+let filteredReservas = [];
+let currentFilter = 'all';
+let selectedId = null;
+let isEditMode = false;
 
-// ========== INICIALIZACIÓN ==========
-export async function initClientes() {
-  console.log('🔵 Inicializando módulo de Clientes...');
+/* ========= Elementos del DOM ========= */
+const elements = {
+  tableBody: document.getElementById('tableBody'),
+  emptyMsg: document.getElementById('emptyMsg'),
+  searchInput: document.getElementById('searchInput'),
   
-  // Actualizar el HTML con la tabla completa
-  updateClientesView();
+  modalBackdrop: document.getElementById('modalBackdrop'),
+  modalDrawer: document.getElementById('modalDrawer'),
+  drawerTitle: document.getElementById('drawerTitle'),
+  mainForm: document.getElementById('mainForm'),
   
-  // Cargar datos
-  await cargarClientes();
+  f_nombre: document.getElementById('f_nombre'),
+  f_telefono: document.getElementById('f_telefono'),
+  f_email: document.getElementById('f_email'),
+  f_direccion: document.getElementById('f_direccion'),
+  f_tipo: document.getElementById('f_tipo'),
+  f_menu: document.getElementById('f_menu'),
+  f_invitados: document.getElementById('f_invitados'),
+  f_fecha: document.getElementById('f_fecha'),
+  f_hora: document.getElementById('f_hora'),
+  f_estado: document.getElementById('f_estado'),
+  statusCol: document.getElementById('statusCol'),
   
-  // Setup event listeners
-  setupEventListeners();
+  btnNew: document.getElementById('btnNew'),
+  btnCloseModal: document.getElementById('btnCloseModal'),
+  btnModalCancel: document.getElementById('btnModalCancel'),
+  btnModalSave: document.getElementById('btnModalSave'),
+  btnModalDelete: document.getElementById('btnModalDelete'),
   
-  // Actualizar estadísticas
-  actualizarEstadisticas();
-}
+  filterPills: document.querySelectorAll('.filter-pills .pill')
+};
 
-// ========== ACTUALIZAR VISTA HTML ==========
-function updateClientesView() {
-  const contentArea = document.getElementById('contentArea');
-  if (!contentArea) return;
-  
-  // Verificar si estamos en la vista de clientes
-  const pageTitle = document.getElementById('pageTitle');
-  if (pageTitle?.textContent !== 'Clientes') return;
-  
-  // Agregar la tabla completa después de las estadísticas
-  const estadisticasContainer = contentArea.querySelector('.grid-4');
-  if (!estadisticasContainer) return;
-  
-  // Crear contenedor de tabla si no existe
-  let tableContainer = document.getElementById('clientesTableContainer');
-  if (!tableContainer) {
-    tableContainer = document.createElement('div');
-    tableContainer.id = 'clientesTableContainer';
-    tableContainer.innerHTML = `
-      <!-- Filtros -->
-      <div class="card" style="margin-bottom: 1.5rem;">
-        <div style="display: grid; grid-template-columns: 1fr 200px auto; gap: 1rem; align-items: center;">
-          <div style="position: relative;">
-            <i class="bi bi-search" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
-            <input 
-              type="search" 
-              id="searchClientes" 
-              placeholder="Buscar por nombre, email, teléfono o RUC..." 
-              style="width: 100%; padding: 0.75rem 1rem 0.75rem 2.5rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem;"
-            >
-          </div>
-          <select id="filterCiudad" style="padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem;">
-            <option value="">Todas las ciudades</option>
-          </select>
-          <button id="btnRefreshClientes" class="icon-btn" style="background: var(--primary); color: white;" title="Actualizar">
-            <i class="bi bi-arrow-clockwise"></i>
-          </button>
-        </div>
-      </div>
-
-      <!-- Tabla de Clientes -->
-      <div class="card">
-        <div style="overflow-x: auto;">
-          <table style="width: 100%; border-collapse: collapse;">
-            <thead>
-              <tr style="border-bottom: 2px solid var(--border);">
-                <th style="padding: 1rem; text-align: left; font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase;">Cliente</th>
-                <th style="padding: 1rem; text-align: left; font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase;">Contacto</th>
-                <th style="padding: 1rem; text-align: left; font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase;">Ubicación</th>
-                <th style="padding: 1rem; text-align: center; font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase;">RUC</th>
-                <th style="padding: 1rem; text-align: center; font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase;">Registro</th>
-                <th style="padding: 1rem; text-align: center; font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase;">Acciones</th>
-              </tr>
-            </thead>
-            <tbody id="clientesTableBody">
-              <tr>
-                <td colspan="6" style="padding: 3rem; text-align: center; color: var(--text-muted);">
-                  <div class="spinner"></div>
-                  <p style="margin-top: 1rem;">Cargando clientes...</p>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    `;
-    
-    estadisticasContainer.insertAdjacentElement('afterend', tableContainer);
-  }
-  
-  // Crear modales si no existen
-  createModals();
-}
-
-// ========== CREAR MODALES ==========
-function createModals() {
-  // Modal de detalle
-  if (!document.getElementById('modalDetalleCliente')) {
-    const modalDetalle = document.createElement('div');
-    modalDetalle.innerHTML = `
-      <div id="modalDetalleCliente" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
-        <div class="modal-content" style="background: white; border-radius: 16px; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
-          <div class="modal-header" style="padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-            <h2 style="margin: 0; font-size: 1.5rem; font-weight: 700;">Detalle del Cliente</h2>
-            <button id="closeModalDetalle" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary);">
-              <i class="bi bi-x-lg"></i>
-            </button>
-          </div>
-          <div style="padding: 1.5rem;">
-            <div style="display: grid; gap: 1.5rem;">
-              <div>
-                <h3 style="font-size: 1.1rem; margin-bottom: 0.75rem; color: var(--primary);">
-                  <i class="bi bi-person-circle"></i> Información General
-                </h3>
-                <div style="display: grid; gap: 0.75rem; padding-left: 1.5rem;">
-                  <div><strong>Razón Social:</strong> <span id="detalleRazon"></span></div>
-                  <div><strong>RUC:</strong> <span id="detalleRuc"></span></div>
-                  <div><strong>Teléfono:</strong> <span id="detalleTel"></span></div>
-                  <div><strong>Email:</strong> <span id="detalleMail"></span></div>
-                  <div><strong>Contacto:</strong> <span id="detalleContacto"></span></div>
-                </div>
-              </div>
-              
-              <div>
-                <h3 style="font-size: 1.1rem; margin-bottom: 0.75rem; color: var(--primary);">
-                  <i class="bi bi-geo-alt"></i> Dirección
-                </h3>
-                <div style="display: grid; gap: 0.75rem; padding-left: 1.5rem;">
-                  <div><strong>Dirección:</strong> <span id="detalleDireccion"></span></div>
-                  <div><strong>Código Postal:</strong> <span id="detallePostal"></span></div>
-                </div>
-              </div>
-              
-              <div>
-                <h3 style="font-size: 1.1rem; margin-bottom: 0.75rem; color: var(--primary);">
-                  <i class="bi bi-clock"></i> Fechas
-                </h3>
-                <div style="display: grid; gap: 0.75rem; padding-left: 1.5rem;">
-                  <div><strong>Registrado:</strong> <span id="detalleFechaCreacion"></span></div>
-                  <div><strong>Última actualización:</strong> <span id="detalleFechaActualizacion"></span></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-    document.body.appendChild(modalDetalle);
-  }
-  
-  // Modal de edición
-  if (!document.getElementById('modalEditarCliente')) {
-    const modalEditar = document.createElement('div');
-    modalEditar.innerHTML = `
-      <div id="modalEditarCliente" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
-        <div class="modal-content" style="background: white; border-radius: 16px; width: 90%; max-width: 700px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
-          <div class="modal-header" style="padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-            <h2 style="margin: 0; font-size: 1.5rem; font-weight: 700;">Editar Cliente</h2>
-            <button id="closeModalEditar" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary);">
-              <i class="bi bi-x-lg"></i>
-            </button>
-          </div>
-          
-          <form id="formEditarCliente" style="padding: 1.5rem;">
-            <input type="hidden" id="editClienteId">
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
-              <div>
-                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Razón Social</label>
-                <input type="text" id="editRazon" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
-              </div>
-              <div>
-                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">RUC</label>
-                <input type="text" id="editRuc" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
-              </div>
-            </div>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
-              <div>
-                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Teléfono</label>
-                <input type="text" id="editTel" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
-              </div>
-              <div>
-                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Email</label>
-                <input type="email" id="editMail" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
-              </div>
-            </div>
-            
-            <div style="margin-bottom: 1.5rem;">
-              <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Contacto</label>
-              <input type="text" id="editContacto" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
-            </div>
-            
-            <h3 style="font-size: 1.1rem; margin-bottom: 1rem; color: var(--primary);">Dirección</h3>
-            
-            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-              <div>
-                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Calle Principal</label>
-                <input type="text" id="editCalle1" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
-              </div>
-              <div>
-                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Número</label>
-                <input type="text" id="editNro" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
-              </div>
-            </div>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
-              <div>
-                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Barrio</label>
-                <input type="text" id="editBarrio" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
-              </div>
-              <div>
-                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Ciudad</label>
-                <input type="text" id="editCiudad" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
-              </div>
-              <div>
-                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Código Postal</label>
-                <input type="text" id="editPostal" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
-              </div>
-            </div>
-            
-            <div style="display: flex; gap: 1rem; justify-content: flex-end;">
-              <button type="button" id="btnCancelarEditar" style="padding: 0.75rem 1.5rem; border: 1px solid var(--border); background: white; border-radius: 8px; font-weight: 600; cursor: pointer;">
-                Cancelar
-              </button>
-              <button type="submit" style="padding: 0.75rem 1.5rem; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
-                <i class="bi bi-check-lg"></i> Guardar Cambios
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    `;
-    document.body.appendChild(modalEditar);
-  }
-}
-
-// ========== CARGAR CLIENTES ==========
-async function cargarClientes() {
+/* ========= Utilidades ========= */
+const formatDate = (dateStr) => {
+  if (!dateStr) return '-';
   try {
-    const { data, error } = await supa
-      .from('clientes_perfil')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-
-    clientesData = data || [];
-    clientesFiltrados = [...clientesData];
-    
-    console.log(`✅ ${clientesData.length} clientes cargados`);
-    
-    renderizarTablaClientes();
-    cargarCiudadesFiltro();
-    actualizarContador();
-    
-  } catch (error) {
-    console.error('❌ Error al cargar clientes:', error);
-    mostrarError('No se pudieron cargar los clientes');
+    const date = new Date(dateStr + 'T00:00:00');
+    return date.toLocaleDateString('es-PY', { 
+      day: '2-digit', 
+      month: 'short', 
+      year: 'numeric' 
+    });
+  } catch (e) {
+    return dateStr;
   }
-}
+};
 
-// ========== RENDERIZAR TABLA ==========
-function renderizarTablaClientes() {
-  const tbody = document.getElementById('clientesTableBody');
-  if (!tbody) return;
+const formatTime = (timeStr) => {
+  if (!timeStr) return '';
+  return timeStr.slice(0, 5);
+};
+
+const formatTimeForDB = (timeStr) => {
+  if (!timeStr) return null;
+  if (timeStr.length === 5) return timeStr + ':00';
+  return timeStr;
+};
+
+// ✅ CORRECCIÓN: Mapeo correcto de estados
+const estadoDisplayMap = {
+  'agendado': 'Agendado',
+  'en_curso': 'En Curso', 
+  'finalizado': 'Finalizado',
+  'cancelado': 'Cancelado',
+  // Mapeo inverso para compatibilidad
+  'pendiente': 'Agendado',
+  'en curso': 'En Curso'
+};
+
+const estadoClassMap = {
+  'agendado': 'pending',
+  'en_curso': 'in-progress',
+  'finalizado': 'completed',
+  'cancelado': 'cancelled',
+  // Compatibilidad
+  'pendiente': 'pending',
+  'en curso': 'in-progress'
+};
+
+const formToDbEstado = {
+  'pending': 'agendado',
+  'in-progress': 'en_curso',
+  'completed': 'finalizado',
+  'cancelled': 'cancelado'
+};
+
+const dbToFormEstado = {
+  'agendado': 'pending',
+  'en_curso': 'in-progress',
+  'finalizado': 'completed',
+  'cancelado': 'cancelled',
+  // Compatibilidad
+  'pendiente': 'pending',
+  'en curso': 'in-progress'
+};
+
+const getStatusText = (status) => {
+  return estadoDisplayMap[status] || status || 'Agendado';
+};
+
+const getStatusClass = (status) => {
+  return estadoClassMap[status] || 'pending';
+};
+
+/* ========= Toast Notifications ========= */
+function showToast(message, type = 'success') {
+  const toastArea = document.getElementById('toastArea');
+  if (!toastArea) return;
   
-  if (clientesFiltrados.length === 0) {
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="6" style="padding: 3rem; text-align: center; color: var(--text-muted);">
-          <i class="bi bi-inbox" style="font-size: 3rem; display: block; margin-bottom: 1rem; opacity: 0.3;"></i>
-          <p style="margin: 0;">No se encontraron clientes</p>
-        </td>
-      </tr>
-    `;
-    return;
-  }
-
-  tbody.innerHTML = clientesFiltrados.map(cliente => {
-    const fechaCreacion = new Date(cliente.created_at).toLocaleDateString('es-PY');
-    const esNuevo = (Date.now() - new Date(cliente.created_at)) < 7 * 24 * 60 * 60 * 1000;
-    
-    return `
-      <tr style="border-bottom: 1px solid var(--border); transition: background 0.2s;" 
-          onmouseover="this.style.background='rgba(111,92,56,0.02)'" 
-          onmouseout="this.style.background='transparent'">
-        
-        <td style="padding: 1rem;">
-          <div style="display: flex; align-items: center; gap: 0.75rem;">
-            <div style="width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), #8b7355); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700;">
-              ${(cliente.razon || 'S').charAt(0).toUpperCase()}
-            </div>
-            <div>
-              <div style="font-weight: 600; margin-bottom: 0.2rem; display: flex; align-items: center; gap: 0.5rem;">
-                ${cliente.razon || 'Sin nombre'}
-                ${esNuevo ? '<span style="background: var(--success); color: white; font-size: 0.7rem; padding: 0.15rem 0.4rem; border-radius: 4px;">NUEVO</span>' : ''}
-              </div>
-              <div style="font-size: 0.85rem; color: var(--text-muted);">
-                ${cliente.mail || 'Sin email'}
-              </div>
-            </div>
-          </div>
-        </td>
-
-        <td style="padding: 1rem;">
-          <div style="font-size: 0.9rem;">
-            <div style="margin-bottom: 0.3rem;">
-              <i class="bi bi-telephone" style="color: var(--success); margin-right: 0.3rem;"></i>
-              ${cliente.tel || 'Sin teléfono'}
-            </div>
-            ${cliente.contacto ? `
-              <div style="font-size: 0.85rem; color: var(--text-muted);">
-                <i class="bi bi-person" style="margin-right: 0.3rem;"></i>
-                ${cliente.contacto}
-              </div>
-            ` : ''}
-          </div>
-        </td>
-
-        <td style="padding: 1rem;">
-          <div style="font-size: 0.9rem;">
-            <div style="font-weight: 500; margin-bottom: 0.2rem;">
-              <i class="bi bi-geo-alt" style="color: var(--primary); margin-right: 0.3rem;"></i>
-              ${cliente.ciudad || 'Sin ciudad'}
-            </div>
-            ${cliente.barrio ? `
-              <div style="font-size: 0.85rem; color: var(--text-muted);">
-                ${cliente.barrio}${cliente.depto ? `, ${cliente.depto}` : ''}
-              </div>
-            ` : ''}
-          </div>
-        </td>
-
-        <td style="padding: 1rem; text-align: center;">
-          <span style="font-family: 'Courier New', monospace; background: var(--bg-main); padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.9rem;">
-            ${cliente.ruc || 'Sin RUC'}
-          </span>
-        </td>
-
-        <td style="padding: 1rem; text-align: center; color: var(--text-secondary); font-size: 0.9rem;">
-          ${fechaCreacion}
-        </td>
-
-        <td style="padding: 1rem; text-align: center;">
-          <div style="display: flex; gap: 0.5rem; justify-content: center;">
-            <button 
-              class="icon-btn" 
-              onclick="window.verDetalleCliente('${cliente.id}')"
-              title="Ver detalles"
-              style="background: var(--primary); color: white;">
-              <i class="bi bi-eye"></i>
-            </button>
-            <button 
-              class="icon-btn" 
-              onclick="window.editarCliente('${cliente.id}')"
-              title="Editar cliente"
-              style="background: var(--info); color: white;">
-              <i class="bi bi-pencil"></i>
-            </button>
-          </div>
-        </td>
-      </tr>
-    `;
-  }).join('');
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  toast.style.cssText = `
+    background: ${type === 'success' ? '#10b981' : '#ef4444'};
+    color: white;
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    animation: slideIn 0.3s;
+  `;
+  
+  toastArea.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transition = 'opacity 0.3s';
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
 }
 
-// ========== ESTADÍSTICAS ==========
-async function actualizarEstadisticas() {
+/* ========= Verificar Cupo ========= */
+async function verificarCupo(fecha) {
   try {
-    const totalClientes = clientesData.length;
-    document.getElementById('totalClientes').textContent = totalClientes;
-
-    const hace30Dias = new Date();
-    hace30Dias.setDate(hace30Dias.getDate() - 30);
-    const clientesNuevos = clientesData.filter(c => 
-      new Date(c.created_at) > hace30Dias
-    ).length;
-    document.getElementById('clientesNuevos').textContent = clientesNuevos;
-
-    // Ciudad principal
-    const ciudades = {};
-    clientesData.forEach(c => {
-      if (c.ciudad) {
-        ciudades[c.ciudad] = (ciudades[c.ciudad] || 0) + 1;
-      }
+    const { data, error } = await supabase.rpc('verificar_cupo_catering', {
+      p_fecha: fecha
     });
     
-    const ciudadTop = Object.entries(ciudades).sort((a, b) => b[1] - a[1])[0];
-    if (ciudadTop) {
-      document.getElementById('ciudadTop').textContent = `${ciudadTop[0]} (${ciudadTop[1]})`;
+    if (error) {
+      console.error('Error verificando cupo:', error);
+      return { tiene_cupo: true, disponible: 999, limite: 999, usados: 0 };
     }
+    
+    return data || { tiene_cupo: true, disponible: 999, limite: 999, usados: 0 };
+  } catch (err) {
+    console.error('Error verificando cupo:', err);
+    return { tiene_cupo: true, disponible: 999, limite: 999, usados: 0 };
+  }
+}
 
-    const conEmail = clientesData.filter(c => 
-      c.mail && c.mail !== 'sin@email.com' && c.mail.includes('@')
-    ).length;
-    document.getElementById('clientesConEmail').textContent = conEmail;
+/* ========= Modal Functions ========= */
+function openModal(mode = 'new', data = null) {
+  isEditMode = mode === 'edit';
+  selectedId = data?.id || null;
+  
+  if (elements.drawerTitle) {
+    elements.drawerTitle.textContent = mode === 'new' ? 'Nueva Reserva' : 'Editar Reserva';
+  }
+  if (elements.btnModalSave) {
+    elements.btnModalSave.textContent = mode === 'new' ? 'Agendar' : 'Guardar Cambios';
+  }
+  
+  if (elements.statusCol) {
+    elements.statusCol.style.display = mode === 'edit' ? 'block' : 'none';
+  }
+  if (elements.btnModalDelete) {
+    elements.btnModalDelete.style.display = mode === 'edit' ? 'inline-block' : 'none';
+  }
+  
+  if (mode === 'new') {
+    if (elements.mainForm) elements.mainForm.reset();
+    const today = new Date().toISOString().split('T')[0];
+    if (elements.f_fecha) elements.f_fecha.value = today;
+  } else if (data) {
+    if (elements.f_nombre) elements.f_nombre.value = data.razonsocial || '';
+    if (elements.f_telefono) elements.f_telefono.value = data.telefono || '';
+    if (elements.f_email) elements.f_email.value = data.email || '';
+    if (elements.f_direccion) elements.f_direccion.value = data.lugar || '';
+    if (elements.f_tipo) elements.f_tipo.value = data.tipoevento || 'catering';
+    if (elements.f_menu) elements.f_menu.value = data.tipocomida || '';
+    if (elements.f_invitados) elements.f_invitados.value = data.invitados || '';
+    if (elements.f_fecha) elements.f_fecha.value = data.fecha || '';
+    if (elements.f_hora) elements.f_hora.value = formatTime(data.hora);
+    if (elements.f_estado) {
+      // ✅ CORRECCIÓN: Mapeo correcto de estado
+      elements.f_estado.value = dbToFormEstado[data.estado] || 'pending';
+    }
+  }
+  
+  if (elements.modalBackdrop) elements.modalBackdrop.classList.add('active');
+  if (elements.modalDrawer) elements.modalDrawer.classList.add('active');
+}
+
+function closeModal() {
+  if (elements.modalBackdrop) elements.modalBackdrop.classList.remove('active');
+  if (elements.modalDrawer) elements.modalDrawer.classList.remove('active');
+  selectedId = null;
+  isEditMode = false;
+}
+
+/* ========= Data Loading ========= */
+async function loadReservas() {
+  try {
+    console.log('📥 Cargando reservas...');
+    
+    const { data, error } = await supabase
+      .from('reservas_catering')
+      .select('*')
+      .order('fecha', { ascending: false })
+      .order('hora', { ascending: false });
+    
+    if (error) {
+      console.error('Error al cargar reservas:', error);
+      throw error;
+    }
+    
+    allReservas = data || [];
+    console.log(`✅ ${allReservas.length} reservas cargadas`);
+    
+    applyFilters();
     
   } catch (error) {
-    console.error('❌ Error al actualizar estadísticas:', error);
+    console.error('❌ Error cargando reservas:', error);
+    showToast('Error al cargar las reservas', 'error');
+    allReservas = [];
+    applyFilters();
   }
 }
 
-// ========== FILTROS ==========
-function cargarCiudadesFiltro() {
-  const selectCiudad = document.getElementById('filterCiudad');
-  if (!selectCiudad) return;
+/* ========= Filters ========= */
+function applyFilters() {
+  const searchTerm = elements.searchInput?.value?.toLowerCase() || '';
   
-  const ciudades = [...new Set(clientesData.map(c => c.ciudad).filter(Boolean))].sort();
-  
-  selectCiudad.innerHTML = '<option value="">Todas las ciudades</option>' +
-    ciudades.map(ciudad => `<option value="${ciudad}">${ciudad}</option>`).join('');
-}
-
-function aplicarFiltros() {
-  const searchText = document.getElementById('searchClientes')?.value.toLowerCase() || '';
-  const ciudadFilter = document.getElementById('filterCiudad')?.value || '';
-  
-  clientesFiltrados = clientesData.filter(cliente => {
-    const matchSearch = !searchText || 
-      cliente.razon?.toLowerCase().includes(searchText) ||
-      cliente.mail?.toLowerCase().includes(searchText) ||
-      cliente.tel?.toLowerCase().includes(searchText) ||
-      cliente.ruc?.toLowerCase().includes(searchText);
+  filteredReservas = allReservas.filter(reserva => {
+    let matchesStatus = true;
+    if (currentFilter !== 'all') {
+      const status = reserva.estado;
+      if (currentFilter === 'pending') {
+        matchesStatus = status === 'agendado' || status === 'pendiente';
+      } else if (currentFilter === 'in-progress') {
+        matchesStatus = status === 'en_curso' || status === 'en curso';
+      } else if (currentFilter === 'completed') {
+        matchesStatus = status === 'finalizado';
+      }
+    }
     
-    const matchCiudad = !ciudadFilter || cliente.ciudad === ciudadFilter;
+    let matchesSearch = true;
+    if (searchTerm) {
+      matchesSearch = 
+        (reserva.razonsocial?.toLowerCase().includes(searchTerm)) ||
+        (reserva.telefono?.toLowerCase().includes(searchTerm)) ||
+        (reserva.email?.toLowerCase().includes(searchTerm)) ||
+        (reserva.lugar?.toLowerCase().includes(searchTerm));
+    }
     
-    return matchSearch && matchCiudad;
+    return matchesStatus && matchesSearch;
   });
   
-  renderizarTablaClientes();
-  actualizarContador();
+  renderTable();
+  updateCounts();
 }
 
-function actualizarContador() {
-  const contador = document.getElementById('contadorClientes');
-  if (contador) {
-    contador.textContent = `Mostrando ${clientesFiltrados.length} de ${clientesData.length} clientes`;
+function updateCounts() {
+  const counts = {
+    all: allReservas.length,
+    pending: allReservas.filter(r => r.estado === 'agendado' || r.estado === 'pendiente').length,
+    'in-progress': allReservas.filter(r => r.estado === 'en_curso' || r.estado === 'en curso').length,
+    completed: allReservas.filter(r => r.estado === 'finalizado').length
+  };
+  
+  elements.filterPills.forEach(pill => {
+    const filter = pill.dataset.filter;
+    const countEl = pill.querySelector('.count');
+    if (countEl) {
+      countEl.textContent = counts[filter] || 0;
+    }
+  });
+}
+
+/* ========= Render Table ========= */
+function renderTable() {
+  if (!elements.tableBody) return;
+  
+  if (filteredReservas.length === 0) {
+    elements.tableBody.innerHTML = '';
+    if (elements.emptyMsg) elements.emptyMsg.style.display = 'flex';
+    return;
+  }
+  
+  if (elements.emptyMsg) elements.emptyMsg.style.display = 'none';
+  
+  const rows = filteredReservas.map(reserva => {
+    const row = document.createElement('tr');
+    const esChatBot = reserva.ruc === 'CHAT-BOT';
+    
+    row.innerHTML = `
+      <td>
+        <div class="cell-content">
+          <span class="text-main">
+            ${reserva.razonsocial || 'Sin nombre'}
+            ${esChatBot ? '🤖' : ''}
+          </span>
+          <span class="text-sub">${reserva.email || ''}</span>
+        </div>
+      </td>
+      <td>${reserva.telefono || '-'}</td>
+      <td>
+        <div class="date-time">
+          <span>${formatDate(reserva.fecha)}</span>
+          <span class="text-sub">${formatTime(reserva.hora)}</span>
+        </div>
+      </td>
+      <td>${reserva.invitados || '-'}</td>
+      <td>
+        <span class="status-badge ${getStatusClass(reserva.estado)}">
+          ${getStatusText(reserva.estado)}
+        </span>
+      </td>
+      <td class="col-actions">
+        <button class="btn-action edit" data-id="${reserva.id}" title="Editar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+        </button>
+        <button class="btn-action delete" data-id="${reserva.id}" title="Cancelar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+          </svg>
+        </button>
+      </td>
+    `;
+    
+    return row;
+  });
+  
+  elements.tableBody.innerHTML = '';
+  rows.forEach(row => elements.tableBody.appendChild(row));
+}
+
+/* ========= CRUD Operations ========= */
+async function saveReserva() {
+  try {
+    // Validar campos requeridos
+    const requiredFields = [
+      { element: elements.f_nombre, name: 'Nombre' },
+      { element: elements.f_fecha, name: 'Fecha' },
+      { element: elements.f_hora, name: 'Hora' }
+    ];
+    
+    for (const field of requiredFields) {
+      if (!field.element?.value?.trim()) {
+        showToast(`El campo "${field.name}" es requerido`, 'error');
+        field.element?.focus();
+        return;
+      }
+    }
+    
+    if (isEditMode && selectedId) {
+      // ===== MODO EDICIÓN =====
+      console.log('📝 Actualizando reserva ID:', selectedId);
+      
+      const currentReserva = allReservas.find(r => r.id === selectedId);
+      
+      // ✅ Preparar datos para catering_editar
+      const updateData = {
+        p_id: selectedId,
+        p_razonsocial: elements.f_nombre.value.trim(),
+        p_ruc: currentReserva?.ruc || '',
+        p_tipoevento: elements.f_tipo?.value?.trim() || 'catering',
+        p_fecha: elements.f_fecha.value,
+        p_hora: formatTimeForDB(elements.f_hora.value),
+        p_tipocomida: elements.f_menu?.value?.trim() || '',
+        p_lugar: elements.f_direccion?.value?.trim() || '-',
+        p_observaciones: '',
+        p_invitados: elements.f_invitados?.value ? parseInt(elements.f_invitados.value) : null,
+        p_telefono: elements.f_telefono?.value?.trim() || null,
+        p_email: elements.f_email?.value?.trim() || null
+      };
+      
+      console.log('📤 Datos para catering_editar:', updateData);
+      
+      const { data: editData, error: editError } = await supabase.rpc('catering_editar', updateData);
+      
+      if (editError) {
+        console.error('❌ Error en catering_editar:', editError);
+        showToast(editError.message || 'Error al actualizar', 'error');
+        return;
+      }
+      
+      console.log('✅ Respuesta de catering_editar:', editData);
+      
+      // Actualizar estado si cambió
+      const newStatus = formToDbEstado[elements.f_estado.value];
+      if (currentReserva && currentReserva.estado !== newStatus) {
+        console.log('📊 Actualizando estado a:', newStatus);
+        
+        const { error: statusError } = await supabase.rpc('catering_set_estado', {
+          p_id: selectedId,
+          p_estado: newStatus
+        });
+        
+        if (statusError) {
+          console.error('Error en catering_set_estado:', statusError);
+          showToast('Datos actualizados pero hubo problema con el estado', 'warning');
+        }
+      }
+      
+      showToast('✅ Reserva actualizada exitosamente', 'success');
+      
+    } else {
+      // ===== MODO CREACIÓN =====
+      console.log('➕ Creando nueva reserva');
+      
+      // Verificar cupo
+      const cupoInfo = await verificarCupo(elements.f_fecha.value);
+      if (!cupoInfo.tiene_cupo) {
+        showToast(`No hay cupo disponible para el ${formatDate(elements.f_fecha.value)}. Límite: ${cupoInfo.limite}, Usados: ${cupoInfo.usados}`, 'error');
+        return;
+      }
+      
+      // ✅ Preparar datos para catering_agendar
+      const createData = {
+        p_razonsocial: elements.f_nombre.value.trim(),
+        p_ruc: '',
+        p_tipoevento: elements.f_tipo?.value?.trim() || 'catering',
+        p_fecha: elements.f_fecha.value,
+        p_hora: formatTimeForDB(elements.f_hora.value),
+        p_tipocomida: elements.f_menu?.value?.trim() || '',
+        p_lugar: elements.f_direccion?.value?.trim() || '-',
+        p_observaciones: '',
+        p_invitados: elements.f_invitados?.value ? parseInt(elements.f_invitados.value) : null,
+        p_telefono: elements.f_telefono?.value?.trim() || null,
+        p_email: elements.f_email?.value?.trim() || null
+      };
+      
+      console.log('📤 Datos para catering_agendar:', createData);
+      
+      const { data, error } = await supabase.rpc('catering_agendar', createData);
+      
+      if (error) {
+        console.error('❌ Error en catering_agendar:', error);
+        
+        if (error.message?.includes('Cupo lleno')) {
+          showToast('Cupo lleno para esa fecha. Prueba otra fecha.', 'error');
+        } else {
+          showToast(error.message || 'Error al crear la reserva', 'error');
+        }
+        return;
+      }
+      
+      console.log('✅ Respuesta de catering_agendar:', data);
+      showToast('✅ Reserva creada exitosamente', 'success');
+    }
+    
+    closeModal();
+    await loadReservas();
+    
+  } catch (error) {
+    console.error('❌ Error guardando reserva:', error);
+    showToast('Error inesperado. Revisa la consola.', 'error');
   }
 }
 
-// ========== FUNCIONES DE MODAL ==========
-window.verDetalleCliente = function(clienteId) {
-  const cliente = clientesData.find(c => c.id === clienteId);
-  if (!cliente) return;
-  
-  const modal = document.getElementById('modalDetalleCliente');
-  if (!modal) return;
-  
-  document.getElementById('detalleRazon').textContent = cliente.razon || 'Sin nombre';
-  document.getElementById('detalleRuc').textContent = cliente.ruc || 'Sin RUC';
-  document.getElementById('detalleTel').textContent = cliente.tel || 'Sin teléfono';
-  document.getElementById('detalleMail').textContent = cliente.mail || 'Sin email';
-  document.getElementById('detalleContacto').textContent = cliente.contacto || 'Sin contacto';
-  
-  const direccionCompleta = [
-    cliente.calle1,
-    cliente.nro ? `N° ${cliente.nro}` : '',
-    cliente.calle2 ? `esq. ${cliente.calle2}` : '',
-    cliente.barrio,
-    cliente.ciudad,
-    cliente.depto
-  ].filter(Boolean).join(', ');
-  
-  document.getElementById('detalleDireccion').textContent = direccionCompleta || 'Sin dirección';
-  document.getElementById('detallePostal').textContent = cliente.postal || 'Sin código postal';
-  
-  document.getElementById('detalleFechaCreacion').textContent = 
-    new Date(cliente.created_at).toLocaleString('es-PY');
-  document.getElementById('detalleFechaActualizacion').textContent = 
-    new Date(cliente.updated_at).toLocaleString('es-PY');
-  
-  modal.style.display = 'flex';
-};
-
-window.editarCliente = function(clienteId) {
-  const cliente = clientesData.find(c => c.id === clienteId);
-  if (!cliente) return;
-  
-  const modal = document.getElementById('modalEditarCliente');
-  if (!modal) return;
-  
-  document.getElementById('editClienteId').value = cliente.id;
-  document.getElementById('editRazon').value = cliente.razon || '';
-  document.getElementById('editRuc').value = cliente.ruc || '';
-  document.getElementById('editTel').value = cliente.tel || '';
-  document.getElementById('editMail').value = cliente.mail || '';
-  document.getElementById('editContacto').value = cliente.contacto || '';
-  document.getElementById('editCalle1').value = cliente.calle1 || '';
-  document.getElementById('editNro').value = cliente.nro || '';
-  document.getElementById('editBarrio').value = cliente.barrio || '';
-  document.getElementById('editCiudad').value = cliente.ciudad || '';
-  document.getElementById('editPostal').value = cliente.postal || '';
-  
-  modal.style.display = 'flex';
-};
-
-async function guardarCambiosCliente(e) {
-  e.preventDefault();
-  
-  const clienteId = document.getElementById('editClienteId').value;
-  const btnGuardar = e.target.querySelector('button[type="submit"]');
-  
-  btnGuardar.disabled = true;
-  btnGuardar.innerHTML = '<i class="bi bi-hourglass-split"></i> Guardando...';
+async function deleteReserva(id) {
+  if (!confirm('¿Está seguro de CANCELAR esta reserva?\n\nEsto cambiará el estado a "Cancelado" y liberará el cupo.')) return;
   
   try {
-    const datosActualizados = {
-      razon: document.getElementById('editRazon').value,
-      ruc: document.getElementById('editRuc').value,
-      tel: document.getElementById('editTel').value,
-      mail: document.getElementById('editMail').value,
-      contacto: document.getElementById('editContacto').value,
-      calle1: document.getElementById('editCalle1').value,
-      nro: document.getElementById('editNro').value,
-      barrio: document.getElementById('editBarrio').value,
-      ciudad: document.getElementById('editCiudad').value,
-      postal: document.getElementById('editPostal').value,
-      updated_at: new Date().toISOString()
-    };
-
-    const { error } = await supa
-      .from('clientes_perfil')
-      .update(datosActualizados)
-      .eq('id', clienteId);
-
+    const { error } = await supabase.rpc('catering_set_estado', {
+      p_id: id,
+      p_estado: 'cancelado'
+    });
+    
     if (error) throw error;
-
-    mostrarExito('✅ Cliente actualizado correctamente');
-    document.getElementById('modalEditarCliente').style.display = 'none';
-    await cargarClientes();
+    
+    showToast('✅ Reserva cancelada exitosamente', 'success');
+    closeModal();
+    await loadReservas();
     
   } catch (error) {
-    console.error('❌ Error al actualizar cliente:', error);
-    mostrarError('No se pudo actualizar el cliente');
-  } finally {
-    btnGuardar.disabled = false;
-    btnGuardar.innerHTML = '<i class="bi bi-check-lg"></i> Guardar Cambios';
+    console.error('Error cancelando reserva:', error);
+    showToast('Error al cancelar la reserva', 'error');
   }
 }
 
-// ========== EXPORTAR CLIENTES ==========
-function exportarClientes() {
-  const csv = [
-    ['Razón Social', 'RUC', 'Teléfono', 'Email', 'Ciudad', 'Barrio', 'Fecha Registro'],
-    ...clientesFiltrados.map(c => [
-      c.razon || '',
-      c.ruc || '',
-      c.tel || '',
-      c.mail || '',
-      c.ciudad || '',
-      c.barrio || '',
-      new Date(c.created_at).toLocaleDateString('es-PY')
-    ])
-  ].map(row => row.join(',')).join('\n');
+/* ========= Event Listeners ========= */
+elements.btnNew?.addEventListener('click', () => openModal('new'));
+elements.btnCloseModal?.addEventListener('click', closeModal);
+elements.btnModalCancel?.addEventListener('click', closeModal);
+elements.modalBackdrop?.addEventListener('click', closeModal);
 
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = `clientes_${new Date().toISOString().split('T')[0]}.csv`;
-  link.click();
-}
+elements.mainForm?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  await saveReserva();
+});
 
-// ========== EVENT LISTENERS ==========
-function setupEventListeners() {
-  // Búsqueda
-  document.getElementById('searchClientes')?.addEventListener('input', aplicarFiltros);
-  
-  // Filtro ciudad
-  document.getElementById('filterCiudad')?.addEventListener('change', aplicarFiltros);
-  
-  // Botón refresh
-  document.getElementById('btnRefreshClientes')?.addEventListener('click', cargarClientes);
-  
-  // Cerrar modales
-  document.getElementById('closeModalDetalle')?.addEventListener('click', () => {
-    document.getElementById('modalDetalleCliente').style.display = 'none';
+elements.btnModalDelete?.addEventListener('click', async () => {
+  if (selectedId) {
+    await deleteReserva(selectedId);
+  }
+});
+
+elements.filterPills.forEach(pill => {
+  pill.addEventListener('click', () => {
+    elements.filterPills.forEach(p => p.classList.remove('active'));
+    pill.classList.add('active');
+    currentFilter = pill.dataset.filter;
+    applyFilters();
   });
+});
+
+elements.searchInput?.addEventListener('input', () => {
+  applyFilters();
+});
+
+elements.tableBody?.addEventListener('click', async (e) => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
   
-  document.getElementById('closeModalEditar')?.addEventListener('click', () => {
-    document.getElementById('modalEditarCliente').style.display = 'none';
-  });
+  const id = parseInt(btn.dataset.id);
+  const reserva = allReservas.find(r => r.id === id);
   
-  document.getElementById('btnCancelarEditar')?.addEventListener('click', () => {
-    document.getElementById('modalEditarCliente').style.display = 'none';
-  });
+  if (btn.classList.contains('edit')) {
+    openModal('edit', reserva);
+  } else if (btn.classList.contains('delete')) {
+    await deleteReserva(id);
+  }
+});
+
+elements.f_fecha?.addEventListener('change', async () => {
+  const fecha = elements.f_fecha.value;
+  if (!fecha) return;
   
-  // Formulario editar
-  document.getElementById('formEditarCliente')?.addEventListener('submit', guardarCambiosCliente);
+  const cupoInfo = await verificarCupo(fecha);
+  const dayOfWeek = new Date(fecha + 'T00:00:00').getDay();
+  const esFinDeSemana = dayOfWeek === 0 || dayOfWeek === 6;
   
-  // Exportar
-  document.getElementById('btnExportarClientes')?.addEventListener('click', exportarClientes);
+  const mensaje = `📅 ${formatDate(fecha)} ${esFinDeSemana ? '(Fin de semana)' : '(Día de semana)'}: ${cupoInfo.disponible} cupos disponibles de ${cupoInfo.limite}`;
   
-  // Cerrar modal al hacer clic fuera
-  window.addEventListener('click', (e) => {
-    const modalDetalle = document.getElementById('modalDetalleCliente');
-    const modalEditar = document.getElementById('modalEditarCliente');
+  const info = document.createElement('small');
+  info.style.color = cupoInfo.disponible > 0 ? 'green' : 'red';
+  info.textContent = mensaje;
+  
+  const parent = elements.f_fecha.parentElement;
+  const oldInfo = parent.querySelector('small');
+  if (oldInfo) oldInfo.remove();
+  parent.appendChild(info);
+});
+
+// Agregar animación CSS
+const style = document.createElement('style');
+style.textContent = `
+  @keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+`;
+document.head.appendChild(style);
+
+/* ========= Inicialización ========= */
+(async function init() {
+  try {
+    console.log('🚀 Inicializando Panel de Catering...');
     
-    if (e.target === modalDetalle) modalDetalle.style.display = 'none';
-    if (e.target === modalEditar) modalEditar.style.display = 'none';
-  });
-}
-
-// ========== UTILIDADES ==========
-function mostrarExito(mensaje) {
-  alert(mensaje); // Puedes implementar un toast más elegante
-}
-
-function mostrarError(mensaje) {
-  alert('❌ ' + mensaje);
-}
-
-console.log('📦 Módulo de Clientes cargado');
+    await requireAuth();
+    await loadReservas();
+    
+    console.log('✅ Panel de Catering inicializado correctamente');
+    
+  } catch (error) {
+    console.error('❌ Error al inicializar:', error);
+    if (error.message?.includes('auth') || error.message?.includes('session')) {
+      window.location.href = 'login.html';
+    }
+  }
+})();
