@@ -1,4 +1,4 @@
-// JS/ScriptLogin.js
+// JS/ScriptLogin.js - VERSIÓN CORREGIDA SIN BUCLES
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 /* ========= Config ========= */
@@ -12,9 +12,17 @@ const LOGIN_URL = "login.html";
 const HOME_CLIENTE = "index.html";
 const HOME_ADMIN = "admin-dashboard.html";
 
+// CORRECCIÓN: Variable para prevenir bucles
+let isRedirecting = false;
+
 function go(path) {
-  window.location.href = new URL(path, window.location.href).href;
+  if (isRedirecting) return; // Prevenir redirecciones múltiples
+  isRedirecting = true;
+  
+  // Usar replace para no crear historial
+  window.location.replace(new URL(path, window.location.href).href);
 }
+
 function showMsg(text, type = "info") {
   const box = document.getElementById("msg");
   if (!box) return;
@@ -34,44 +42,54 @@ export async function getUser() {
 export async function getProfile() {
   const user = await getUser();
   if (!user) return null;
+  
+  // CORRECCIÓN: Usar perfiles_usuarios en lugar de profiles
   const { data, error } = await supabase
-    .from("profiles")
-    .select("id, email, nombre, role")
-    .eq("id", user.id)
+    .from("perfiles_usuarios")
+    .select("user_id, email, nombre, rol")
+    .eq("user_id", user.id)
     .maybeSingle();
-  if (error) { console.error("[profiles]", error); return null; }
+    
+  if (error) { 
+    console.error("[perfiles_usuarios]", error); 
+    return null; 
+  }
   return data;
 }
 
 export async function getClientePerfil() {
   const user = await getUser();
   if (!user) return null;
-  // Tabla: clientes_perfil(user_id, ruc, razon, tel, mail, ...)
+  
   const { data, error } = await supabase
     .from("clientes_perfil")
     .select("user_id, razon, ruc, tel, mail")
     .eq("user_id", user.id)
     .maybeSingle();
-  if (error) { console.error("[clientes_perfil]", error); return null; }
+    
+  if (error) { 
+    console.error("[clientes_perfil]", error); 
+    return null; 
+  }
   return data;
 }
 
 /* ========= Nombre visible en el chip =========
-   Prioridad: clientes_perfil.razon  >  profiles.nombre  >  user_metadata.nombre
+   Prioridad: clientes_perfil.razon  >  perfiles_usuarios.nombre  >  user_metadata.nombre
 */
 async function getDisplayName() {
   const user = await getUser();
-  if (!user) return ""; // sin sesión -> "Cuenta"
+  if (!user) return "";
 
-  const cp = await getClientePerfil();              // 1) razón comercial
+  const cp = await getClientePerfil();
   const razon = cp?.razon?.trim();
   if (razon) return razon;
 
-  const p = await getProfile();                     // 2) nombre de profiles
+  const p = await getProfile();
   const nomPerfil = p?.nombre?.trim();
   if (nomPerfil) return nomPerfil;
 
-  const nomMeta = user.user_metadata?.nombre?.trim(); // 3) metadata de auth
+  const nomMeta = user.user_metadata?.nombre?.trim();
   if (nomMeta) return nomMeta;
 
   return "";
@@ -79,19 +97,38 @@ async function getDisplayName() {
 
 /* ========= Navegación por rol ========= */
 export async function goByRole() {
+  if (isRedirecting) return; // Prevenir múltiples redirecciones
+  
   const p = await getProfile();
-  if (!p) return;
-  if (p.role === "admin") go(HOME_ADMIN);
-  else go(HOME_CLIENTE);
+  if (!p) {
+    console.log('⚠️ No se encontró perfil de usuario');
+    return;
+  }
+  
+  console.log('🔄 Redirigiendo según rol:', p.rol);
+  
+  // CORRECCIÓN: Usar 'rol' en lugar de 'role'
+  if (p.rol === "admin") {
+    go(HOME_ADMIN);
+  } else {
+    go(HOME_CLIENTE);
+  }
 }
 
 export async function requireRole(roleNeeded = "cliente") {
   const { data } = await supabase.auth.getSession();
-  if (!data.session) { go(LOGIN_URL); return; }
+  if (!data.session) { 
+    go(LOGIN_URL); 
+    return; 
+  }
+  
   const p = await getProfile();
-  if (!p || p.role !== roleNeeded) {
-    if (roleNeeded === "admin") go("loginAdmin.html");
-    else go(LOGIN_URL);
+  if (!p || p.rol !== roleNeeded) {
+    if (roleNeeded === "admin") {
+      go("loginAdmin.html");
+    } else {
+      go(LOGIN_URL);
+    }
   }
 }
 
@@ -101,38 +138,40 @@ export function setUserNameUI(nombre) {
   if (el) el.textContent = nombre || "Cuenta";
 }
 
-/** Pinta el chip:
- *  - Con sesión: nombre visible (razon/nombre/metadata)
- *  - Sin sesión: "Cuenta"
- */
 export async function paintUserChip() {
   const { data } = await supabase.auth.getSession();
   if (!data?.session) return setUserNameUI("Cuenta");
+  
   const display = await getDisplayName();
   setUserNameUI(display || "Cuenta");
 }
 
 export async function logout(ev) {
   ev?.preventDefault?.();
-  try { await supabase.auth.signOut(); } catch {}
+  
+  try { 
+    await supabase.auth.signOut(); 
+  } catch (e) {
+    console.error('Error al cerrar sesión:', e);
+  }
+  
   try { localStorage.clear(); } catch {}
   try { sessionStorage.clear(); } catch {}
-  go(LOGIN_URL);
+  
+  // CORRECCIÓN: Usar replace en lugar de go
+  window.location.replace(LOGIN_URL);
 }
 
-/** Ajusta el item de acción (id="logoutBtn"):
- *  - Con sesión:  "Cerrar sesión"  -> logout()
- *  - Sin sesión:  "Iniciar sesión" -> ir a login.html
- * Además, deja funcionando "Actualizar datos" -> misdatos.html
- */
 export async function autoWireAuthMenu() {
   const authBtn = document.getElementById("logoutBtn");
   const upd = document.getElementById("updateProfileBtn");
 
-  if (upd) upd.addEventListener("click", (ev) => {
-    ev?.preventDefault?.();
-    window.location.href = "misdatos.html";
-  });
+  if (upd) {
+    upd.addEventListener("click", (ev) => {
+      ev?.preventDefault?.();
+      window.location.href = "misdatos.html";
+    });
+  }
 
   if (authBtn) {
     const { data } = await supabase.auth.getSession();
@@ -147,7 +186,6 @@ export async function autoWireAuthMenu() {
     }
   }
 
-  // Finalmente, pinta el chip
   await paintUserChip();
 }
 
@@ -164,9 +202,25 @@ async function wireLoginPage() {
   registerBtn?.addEventListener("click", () => wrapper?.classList.add("active"));
   loginBtn?.addEventListener("click", () => wrapper?.classList.remove("active"));
 
-  // Si ya tiene sesión, redirigir según rol
-  const { data } = await supabase.auth.getSession();
-  if (data.session) return await goByRole();
+  // CORRECCIÓN: Verificar sesión CON TIMEOUT para evitar bloqueos
+  try {
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Timeout')), 3000)
+    );
+    
+    const sessionPromise = supabase.auth.getSession();
+    
+    const { data } = await Promise.race([sessionPromise, timeoutPromise]);
+    
+    if (data?.session) {
+      console.log('✅ Sesión existente detectada, redirigiendo...');
+      await goByRole();
+      return; // Importante: detener la ejecución aquí
+    }
+  } catch (error) {
+    console.log('⚠️ Error verificando sesión:', error.message);
+    // Continuar con el formulario de login
+  }
 
   // Login
   loginForm?.addEventListener("submit", async (e) => {
@@ -177,12 +231,18 @@ async function wireLoginPage() {
     const password = (document.getElementById("loginPassword")?.value || "").trim();
 
     const { error } = await supabase.auth.signInWithPassword({ email, password });
+    
     if (error) {
       console.error(error);
       showMsg("❌ Credenciales incorrectas.", "danger");
       return;
     }
+    
     showMsg("✅ Bienvenido. Verificando rol…", "success");
+    
+    // Pequeño delay para que el mensaje se vea
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
     await goByRole();
   });
 
@@ -195,7 +255,8 @@ async function wireLoginPage() {
     const password = (document.getElementById("registerPassword")?.value || "").trim();
 
     const { error } = await supabase.auth.signUp({
-      email, password,
+      email, 
+      password,
       options: { data: { nombre: email.split("@")[0] } },
     });
 
@@ -204,6 +265,7 @@ async function wireLoginPage() {
       showMsg("❌ No se pudo registrar. Revisa el correo o la contraseña.", "danger");
       return;
     }
+    
     showMsg("✅ Cuenta creada. Revisa tu correo si se requiere verificación.", "success");
     wrapper?.classList.remove("active");
   });
@@ -213,14 +275,17 @@ async function wireLoginPage() {
     e.preventDefault();
     const email = prompt("Ingresa tu correo para recuperar la contraseña:");
     if (!email) return;
+    
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: window.location.origin + "/" + LOGIN_URL,
     });
+    
     if (error) {
       console.error(error);
       showMsg("❌ No se pudo enviar el correo de recuperación.", "danger");
       return;
     }
+    
     showMsg("📧 Te enviamos un correo con las instrucciones.", "info");
   });
 }
@@ -228,28 +293,33 @@ async function wireLoginPage() {
 /* ========= Auto-init ========= */
 (async function init() {
   try {
-    await autoWireAuthMenu();
+    // Solo ejecutar autoWireAuthMenu si NO estamos en login.html
+    const isLoginPage = document.getElementById("loginForm") || document.getElementById("registerForm");
+    
+    if (!isLoginPage) {
+      await autoWireAuthMenu();
+    }
 
-    // Si estamos en login.html
-    if (document.getElementById("loginForm") || document.getElementById("registerForm")) {
+    // Si estamos en login.html, ejecutar lógica específica
+    if (isLoginPage) {
+      console.log('📄 Inicializando página de login...');
       await wireLoginPage();
     }
   } catch (e) {
-    console.warn("init:", e);
+    console.warn("Error en init:", e);
   }
 })();
 
-
-// --- NUEVO: exige sesión o redirige a login ---
+// Exportar para uso externo
 export async function requireAuth() {
   const { data } = await supabase.auth.getSession();
   if (!data?.session) {
-    // sin sesión -> al login y corta el flujo
-    window.location.href = "login.html";
+    window.location.replace("login.html");
     throw new Error("Auth requerida");
   }
-  return data.session.user; // por si querés usar el user
+  return data.session.user;
 }
 
-
 window.supabase = supabase;
+
+console.log('✅ ScriptLogin.js cargado (versión sin bucles)');
