@@ -1,23 +1,25 @@
-// ==================== ADMIN DASHBOARD JS - VERSIÓN CON IMPORTS CORREGIDOS ====================
+// ==================== ADMIN DASHBOARD JS - VERSIÓN FUNCIONAL ====================
+// Sistema de navegación SPA + Integración con módulos
 
-import { supa } from './supabase-client.js';
+// ========== IMPORTS ==========
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-// ✅ CORRECCIÓN: Imports dinámicos que no rompen el dashboard si faltan módulos
-let initProductos = null;
+// ✅ CORRECCIÓN: Import correcto del módulo de productos
+import { initProductos } from './modules/productos.js';
+
+// ========== SUPABASE SETUP ==========
+const SUPABASE_URL = 'https://jyygevitfnbwrvxrjexp.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5eWdldml0Zm5id3J2eHJqZXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2OTQ2OTYsImV4cCI6MjA3MTI3MDY5Nn0.St0IiSZSeELESshctneazCJHXCDBi9wrZ28UkiEDXYo';
+
+const supa = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ========== OTROS MÓDULOS (Imports dinámicos seguros) ==========
 let initClientes = null;
 let initConfiguracion = null;
 let configuracionView = '<div class="card"><h3>Módulo de configuración no disponible</h3></div>';
 
-// Cargar módulos de forma segura
+// Cargar otros módulos de forma segura (sin romper si no existen)
 (async () => {
-  try {
-    const productosModule = await import('./modules/productos.js');
-    initProductos = productosModule.initProductos;
-    console.log('✅ Módulo productos cargado');
-  } catch (e) {
-    console.warn('⚠️ Módulo productos no disponible:', e.message);
-  }
-
   try {
     const clientesModule = await import('./clientes.js');
     initClientes = clientesModule.initClientes;
@@ -526,13 +528,14 @@ function navigateTo(viewName) {
       }
     });
 
+    // ✅ CORRECCIÓN: Llamar initProductos cuando se navega a productos
     setTimeout(() => {
       switch(viewName) {
         case 'dashboard':
           initDashboard();
           break;
         case 'productos':
-          if (typeof initProductos === 'function') initProductos();
+          initProductos(); // ✅ Llamada directa al módulo importado
           break;
         case 'clientes':
           if (typeof initClientes === 'function') initClientes();
@@ -579,7 +582,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // ✅ CORRECCIÓN: Logout con ruta correcta
+  // Logout
   const logoutBtn = document.getElementById('logoutBtn');
   logoutBtn?.addEventListener('click', async () => {
     const ok = confirm('¿Seguro que querés cerrar sesión?');
@@ -592,7 +595,7 @@ document.addEventListener('DOMContentLoaded', () => {
       console.error('❌ Error al cerrar sesión:', error);
     }
 
-    window.location.href = 'login.html';  // ✅ CORREGIDO
+    window.location.href = 'loginAdmin.html';
   });
 
   // Cargar vista inicial
