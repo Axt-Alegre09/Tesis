@@ -1,17 +1,13 @@
-// ==================== ADMIN DASHBOARD JS - VERSIÓN FUNCIONAL ====================
+// ==================== ADMIN DASHBOARD JS - VERSIÓN SIN INSTANCIAS DUPLICADAS ====================
 // Sistema de navegación SPA + Integración con módulos
 
 // ========== IMPORTS ==========
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-// ✅ CORRECCIÓN: Import correcto del módulo de productos
+// ✅ CORRECCIÓN: Importar el cliente único desde supabase-config
+import { supabase } from './modules/supabase-config.js';
 import { initProductos } from './modules/productos.js';
 
-// ========== SUPABASE SETUP ==========
-const SUPABASE_URL = 'https://jyygevitfnbwrvxrjexp.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5eWdldml0Zm5id3J2eHJqZXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2OTQ2OTYsImV4cCI6MjA3MTI3MDY5Nn0.St0IiSZSeELESshctneazCJHXCDBi9wrZ28UkiEDXYo';
-
-const supa = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// ✅ Usar el cliente importado (no crear uno nuevo)
+const supa = supabase;
 
 // ========== OTROS MÓDULOS (Imports dinámicos seguros) ==========
 let initClientes = null;
@@ -528,14 +524,13 @@ function navigateTo(viewName) {
       }
     });
 
-    // ✅ CORRECCIÓN: Llamar initProductos cuando se navega a productos
     setTimeout(() => {
       switch(viewName) {
         case 'dashboard':
           initDashboard();
           break;
         case 'productos':
-          initProductos(); // ✅ Llamada directa al módulo importado
+          initProductos();
           break;
         case 'clientes':
           if (typeof initClientes === 'function') initClientes();
@@ -597,10 +592,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.location.href = 'loginAdmin.html';
   });
-
   // Cargar vista inicial
   const hash = window.location.hash.replace('#', '') || 'dashboard';
   navigateTo(hash);
 
   console.log('✅ Dashboard inicializado');
 });
+
