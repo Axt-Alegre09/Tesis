@@ -1,215 +1,215 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin Dashboard - Paniquiños</title>
-  
-  <link rel="shortcut icon" href="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinosico.ico" type="image/x-icon">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="CSS/admin-dashboard.css">
-</head>
-<body>
-  
-  <!-- ========== SIDEBAR ========== -->
-  <aside class="sidebar" id="sidebar">  
+  <!DOCTYPE html>
+  <html lang="es">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Paniquiños</title>
     
-    <!-- Header del Sidebar -->
-    <div class="sidebar-header">
-      <img src="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinosico.ico" alt="Paniquiños" class="sidebar-logo">
-      <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle Sidebar">
-        <i class="bi bi-layout-sidebar-inset-reverse"></i>
-      </button>
-    </div>
-
-    <!-- Navegación -->
-    <nav class="sidebar-nav">
-      <!-- Dashboard -->
-      <a href="#dashboard" class="nav-link active" data-view="dashboard">
-        <i class="bi bi-speedometer2"></i>
-        <span class="nav-text">Dashboard</span>
-      </a>
-
-      <!-- Productos -->
-      <a href="#productos" class="nav-link" data-view="productos">
-        <i class="bi bi-box-seam"></i>
-        <span class="nav-text">Productos</span>
-      </a>
-
-      <!-- Promos -->
-      <a href="#promos" class="nav-link" data-view="promos">
-        <i class="bi bi-tag-fill"></i>
-        <span class="nav-text">Promos</span>
-      </a>
-
-      <!-- Pedidos -->
-      <a href="#pedidos" class="nav-link" data-view="pedidos">
-        <i class="bi bi-cart-check"></i>
-        <span class="nav-text">Pedidos</span>
-      </a>
-
-      <!-- Catering -->
-      <a href="#catering" class="nav-link" data-view="catering">
-        <i class="bi bi-calendar-event"></i>
-        <span class="nav-text">Catering</span>
-      </a>
-
-      <!-- Clientes -->
-      <a href="#clientes" class="nav-link" data-view="clientes">
-        <i class="bi bi-people"></i>
-        <span class="nav-text">Clientes</span>
-      </a>
-
-      <!-- Divider -->
-      <div class="nav-divider"></div>
-    </nav>
-
-    <!-- Footer del Sidebar -->
-    <div class="sidebar-footer">
-      <div class="user-profile">
-        <div class="user-avatar">
-          <i class="bi bi-person-circle"></i>
-        </div>
-        <div class="user-info">
-          <div class="user-name">Admin</div>
-          <div class="user-email">admin@paniquinos.com</div>
-        </div>
-        <button class="btn-dropdown" id="userDropdownBtn">
-          <i class="bi bi-three-dots-vertical"></i>
-        </button>
-      </div>
-      <button class="btn-logout" id="logoutBtn">
-        <i class="bi bi-box-arrow-right"></i>
-        <span>Cerrar Sesión</span>
-      </button>
-    </div>
-
-  </aside>
-
-  <!-- ========== MAIN CONTENT ========== -->
-  <main class="main-content">
+    <link rel="shortcut icon" href="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinosico.ico" type="image/x-icon">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="CSS/admin-dashboard.css">
+  </head>
+  <body>
     
-    <!-- Topbar -->
-    <header class="topbar">
-      <div class="topbar-left">
-        <button class="mobile-menu-btn" id="mobileMenuBtn">
-          <i class="bi bi-list"></i>
-        </button>
-        <h1 class="page-title" id="pageTitle">Dashboard</h1>
-      </div>
+    <!-- ========== SIDEBAR ========== -->
+    <aside class="sidebar" id="sidebar">  
       
-      <div class="topbar-right">
-        <!-- Notifications -->
-        <button class="icon-btn" id="notificationsBtn">
-          <i class="bi bi-bell"></i>
-          <span class="badge" id="notificationsBadge">3</span>
-        </button>
-
-        <!-- Quick Actions -->
-        <button class="btn-primary" id="quickAddBtn">
-          <i class="bi bi-plus-lg"></i>
-          <span>Nuevo</span>
+      <!-- Header del Sidebar -->
+      <div class="sidebar-header">
+        <img src="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinosico.ico" alt="Paniquiños" class="sidebar-logo">
+        <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle Sidebar">
+          <i class="bi bi-layout-sidebar-inset-reverse"></i>
         </button>
       </div>
-    </header>
 
-    <!-- Content Area -->
-    <div class="content-area" id="contentArea">
-      <!-- Las vistas se cargan aquí dinámicamente -->
-    </div>
+      <!-- Navegación -->
+      <nav class="sidebar-nav">
+        <!-- Dashboard -->
+        <a href="#dashboard" class="nav-link active" data-view="dashboard">
+          <i class="bi bi-speedometer2"></i>
+          <span class="nav-text">Dashboard</span>
+        </a>
 
-  </main>
+        <!-- Productos -->
+        <a href="#productos" class="nav-link" data-view="productos">
+          <i class="bi bi-box-seam"></i>
+          <span class="nav-text">Productos</span>
+        </a>
 
-  <!-- ========== MODAL DE PRODUCTOS ========== -->
-  <div id="modalProducto" class="modal-overlay" style="display: none;">
-    <div class="modal-content" style="background: white; border-radius: 16px; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+        <!-- Promos -->
+        <a href="#promos" class="nav-link" data-view="promos">
+          <i class="bi bi-tag-fill"></i>
+          <span class="nav-text">Promos</span>
+        </a>
+
+        <!-- Pedidos -->
+        <a href="#pedidos" class="nav-link" data-view="pedidos">
+          <i class="bi bi-cart-check"></i>
+          <span class="nav-text">Pedidos</span>
+        </a>
+
+        <!-- Catering -->
+        <a href="#catering" class="nav-link" data-view="catering">
+          <i class="bi bi-calendar-event"></i>
+          <span class="nav-text">Catering</span>
+        </a>
+
+        <!-- Clientes -->
+        <a href="#clientes" class="nav-link" data-view="clientes">
+          <i class="bi bi-people"></i>
+          <span class="nav-text">Clientes</span>
+        </a>
+
+        <!-- Divider -->
+        <div class="nav-divider"></div>
+      </nav>
+
+      <!-- Footer del Sidebar -->
+      <div class="sidebar-footer">
+        <div class="user-profile">
+          <div class="user-avatar">
+            <i class="bi bi-person-circle"></i>
+          </div>
+          <div class="user-info">
+            <div class="user-name">Admin</div>
+            <div class="user-email">admin@paniquinos.com</div>
+          </div>
+          <button class="btn-dropdown" id="userDropdownBtn">
+            <i class="bi bi-three-dots-vertical"></i>
+          </button>
+        </div>
+        <button class="btn-logout" id="logoutBtn">
+          <i class="bi bi-box-arrow-right"></i>
+          <span>Cerrar Sesión</span>
+        </button>
+      </div>
+
+    </aside>
+
+    <!-- ========== MAIN CONTENT ========== -->
+    <main class="main-content">
       
-      <div class="modal-header" style="padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-        <h2 id="modalProductoTitle" style="margin: 0; font-size: 1.5rem; font-weight: 700;">Nuevo Producto</h2>
-        <button id="closeModalProducto" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary);">
-          <i class="bi bi-x-lg"></i>
-        </button>
-      </div>
-
-      <form id="formProducto" style="padding: 1.5rem;">
-        <input type="hidden" id="productoId">
+      <!-- Topbar -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <button class="mobile-menu-btn" id="mobileMenuBtn">
+            <i class="bi bi-list"></i>
+          </button>
+          <h1 class="page-title" id="pageTitle">Dashboard</h1>
+        </div>
         
-        <div style="margin-bottom: 1.5rem;">
-          <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">
-            Nombre del Producto <span style="color: var(--danger);">*</span>
-          </label>
-          <input type="text" id="productoNombre" required 
-            style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem;">
+        <div class="topbar-right">
+          <!-- Notifications -->
+          <button class="icon-btn" id="notificationsBtn">
+            <i class="bi bi-bell"></i>
+            <span class="badge" id="notificationsBadge">3</span>
+          </button>
+
+          <!-- Quick Actions -->
+          <button class="btn-primary" id="quickAddBtn">
+            <i class="bi bi-plus-lg"></i>
+            <span>Nuevo</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Content Area -->
+      <div class="content-area" id="contentArea">
+        <!-- Las vistas se cargan aquí dinámicamente -->
+      </div>
+
+    </main>
+
+    <!-- ========== MODAL DE PRODUCTOS ========== -->
+    <div id="modalProducto" class="modal-overlay" style="display: none;">
+      <div class="modal-content" style="background: white; border-radius: 16px; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+        
+        <div class="modal-header" style="padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+          <h2 id="modalProductoTitle" style="margin: 0; font-size: 1.5rem; font-weight: 700;">Nuevo Producto</h2>
+          <button id="closeModalProducto" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary);">
+            <i class="bi bi-x-lg"></i>
+          </button>
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
-          <div>
+        <form id="formProducto" style="padding: 1.5rem;">
+          <input type="hidden" id="productoId">
+          
+          <div style="margin-bottom: 1.5rem;">
             <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">
-              Precio (Gs) <span style="color: var(--danger);">*</span>
+              Nombre del Producto <span style="color: var(--danger);">*</span>
             </label>
-            <input type="number" id="productoPrecio" required min="0"
+            <input type="text" id="productoNombre" required 
               style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem;">
           </div>
-          
-          <div>
-            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">
-              Categoría <span style="color: var(--danger);">*</span>
-            </label>
-            <select id="productoCategoria" required
-              style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; background: white;">
-              <option value="">Selecciona una categoría</option>
-            </select>
-          </div>
-        </div>
 
-        <div style="margin-bottom: 1.5rem;">
-          <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">
-            Descripción
-          </label>
-          <textarea id="productoDescripcion" rows="3"
-            style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; resize: vertical;">
-          </textarea>
-        </div>
-
-        <div style="margin-bottom: 1.5rem;">
-          <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">
-            Imagen del Producto
-          </label>
-          <div id="uploadArea" style="border: 2px dashed var(--border); border-radius: 12px; padding: 2rem; text-align: center; cursor: pointer; transition: all 0.3s;">
-            <input type="file" id="productoImagen" accept="image/*" style="display: none;">
-            <div id="previewArea">
-              <i class="bi bi-cloud-upload" style="font-size: 3rem; color: var(--text-muted); display: block; margin-bottom: 0.5rem;"></i>
-              <p style="color: var(--text-secondary); margin: 0;">Haz clic o arrastra una imagen aquí</p>
-              <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.25rem;">PNG, JPG o WEBP (máx. 5MB)</p>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+            <div>
+              <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">
+                Precio (Gs) <span style="color: var(--danger);">*</span>
+              </label>
+              <input type="number" id="productoPrecio" required min="0"
+                style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem;">
+            </div>
+            
+            <div>
+              <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">
+                Categoría <span style="color: var(--danger);">*</span>
+              </label>
+              <select id="productoCategoria" required
+                style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; background: white;">
+                <option value="">Selecciona una categoría</option>
+              </select>
             </div>
           </div>
-        </div>
 
-        <div style="margin-bottom: 1.5rem;">
-          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-            <input type="checkbox" id="productoDisponible" checked style="width: 18px; height: 18px;">
-            <span style="font-weight: 600;">Producto disponible</span>
-          </label>
-        </div>
+          <div style="margin-bottom: 1.5rem;">
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">
+              Descripción
+            </label>
+            <textarea id="productoDescripcion" rows="3"
+              style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; resize: vertical;">
+            </textarea>
+          </div>
 
-        <div style="display: flex; gap: 1rem; justify-content: flex-end;">
-          <button type="button" id="btnCancelarProducto" 
-            style="padding: 0.75rem 1.5rem; border: 1px solid var(--border); background: white; border-radius: 8px; font-weight: 600; cursor: pointer;">
-            Cancelar
-          </button>
-          <button type="submit" 
-            style="padding: 0.75rem 1.5rem; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
-            <i class="bi bi-check-lg"></i> Guardar Producto
-          </button>
-        </div>
-      </form>
+          <div style="margin-bottom: 1.5rem;">
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">
+              Imagen del Producto
+            </label>
+            <div id="uploadArea" style="border: 2px dashed var(--border); border-radius: 12px; padding: 2rem; text-align: center; cursor: pointer; transition: all 0.3s;">
+              <input type="file" id="productoImagen" accept="image/*" style="display: none;">
+              <div id="previewArea">
+                <i class="bi bi-cloud-upload" style="font-size: 3rem; color: var(--text-muted); display: block; margin-bottom: 0.5rem;"></i>
+                <p style="color: var(--text-secondary); margin: 0;">Haz clic o arrastra una imagen aquí</p>
+                <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.25rem;">PNG, JPG o WEBP (máx. 5MB)</p>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-bottom: 1.5rem;">
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+              <input type="checkbox" id="productoDisponible" checked style="width: 18px; height: 18px;">
+              <span style="font-weight: 600;">Producto disponible</span>
+            </label>
+          </div>
+
+          <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+            <button type="button" id="btnCancelarProducto" 
+              style="padding: 0.75rem 1.5rem; border: 1px solid var(--border); background: white; border-radius: 8px; font-weight: 600; cursor: pointer;">
+              Cancelar
+            </button>
+            <button type="submit" 
+              style="padding: 0.75rem 1.5rem; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
+              <i class="bi bi-check-lg"></i> Guardar Producto
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
-  </div>
 
-  <!-- Scripts -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
-  <script type="module" src="JS/admin-dashboard.js"></script>
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    <script type="module" src="JS/admin-dashboard.js"></script>
 
-</body>
-</html>
+  </body>
+  </html>

@@ -1,12 +1,10 @@
-// ==================== ADMIN DASHBOARD JS - VERSIÓN SIN INSTANCIAS DUPLICADAS ====================
-// Sistema de navegación SPA + Integración con módulos
+// ==================== ADMIN DASHBOARD JS - VERSIÓN CORREGIDA ====================
+// Sistema de navegación SPA + Integración con módulos + Dashboard FUNCIONAL
 
 // ========== IMPORTS ==========
-// ✅ CORRECCIÓN: Importar el cliente único desde supabase-config
 import { supabase } from './modules/supabase-config.js';
 import { initProductos } from './modules/productos.js';
 
-// ✅ Usar el cliente importado (no crear uno nuevo)
 const supa = supabase;
 
 // ========== OTROS MÓDULOS (Imports dinámicos seguros) ==========
@@ -446,22 +444,57 @@ const views = {
   configuracion: configuracionView
 };
 
-// ========== INICIALIZACIÓN DEL DASHBOARD ==========
+// ========== VARIABLE GLOBAL PARA EL GRÁFICO ==========
+let chartInstance = null;
+
+// ========== INICIALIZACIÓN DEL DASHBOARD - ✅ VERSIÓN CORREGIDA ✅ ==========
 async function initDashboard() {
   console.log('🚀 Inicializando Dashboard...');
 
   try {
-    const { data: resumenHoy } = await supa
+    // ========== 1. CARGAR DATOS DE HOY ==========
+    const { data: resumenHoy, error: errorResumen } = await supa
       .from('v_resumen_hoy')
       .select('*')
       .maybeSingle();
 
-    if (resumenHoy) {
-      document.getElementById('ventasHoy').textContent = formatGs(resumenHoy.total_hoy || 0);
-      document.getElementById('pedidosHoy').textContent = resumenHoy.pedidos_hoy || 0;
-      document.getElementById('ticketPromedio').textContent = formatGs(resumenHoy.ticket_promedio_hoy || 0);
+    if (errorResumen) {
+      console.error('Error cargando resumen:', errorResumen);
     }
 
+    if (resumenHoy) {
+      // Ventas de hoy
+      const ventasHoy = resumenHoy.total_hoy || 0;
+      const ventasAyer = resumenHoy.total_ayer || 0;
+      
+      document.getElementById('ventasHoy').textContent = formatGs(ventasHoy);
+      document.getElementById('pedidosHoy').textContent = resumenHoy.pedidos_hoy || 0;
+      document.getElementById('ticketPromedio').textContent = formatGs(resumenHoy.ticket_promedio_hoy || 0);
+
+      // Calcular cambio porcentual vs ayer
+      const changeElement = document.getElementById('ventasChange');
+      if (ventasAyer > 0) {
+        const cambio = ((ventasHoy - ventasAyer) / ventasAyer) * 100;
+        const isPositive = cambio >= 0;
+        
+        changeElement.className = `kpi-change ${isPositive ? 'positive' : 'negative'}`;
+        changeElement.innerHTML = `
+          <i class="bi bi-arrow-${isPositive ? 'up' : 'down'}"></i>
+          <span>${isPositive ? '+' : ''}${cambio.toFixed(1)}%</span>
+        `;
+      } else if (ventasHoy > 0) {
+        changeElement.className = 'kpi-change positive';
+        changeElement.innerHTML = `
+          <i class="bi bi-arrow-up"></i>
+          <span>+100%</span>
+        `;
+      } else {
+        changeElement.className = 'kpi-change';
+        changeElement.innerHTML = `<span>Sin cambio</span>`;
+      }
+    }
+
+    // ========== 2. CARGAR PRODUCTOS ==========
     const { count: totalProductos } = await supa
       .from('productos')
       .select('*', { count: 'exact', head: true });
@@ -473,16 +506,180 @@ async function initDashboard() {
 
     document.getElementById('productosTotal').textContent = totalProductos || 0;
     document.getElementById('productosActivos').textContent = productosActivos || 0;
+
+    // ========== 3. MÉTRICAS DE CHATBOT (Por ahora en 0) ==========
     document.getElementById('chatbotInteracciones').textContent = '0';
     document.getElementById('chatbotTasa').textContent = '0%';
 
-    console.log('✅ Dashboard cargado');
+    // ========== 4. CARGAR GRÁFICO DE TENDENCIA ==========
+    await cargarGraficoTendencia();
+
+    console.log('✅ Dashboard cargado correctamente');
 
   } catch (error) {
     console.error('❌ Error cargando dashboard:', error);
+    
+    // Mostrar valores por defecto en caso de error
+    document.getElementById('ventasHoy').textContent = 'Gs 0';
+    document.getElementById('pedidosHoy').textContent = '0';
+    document.getElementById('ticketPromedio').textContent = 'Gs 0';
+    document.getElementById('productosTotal').textContent = '0';
+    document.getElementById('productosActivos').textContent = '0';
   }
 }
 
+// ========== FUNCIÓN PARA CARGAR GRÁFICO DE TENDENCIA - ✅ NUEVA ✅ ==========
+async function cargarGraficoTendencia() {
+  try {
+    // Obtener datos de los últimos 7 días
+    const { data: ventasPorDia, error } = await supa
+      .from('v_ventas_por_dia')
+      .select('*')
+      .order('dia', { ascending: true })
+      .limit(7);
+
+    if (error) {
+      console.error('Error cargando datos del gráfico:', error);
+      return;
+    }
+
+    if (!ventasPorDia || ventasPorDia.length === 0) {
+      console.warn('No hay datos para el gráfico');
+      mostrarMensajeGraficoVacio();
+      return;
+    }
+
+    // Preparar datos para el gráfico
+    const labels = ventasPorDia.map(v => {
+      const fecha = new Date(v.dia);
+      return fecha.toLocaleDateString('es-PY', { day: '2-digit', month: 'short' });
+    });
+
+    const datos = ventasPorDia.map(v => parseFloat(v.total_gs) || 0);
+    const pedidos = ventasPorDia.map(v => v.pedidos || 0);
+
+    // Destruir gráfico anterior si existe
+    if (chartInstance) {
+      chartInstance.destroy();
+    }
+
+    // Crear nuevo gráfico
+    const ctx = document.getElementById('chartVentasTendencia');
+    if (!ctx) {
+      console.error('Canvas no encontrado');
+      return;
+    }
+
+    chartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Ventas (Gs)',
+            data: datos,
+            borderColor: 'rgb(111, 92, 56)',
+            backgroundColor: 'rgba(111, 92, 56, 0.1)',
+            borderWidth: 3,
+            fill: true,
+            tension: 0.4,
+            pointRadius: 5,
+            pointHoverRadius: 7,
+            pointBackgroundColor: 'rgb(111, 92, 56)',
+            pointBorderColor: '#fff',
+            pointBorderWidth: 2
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false
+          },
+          tooltip: {
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            padding: 12,
+            titleFont: {
+              size: 14,
+              weight: 'bold'
+            },
+            bodyFont: {
+              size: 13
+            },
+            callbacks: {
+              label: function(context) {
+                const index = context.dataIndex;
+                const ventas = formatGs(context.parsed.y);
+                const numPedidos = pedidos[index];
+                return [
+                  `Ventas: ${ventas}`,
+                  `Pedidos: ${numPedidos}`
+                ];
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              callback: function(value) {
+                return 'Gs ' + (value / 1000).toFixed(0) + 'k';
+              },
+              font: {
+                size: 12
+              }
+            },
+            grid: {
+              color: 'rgba(0, 0, 0, 0.05)'
+            }
+          },
+          x: {
+            grid: {
+              display: false
+            },
+            ticks: {
+              font: {
+                size: 12
+              }
+            }
+          }
+        },
+        interaction: {
+          intersect: false,
+          mode: 'index'
+        }
+      }
+    });
+
+    console.log('✅ Gráfico de tendencia cargado');
+
+  } catch (error) {
+    console.error('❌ Error creando gráfico:', error);
+    mostrarMensajeGraficoVacio();
+  }
+}
+
+// ========== MOSTRAR MENSAJE CUANDO NO HAY DATOS - ✅ NUEVA ✅ ==========
+function mostrarMensajeGraficoVacio() {
+  const canvas = document.getElementById('chartVentasTendencia');
+  if (!canvas) return;
+
+  const parent = canvas.parentElement;
+  if (!parent) return;
+
+  parent.innerHTML = `
+    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 300px; color: var(--text-muted);">
+      <i class="bi bi-graph-up" style="font-size: 4rem; opacity: 0.3; margin-bottom: 1rem;"></i>
+      <p style="font-size: 1.1rem; margin: 0;">No hay datos de ventas para mostrar</p>
+      <p style="font-size: 0.9rem; margin-top: 0.5rem;">Los datos aparecerán cuando haya pedidos finalizados</p>
+    </div>
+  `;
+}
+
+// ========== FORMATO DE MONEDA ==========
 function formatGs(valor) {
   return new Intl.NumberFormat('es-PY', {
     style: 'currency',
@@ -592,6 +789,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.location.href = 'loginAdmin.html';
   });
+  
   // Cargar vista inicial
   const hash = window.location.hash.replace('#', '') || 'dashboard';
   navigateTo(hash);
