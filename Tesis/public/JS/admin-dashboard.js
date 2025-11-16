@@ -1,10 +1,7 @@
-// ==================== ADMIN DASHBOARD JS - VERSIÓN CORREGIDA ====================
-// Correcciones:
-// 1. ✅ Tabla usuarios → perfiles_usuarios
-// 2. ✅ Implementación de modo mantenimiento
-// 3. ✅ Integración de ChatBot
-// 4. ✅ Sistema de notificaciones completo
-// 5. ✅ Instancia única de Supabase
+// ==================== ADMIN DASHBOARD JS - VERSIÓN FINAL ====================
+// Cambios finales:
+// 1. ✅ Email dinámico del usuario autenticado
+// 2. ✅ Chatbot removido completamente
 
 import { supa } from './supabase-client.js';
 import { configuracionView, initConfiguracion } from './modules/configuracion-complete.js';
@@ -252,221 +249,6 @@ class NotificationSystem {
 
 // Instancia global del sistema de notificaciones
 let notificationSystem = null;
-
-// ========== SISTEMA DE CHATBOT ==========
-class ChatBotSystem {
-  constructor() {
-    this.widget = null;
-    this.isOpen = false;
-  }
-
-  init() {
-    this.createWidget();
-    this.loadChatBotMetrics();
-  }
-
-  createWidget() {
-    // Crear widget flotante del chatbot
-    const widget = document.createElement('div');
-    widget.id = 'chatbotWidget';
-    widget.style.cssText = `
-      position: fixed;
-      bottom: 30px;
-      right: 30px;
-      z-index: 1000;
-      display: none;
-    `;
-    
-    widget.innerHTML = `
-      <button id="chatbotToggle" style="
-        width: 60px;
-        height: 60px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, var(--primary), var(--primary-light));
-        border: none;
-        color: white;
-        font-size: 1.5rem;
-        cursor: pointer;
-        box-shadow: 0 4px 20px rgba(111,92,56,0.3);
-        transition: transform 0.3s, box-shadow 0.3s;
-      ">
-        <i class="bi bi-robot"></i>
-      </button>
-      
-      <div id="chatbotPanel" style="
-        position: absolute;
-        bottom: 80px;
-        right: 0;
-        width: 380px;
-        height: 600px;
-        background: white;
-        border-radius: 16px;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-        display: none;
-        flex-direction: column;
-        overflow: hidden;
-      ">
-        <div style="padding: 1.5rem; background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: white;">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div>
-              <h3 style="margin: 0; font-size: 1.2rem;">Asistente IA</h3>
-              <p style="margin: 0.25rem 0 0 0; font-size: 0.9rem; opacity: 0.9;">Siempre listo para ayudar</p>
-            </div>
-            <button id="chatbotClose" style="background: rgba(255,255,255,0.2); border: none; color: white; width: 32px; height: 32px; border-radius: 8px; cursor: pointer;">
-              <i class="bi bi-x-lg"></i>
-            </button>
-          </div>
-        </div>
-        
-        <div id="chatbotMessages" style="flex: 1; overflow-y: auto; padding: 1.5rem; background: #f8f9fa;">
-          <div style="text-align: center; color: var(--text-muted); padding: 2rem;">
-            <i class="bi bi-robot" style="font-size: 3rem; opacity: 0.3;"></i>
-            <p style="margin-top: 1rem;">¡Hola! Soy tu asistente IA.<br>¿En qué puedo ayudarte?</p>
-          </div>
-        </div>
-        
-        <div style="padding: 1rem; border-top: 1px solid var(--border); background: white;">
-          <div style="display: flex; gap: 0.5rem;">
-            <input type="text" id="chatbotInput" placeholder="Escribe tu mensaje..." style="flex: 1; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem;">
-            <button id="chatbotSend" style="padding: 0.75rem 1.5rem; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer;">
-              <i class="bi bi-send"></i>
-            </button>
-          </div>
-        </div>
-      </div>
-    `;
-    
-    document.body.appendChild(widget);
-    this.widget = widget;
-    
-    // Event listeners
-    document.getElementById('chatbotToggle')?.addEventListener('click', () => {
-      this.toggle();
-    });
-    
-    document.getElementById('chatbotClose')?.addEventListener('click', () => {
-      this.close();
-    });
-    
-    document.getElementById('chatbotSend')?.addEventListener('click', () => {
-      this.sendMessage();
-    });
-    
-    document.getElementById('chatbotInput')?.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') {
-        this.sendMessage();
-      }
-    });
-    
-    // Mostrar widget en dashboard
-    if (window.location.hash === '#dashboard' || !window.location.hash) {
-      widget.style.display = 'block';
-    }
-  }
-
-  toggle() {
-    const panel = document.getElementById('chatbotPanel');
-    const toggle = document.getElementById('chatbotToggle');
-    
-    if (panel.style.display === 'none') {
-      panel.style.display = 'flex';
-      toggle.style.transform = 'rotate(180deg)';
-      this.isOpen = true;
-    } else {
-      this.close();
-    }
-  }
-
-  close() {
-    const panel = document.getElementById('chatbotPanel');
-    const toggle = document.getElementById('chatbotToggle');
-    
-    panel.style.display = 'none';
-    toggle.style.transform = 'rotate(0deg)';
-    this.isOpen = false;
-  }
-
-  async sendMessage() {
-    const input = document.getElementById('chatbotInput');
-    const message = input.value.trim();
-    
-    if (!message) return;
-    
-    // Agregar mensaje del usuario
-    this.addMessage(message, 'user');
-    input.value = '';
-    
-    // Simular respuesta del bot (aquí conectarías con tu API real)
-    setTimeout(() => {
-      this.addMessage('Gracias por tu mensaje. Estoy procesando tu solicitud...', 'bot');
-    }, 500);
-    
-    // Registrar interacción en la base de datos
-    try {
-      await supa.from('chatbot_interacciones').insert({
-        mensaje_usuario: message,
-        created_at: new Date().toISOString()
-      });
-    } catch (error) {
-      console.error('Error registrando interacción:', error);
-    }
-  }
-
-  addMessage(text, sender) {
-    const container = document.getElementById('chatbotMessages');
-    const messageDiv = document.createElement('div');
-    
-    messageDiv.style.cssText = `
-      margin-bottom: 1rem;
-      display: flex;
-      ${sender === 'user' ? 'justify-content: flex-end;' : 'justify-content: flex-start;'}
-    `;
-    
-    messageDiv.innerHTML = `
-      <div style="
-        max-width: 70%;
-        padding: 0.75rem 1rem;
-        border-radius: 12px;
-        ${sender === 'user' 
-          ? 'background: var(--primary); color: white;' 
-          : 'background: white; color: var(--text); border: 1px solid var(--border);'
-        }
-      ">
-        ${text}
-      </div>
-    `;
-    
-    container.appendChild(messageDiv);
-    container.scrollTop = container.scrollHeight;
-  }
-
-  async loadChatBotMetrics() {
-    // Cargar métricas del chatbot cada 30 segundos
-    setInterval(async () => {
-      if (window.location.hash === '#dashboard' || !window.location.hash) {
-        try {
-          const { data } = await supa
-            .from('v_chatbot_metricas_hoy')
-            .select('*')
-            .maybeSingle();
-          
-          if (data) {
-            const elem = document.getElementById('chatbotInteracciones');
-            if (elem) elem.textContent = data.total_interacciones || 0;
-            
-            const tasa = document.getElementById('chatbotTasa');
-            if (tasa) tasa.textContent = `${data.tasa_exito || 0}%`;
-          }
-        } catch (error) {
-          console.error('Error actualizando métricas chatbot:', error);
-        }
-      }
-    }, 30000);
-  }
-}
-
-// Instancia global del chatbot
-let chatBotSystem = null;
 
 // ========== MODO MANTENIMIENTO ==========
 class MaintenanceMode {
@@ -1126,12 +908,6 @@ function navigateTo(viewName) {
       }
     });
 
-    // Mostrar/ocultar chatbot widget según la vista
-    const chatWidget = document.getElementById('chatbotWidget');
-    if (chatWidget) {
-      chatWidget.style.display = viewName === 'dashboard' ? 'block' : 'none';
-    }
-
     setTimeout(() => {
       switch(viewName) {
         case 'dashboard':
@@ -1177,7 +953,7 @@ export async function crearNotificacionGlobal(tipo, titulo, mensaje) {
 }
 
 // ========== INICIALIZACIÓN ==========
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   console.log('🚀 Inicializando Admin Dashboard Final...');
   
   // Limpiar modales al inicio
@@ -1185,12 +961,29 @@ document.addEventListener('DOMContentLoaded', () => {
     modal.style.display = 'none';
   });
   
+  // Cargar email del usuario autenticado
+  try {
+    const { data: { user } } = await supa.auth.getUser();
+    if (user && user.email) {
+      const userEmailElement = document.querySelector('.user-email');
+      if (userEmailElement) {
+        userEmailElement.textContent = user.email;
+      }
+      const userNameElement = document.querySelector('.user-name');
+      if (userNameElement) {
+        userNameElement.textContent = user.email.split('@')[0];
+      }
+      console.log('✅ Usuario autenticado:', user.email);
+    }
+  } catch (error) {
+    console.error('Error cargando usuario:', error);
+  }
+  
   // Inicializar sistemas
   notificationSystem = new NotificationSystem();
   notificationSystem.init();
   
-  chatBotSystem = new ChatBotSystem();
-  chatBotSystem.init();
+  // CHATBOT REMOVIDO - No se inicializa
   
   maintenanceMode = new MaintenanceMode();
   maintenanceMode.init();
