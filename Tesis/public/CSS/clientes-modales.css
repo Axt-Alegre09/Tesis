@@ -1,0 +1,98 @@
+/* ==================== ESTILOS PARA MODALES DE CLIENTES ==================== */
+
+/* Overlay del modal - capa oscura de fondo */
+.modal-overlay {
+  display: none !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  background: rgba(0, 0, 0, 0.5) !important;
+  z-index: 9999 !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow-y: auto !important;
+  padding: 20px !important;
+}
+
+/* Cuando el modal está activo (display: flex) */
+.modal-overlay[style*="display: flex"],
+.modal-overlay[style*="display:flex"] {
+  display: flex !important;
+}
+
+/* Contenido del modal */
+.modal-overlay .modal-content {
+  position: relative !important;
+  margin: auto !important;
+  background: white !important;
+  border-radius: 16px !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3) !important;
+  max-height: 90vh !important;
+  overflow-y: auto !important;
+}
+
+/* Animaciones de entrada/salida */
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.modal-overlay[style*="display: flex"] .modal-content {
+  animation: modalFadeIn 0.3s ease-out;
+}
+
+/* Spinner de carga */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Animaciones de toast */
+@keyframes slideIn {
+  from {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+}
+
+/* Estilos específicos para los modales de clientes */
+#modalDetalleCliente,
+#modalEditarCliente {
+  display: none !important;
+}
+
+#modalDetalleCliente[style*="display: flex"],
+#modalDetalleCliente[style*="display:flex"],
+#modalEditarCliente[style*="display: flex"],
+#modalEditarCliente[style*="display:flex"] {
+  display: flex !important;
+}
+
+/* Prevenir scroll del body cuando el modal está abierto */
+body.modal-open {
+  overflow: hidden;
+}

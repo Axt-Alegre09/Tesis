@@ -1,6 +1,9 @@
-// ==================== MÓDULO CLIENTES - VERSIÓN CORREGIDA BASADA EN PROYECTO VIEJO ====================
-// ✅ Enfoque probado: onclick inline + window.module
-// ✅ Misma estructura que productos.js que SÍ funciona
+// ==================== MÓDULO CLIENTES - VERSIÓN COMPLETA CON TODAS LAS FUNCIONALIDADES ====================
+// ✅ Ver detalle
+// ✅ Editar cliente
+// ✅ Eliminar cliente (NUEVO)
+// ✅ Exportar CSV
+// ✅ Filtros y búsqueda
 
 import { supabase } from './modules/supabase-config.js';
 
@@ -110,11 +113,14 @@ function createModals() {
   // Modal de detalle
   if (!document.getElementById('modalDetalleCliente')) {
     const modalDetalle = document.createElement('div');
+    modalDetalle.id = 'modalDetalleCliente';
+    modalDetalle.className = 'modal-overlay';
     modalDetalle.innerHTML = `
-      <div id="modalDetalleCliente" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
         <div class="modal-content" style="background: white; border-radius: 16px; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
           <div class="modal-header" style="padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-            <h2 style="margin: 0; font-size: 1.5rem; font-weight: 700;">Detalle del Cliente</h2>
+            <h2 style="margin: 0; font-size: 1.5rem; font-weight: 700;">
+              <i class="bi bi-person-circle"></i> Detalle del Cliente
+            </h2>
             <button id="closeModalDetalle" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary);">
               <i class="bi bi-x-lg"></i>
             </button>
@@ -123,34 +129,61 @@ function createModals() {
             <div style="display: grid; gap: 1.5rem;">
               <div>
                 <h3 style="font-size: 1.1rem; margin-bottom: 0.75rem; color: var(--primary);">
-                  <i class="bi bi-person-circle"></i> Información General
+                  <i class="bi bi-building"></i> Información General
                 </h3>
                 <div style="display: grid; gap: 0.75rem; padding-left: 1.5rem;">
-                  <div><strong>Razón Social:</strong> <span id="detalleRazon"></span></div>
-                  <div><strong>RUC:</strong> <span id="detalleRuc"></span></div>
-                  <div><strong>Teléfono:</strong> <span id="detalleTel"></span></div>
-                  <div><strong>Email:</strong> <span id="detalleMail"></span></div>
-                  <div><strong>Contacto:</strong> <span id="detalleContacto"></span></div>
+                  <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--border);">
+                    <strong style="color: var(--text-secondary);">Razón Social:</strong> 
+                    <span id="detalleRazon" style="font-weight: 500;"></span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--border);">
+                    <strong style="color: var(--text-secondary);">RUC:</strong> 
+                    <span id="detalleRuc" style="font-family: 'Courier New', monospace; background: var(--bg-main); padding: 0.25rem 0.5rem; border-radius: 4px;"></span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--border);">
+                    <strong style="color: var(--text-secondary);">Teléfono:</strong> 
+                    <span id="detalleTel" style="font-weight: 500;"></span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--border);">
+                    <strong style="color: var(--text-secondary);">Email:</strong> 
+                    <span id="detalleMail" style="font-weight: 500;"></span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; padding: 0.5rem 0;">
+                    <strong style="color: var(--text-secondary);">Contacto:</strong> 
+                    <span id="detalleContacto" style="font-weight: 500;"></span>
+                  </div>
                 </div>
               </div>
               
               <div>
                 <h3 style="font-size: 1.1rem; margin-bottom: 0.75rem; color: var(--primary);">
-                  <i class="bi bi-geo-alt"></i> Dirección
+                  <i class="bi bi-geo-alt-fill"></i> Dirección
                 </h3>
                 <div style="display: grid; gap: 0.75rem; padding-left: 1.5rem;">
-                  <div><strong>Dirección:</strong> <span id="detalleDireccion"></span></div>
-                  <div><strong>Código Postal:</strong> <span id="detallePostal"></span></div>
+                  <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--border);">
+                    <strong style="color: var(--text-secondary);">Dirección:</strong> 
+                    <span id="detalleDireccion" style="font-weight: 500; text-align: right; max-width: 60%;"></span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; padding: 0.5rem 0;">
+                    <strong style="color: var(--text-secondary);">Código Postal:</strong> 
+                    <span id="detallePostal" style="font-weight: 500;"></span>
+                  </div>
                 </div>
               </div>
               
               <div>
                 <h3 style="font-size: 1.1rem; margin-bottom: 0.75rem; color: var(--primary);">
-                  <i class="bi bi-clock"></i> Fechas
+                  <i class="bi bi-clock-history"></i> Fechas
                 </h3>
                 <div style="display: grid; gap: 0.75rem; padding-left: 1.5rem;">
-                  <div><strong>Registrado:</strong> <span id="detalleFechaCreacion"></span></div>
-                  <div><strong>Última actualización:</strong> <span id="detalleFechaActualizacion"></span></div>
+                  <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--border);">
+                    <strong style="color: var(--text-secondary);">Registrado:</strong> 
+                    <span id="detalleFechaCreacion" style="font-weight: 500;"></span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; padding: 0.5rem 0;">
+                    <strong style="color: var(--text-secondary);">Última actualización:</strong> 
+                    <span id="detalleFechaActualizacion" style="font-weight: 500;"></span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -164,11 +197,14 @@ function createModals() {
   // Modal de edición
   if (!document.getElementById('modalEditarCliente')) {
     const modalEditar = document.createElement('div');
+    modalEditar.id = 'modalEditarCliente';
+    modalEditar.className = 'modal-overlay';
     modalEditar.innerHTML = `
-      <div id="modalEditarCliente" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
         <div class="modal-content" style="background: white; border-radius: 16px; width: 90%; max-width: 700px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
           <div class="modal-header" style="padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-            <h2 style="margin: 0; font-size: 1.5rem; font-weight: 700;">Editar Cliente</h2>
+            <h2 style="margin: 0; font-size: 1.5rem; font-weight: 700;">
+              <i class="bi bi-pencil-square"></i> Editar Cliente
+            </h2>
             <button id="closeModalEditar" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary);">
               <i class="bi bi-x-lg"></i>
             </button>
@@ -179,62 +215,74 @@ function createModals() {
             
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
               <div>
-                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Razón Social</label>
-                <input type="text" id="editRazon" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">
+                  <i class="bi bi-building"></i> Razón Social
+                </label>
+                <input type="text" id="editRazon" required style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
               </div>
               <div>
-                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">RUC</label>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">
+                  <i class="bi bi-card-text"></i> RUC
+                </label>
                 <input type="text" id="editRuc" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
               </div>
             </div>
             
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
               <div>
-                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Teléfono</label>
-                <input type="text" id="editTel" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">
+                  <i class="bi bi-telephone"></i> Teléfono
+                </label>
+                <input type="text" id="editTel" required style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
               </div>
               <div>
-                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Email</label>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">
+                  <i class="bi bi-envelope"></i> Email
+                </label>
                 <input type="email" id="editMail" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
               </div>
             </div>
             
             <div style="margin-bottom: 1.5rem;">
-              <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Contacto</label>
+              <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">
+                <i class="bi bi-person"></i> Contacto
+              </label>
               <input type="text" id="editContacto" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
             </div>
             
-            <h3 style="font-size: 1.1rem; margin-bottom: 1rem; color: var(--primary);">Dirección</h3>
+            <h3 style="font-size: 1.1rem; margin-bottom: 1rem; color: var(--primary); border-top: 2px solid var(--border); padding-top: 1rem;">
+              <i class="bi bi-map"></i> Dirección
+            </h3>
             
             <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; margin-bottom: 1rem;">
               <div>
-                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Calle Principal</label>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">Calle Principal</label>
                 <input type="text" id="editCalle1" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
               </div>
               <div>
-                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Número</label>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">Número</label>
                 <input type="text" id="editNro" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
               </div>
             </div>
             
             <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
               <div>
-                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Barrio</label>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">Barrio</label>
                 <input type="text" id="editBarrio" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
               </div>
               <div>
-                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Ciudad</label>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">Ciudad</label>
                 <input type="text" id="editCiudad" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
               </div>
               <div>
-                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Código Postal</label>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">Código Postal</label>
                 <input type="text" id="editPostal" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
               </div>
             </div>
             
             <div style="display: flex; gap: 1rem; justify-content: flex-end;">
               <button type="button" id="btnCancelarEditar" style="padding: 0.75rem 1.5rem; border: 1px solid var(--border); background: white; border-radius: 8px; font-weight: 600; cursor: pointer;">
-                Cancelar
+                <i class="bi bi-x-circle"></i> Cancelar
               </button>
               <button type="submit" style="padding: 0.75rem 1.5rem; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
                 <i class="bi bi-check-lg"></i> Guardar Cambios
@@ -242,7 +290,6 @@ function createModals() {
             </div>
           </form>
         </div>
-      </div>
     `;
     document.body.appendChild(modalEditar);
   }
@@ -302,7 +349,6 @@ async function cargarClientes() {
 }
 
 // ==================== RENDERIZAR TABLA ====================
-// ✅ ENFOQUE PROYECTO VIEJO: onclick inline
 function renderizarTablaClientes(filteredData = null) {
   const tbody = document.getElementById('clientesTableBody');
   if (!tbody) return;
@@ -325,7 +371,7 @@ function renderizarTablaClientes(filteredData = null) {
     const fechaCreacion = new Date(cliente.created_at).toLocaleDateString('es-PY');
     const esNuevo = (Date.now() - new Date(cliente.created_at)) < 7 * 24 * 60 * 60 * 1000;
     
-    // ✅ Escapar comillas para onclick
+    // Escapar comillas para onclick
     const nombreEscapado = (cliente.razon || 'Sin nombre').replace(/'/g, "\\'");
     
     return `
@@ -404,6 +450,13 @@ function renderizarTablaClientes(filteredData = null) {
               title="Editar cliente"
               style="background: var(--info); color: white;">
               <i class="bi bi-pencil"></i>
+            </button>
+            <button 
+              onclick="window.clientesModule.eliminarCliente('${cliente.id}', '${nombreEscapado}')"
+              class="icon-btn" 
+              title="Eliminar cliente"
+              style="background: var(--danger); color: white;">
+              <i class="bi bi-trash"></i>
             </button>
           </div>
         </td>
@@ -500,10 +553,16 @@ export function verDetalleCliente(clienteId) {
   console.log('👁️ Viendo detalle del cliente:', clienteId);
   
   const cliente = clientesData.find(c => c.id === clienteId);
-  if (!cliente) return;
+  if (!cliente) {
+    showToast('Cliente no encontrado', 'error');
+    return;
+  }
   
   const modal = document.getElementById('modalDetalleCliente');
-  if (!modal) return;
+  if (!modal) {
+    console.error('❌ Modal de detalle no encontrado en el DOM');
+    return;
+  }
   
   document.getElementById('detalleRazon').textContent = cliente.razon || 'Sin nombre';
   document.getElementById('detalleRuc').textContent = cliente.ruc || 'Sin RUC';
@@ -528,8 +587,12 @@ export function verDetalleCliente(clienteId) {
   document.getElementById('detalleFechaActualizacion').textContent = 
     new Date(cliente.updated_at).toLocaleString('es-PY');
   
+  // Agregar clase al body para prevenir scroll
+  document.body.classList.add('modal-open');
+  
+  // Mostrar modal
   modal.style.display = 'flex';
-  console.log('✅ Modal de detalle abierto');
+  console.log('✅ Modal de detalle abierto - display:', modal.style.display);
 }
 
 /**
@@ -540,10 +603,16 @@ export function editarCliente(clienteId) {
   console.log('✏️ Editando cliente:', clienteId);
   
   const cliente = clientesData.find(c => c.id === clienteId);
-  if (!cliente) return;
+  if (!cliente) {
+    showToast('Cliente no encontrado', 'error');
+    return;
+  }
   
   const modal = document.getElementById('modalEditarCliente');
-  if (!modal) return;
+  if (!modal) {
+    console.error('❌ Modal de edición no encontrado en el DOM');
+    return;
+  }
   
   document.getElementById('editClienteId').value = cliente.id;
   document.getElementById('editRazon').value = cliente.razon || '';
@@ -557,8 +626,55 @@ export function editarCliente(clienteId) {
   document.getElementById('editCiudad').value = cliente.ciudad || '';
   document.getElementById('editPostal').value = cliente.postal || '';
   
+  // Agregar clase al body para prevenir scroll
+  document.body.classList.add('modal-open');
+  
+  // Mostrar modal
   modal.style.display = 'flex';
-  console.log('✅ Modal de edición abierto');
+  console.log('✅ Modal de edición abierto - display:', modal.style.display);
+}
+
+/**
+ * Eliminar cliente
+ * @param {string} clienteId - ID del cliente
+ * @param {string} nombreCliente - Nombre del cliente para confirmación
+ */
+export async function eliminarCliente(clienteId, nombreCliente) {
+  console.log('🗑️ Eliminando cliente:', clienteId);
+  
+  // Confirmación
+  const confirmar = confirm(
+    `¿Estás seguro de que deseas eliminar al cliente "${nombreCliente}"?\n\n` +
+    `Esta acción no se puede deshacer.`
+  );
+  
+  if (!confirmar) {
+    console.log('❌ Eliminación cancelada por el usuario');
+    return;
+  }
+  
+  try {
+    // Mostrar indicador de carga
+    showToast('Eliminando cliente...', 'info');
+    
+    const { error } = await supabase
+      .from('clientes_perfil')
+      .delete()
+      .eq('id', clienteId);
+
+    if (error) throw error;
+
+    showToast('✅ Cliente eliminado correctamente', 'success');
+    
+    // Recargar la lista de clientes
+    await cargarClientes();
+    
+    console.log('✅ Cliente eliminado exitosamente');
+    
+  } catch (error) {
+    console.error('❌ Error al eliminar cliente:', error);
+    showToast(`Error al eliminar: ${error.message}`, 'error');
+  }
 }
 
 /**
@@ -598,8 +714,9 @@ async function guardarCambiosCliente(e) {
 
     if (error) throw error;
 
-    showToast('✅ Cliente actualizado correctamente');
+    showToast('✅ Cliente actualizado correctamente', 'success');
     document.getElementById('modalEditarCliente').style.display = 'none';
+    document.body.classList.remove('modal-open');
     await cargarClientes();
     
     console.log('✅ Cliente actualizado exitosamente');
@@ -636,6 +753,7 @@ export function exportarClientes() {
   link.download = `clientes_${new Date().toISOString().split('T')[0]}.csv`;
   link.click();
   
+  showToast('✅ CSV exportado correctamente', 'success');
   console.log('✅ CSV descargado');
 }
 
@@ -669,6 +787,7 @@ function setupEventListeners() {
   if (closeModalDetalle) {
     closeModalDetalle.addEventListener('click', () => {
       document.getElementById('modalDetalleCliente').style.display = 'none';
+      document.body.classList.remove('modal-open');
     });
   }
   
@@ -676,6 +795,7 @@ function setupEventListeners() {
   if (closeModalEditar) {
     closeModalEditar.addEventListener('click', () => {
       document.getElementById('modalEditarCliente').style.display = 'none';
+      document.body.classList.remove('modal-open');
     });
   }
   
@@ -683,6 +803,7 @@ function setupEventListeners() {
   if (btnCancelarEditar) {
     btnCancelarEditar.addEventListener('click', () => {
       document.getElementById('modalEditarCliente').style.display = 'none';
+      document.body.classList.remove('modal-open');
     });
   }
   
@@ -705,17 +826,159 @@ function setupEventListeners() {
     const modalDetalle = document.getElementById('modalDetalleCliente');
     const modalEditar = document.getElementById('modalEditarCliente');
     
-    if (e.target === modalDetalle) modalDetalle.style.display = 'none';
-    if (e.target === modalEditar) modalEditar.style.display = 'none';
+    if (e.target === modalDetalle) {
+      modalDetalle.style.display = 'none';
+      document.body.classList.remove('modal-open');
+    }
+    if (e.target === modalEditar) {
+      modalEditar.style.display = 'none';
+      document.body.classList.remove('modal-open');
+    }
   });
 }
 
+// ==================== UTILIDADES ====================
 function showToast(mensaje, tipo = 'success') {
-  alert(mensaje); // Puedes implementar un toast más elegante
+  const colores = {
+    success: '#10b981',
+    error: '#ef4444',
+    info: '#3b82f6',
+    warning: '#f59e0b'
+  };
+  
+  const iconos = {
+    success: 'check-circle',
+    error: 'x-circle',
+    info: 'info-circle',
+    warning: 'exclamation-triangle'
+  };
+  
+  const toast = document.createElement('div');
+  toast.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: white;
+    color: ${colores[tipo]};
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-weight: 500;
+    border-left: 4px solid ${colores[tipo]};
+    animation: slideIn 0.3s ease-out;
+  `;
+  
+  toast.innerHTML = `
+    <i class="bi bi-${iconos[tipo]}" style="font-size: 1.25rem;"></i>
+    <span>${mensaje}</span>
+  `;
+  
+  document.body.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.style.animation = 'slideOut 0.3s ease-in';
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
 }
 
+// Agregar animaciones CSS
+const style = document.createElement('style');
+style.id = 'clientes-modal-styles';
+style.textContent = `
+  @keyframes slideIn {
+    from {
+      transform: translateX(400px);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+  
+  @keyframes slideOut {
+    from {
+      transform: translateX(0);
+      opacity: 1;
+    }
+    to {
+      transform: translateX(400px);
+      opacity: 0;
+    }
+  }
+  
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  
+  @keyframes modalFadeIn {
+    from {
+      opacity: 0;
+      transform: scale(0.9);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  
+  /* Estilos críticos para modales - CON !important PARA FORZAR */
+  .modal-overlay {
+    display: none !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background: rgba(0,0,0,0.5) !important;
+    z-index: 9999 !important;
+    align-items: center !important;
+    justify-content: center !important;
+    overflow-y: auto !important;
+    padding: 20px !important;
+  }
+  
+  /* CRÍTICO: Cuando se establece display: flex en el estilo inline */
+  .modal-overlay[style*="display: flex"],
+  .modal-overlay[style*="display:flex"] {
+    display: flex !important;
+  }
+  
+  #modalDetalleCliente[style*="display: flex"],
+  #modalDetalleCliente[style*="display:flex"],
+  #modalEditarCliente[style*="display: flex"],
+  #modalEditarCliente[style*="display:flex"] {
+    display: flex !important;
+  }
+  
+  .modal-overlay .modal-content {
+    position: relative !important;
+    margin: auto !important;
+    animation: modalFadeIn 0.3s ease-out;
+  }
+  
+  /* Prevenir scroll cuando modal está abierto */
+  body.modal-open {
+    overflow: hidden !important;
+  }
+`;
+
+// Remover el estilo anterior si existe
+const oldStyle = document.getElementById('clientes-modal-styles');
+if (oldStyle) {
+  oldStyle.remove();
+}
+
+document.head.appendChild(style);
+console.log('✅ Estilos de modal agregados al DOM');
+
 // ==================== EXPORTAR PARA USO GLOBAL ====================
-// ✅ CRÍTICO: Hacer las funciones disponibles globalmente para onclick handlers
 if (typeof window !== 'undefined') {
   window.clientesModule = {
     initClientes,
@@ -723,10 +986,10 @@ if (typeof window !== 'undefined') {
     aplicarFiltros,
     verDetalleCliente,
     editarCliente,
+    eliminarCliente,
     exportarClientes
   };
   console.log('✅ Módulo clientes exportado a window.clientesModule');
 }
 
-
-console.log('📦 Módulo de Clientes cargado (versión corregida basada en proyecto viejo)');
+console.log('📦 Módulo de Clientes cargado (versión completa con eliminación)');
