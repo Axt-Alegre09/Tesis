@@ -1,10 +1,10 @@
 // ==================== MÓDULO DE CONFIGURACIÓN COMPLETO - VERSIÓN CORREGIDA ====================
 // Para el panel de administración de Paniquiños
 
-// ✅ CORRECCIÓN: Importar el cliente compartido en lugar de crear uno nuevo
+//  CORRECCIÓN: Importar el cliente compartido en lugar de crear uno nuevo
 import { supabase } from './supabase-config.js';
 
-// ✅ Usar el cliente importado
+// Usar el cliente importado
 const supa = supabase;
 
 // [El resto del código sigue igual - solo cambié el import inicial]
@@ -19,7 +19,7 @@ export const configuracionView = `
 // [Todas las funciones siguen igual]
 
 export async function initConfiguracion() {
-  console.log('🚀 Inicializando módulo de configuración...');
+  console.log(' Inicializando módulo de configuración...');
   
   setupConfigTabs();
   await cargarUsuarios();
@@ -31,4 +31,4 @@ export async function initConfiguracion() {
 
 // [Resto de funciones...]
 
-console.log('✅ Módulo de configuración cargado (usando cliente compartido)');
+console.log(' Módulo de configuración cargado (usando cliente compartido)');

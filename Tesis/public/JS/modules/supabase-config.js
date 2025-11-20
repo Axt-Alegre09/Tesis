@@ -135,7 +135,7 @@ export function showToast(message, type = 'info') {
  * @param {string} contexto - Contexto donde ocurrió el error
  */
 export function handleError(error, contexto = 'Operación') {
-  console.error(`❌ Error en ${contexto}:`, error);
+  console.error(` Error en ${contexto}:`, error);
   
   let mensaje = error.message || 'Error desconocido';
   
@@ -219,4 +219,4 @@ export async function deleteImage(fileName, bucket = 'productos') {
   }
 }
 
-console.log('✅ Supabase config cargado');
+console.log(' Supabase config cargado');
