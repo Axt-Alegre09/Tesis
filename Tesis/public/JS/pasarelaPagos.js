@@ -364,7 +364,7 @@ function setupFormInterceptor() {
       console.log("Carrito limpiado");
 
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-      console.log("✅ PEDIDO COMPLETADO");
+      console.log(" PEDIDO COMPLETADO");
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
     } catch (err) {
