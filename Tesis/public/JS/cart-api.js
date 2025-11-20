@@ -36,7 +36,7 @@ function _writeLocal(cart) {
   };
   localStorage.setItem("carrito", JSON.stringify(cartData));
   
-  console.log("🛒 Carrito guardado:", {
+  console.log("Carrito guardado:", {
     items: cart.length,
     conPromo: cart.filter(p => p.tienePromo).length,
     sinPromo: cart.filter(p => !p.tienePromo).length
@@ -83,7 +83,7 @@ function _addLocal(prod, qty=1) {
     descuentoPorcentaje = Math.round(((precioOriginal - precioFinal) / precioOriginal) * 100);
   }
   
-  console.log("➕ Agregando producto:", {
+  console.log("Agregando producto:", {
     nombre: prod.titulo || prod.nombre,
     tienePromo,
     precioOriginal,
@@ -262,7 +262,7 @@ async function getSnapshot() {
   const cart = _readLocal();
   const total = _totalLocal(cart);
   
-  console.log("📊 Snapshot local:", {
+  console.log("Snapshot local:", {
     items: cart.length,
     conPromo: cart.filter(i => i.tienePromo).length,
     total
@@ -300,7 +300,7 @@ async function addProduct(productObj, qty=1) {
       : Number(productObj.precioOriginal || productObj.precio)
   };
   
-  console.log("🛒 CartAPI.addProduct:", {
+  console.log("CartAPI.addProduct:", {
     nombre: productoCompleto.titulo || productoCompleto.nombre,
     tienePromo: productoCompleto.tienePromo,
     descuento: productoCompleto.descuentoPorcentaje + "%"
@@ -347,13 +347,13 @@ function verificarCarrito() {
   const conPromo = cart.filter(p => p.tienePromo);
   const sinPromo = cart.filter(p => !p.tienePromo);
   
-  console.log("🔍 Estado del carrito:");
+  console.log("Estado del carrito:");
   console.log(`   Total: ${cart.length} productos`);
   console.log(`   Con promoción: ${conPromo.length}`);
   console.log(`   Sin promoción: ${sinPromo.length}`);
   
   if (conPromo.length > 0) {
-    console.log("📦 Productos con descuento:");
+    console.log("Productos con descuento:");
     conPromo.forEach(p => {
       console.log(`   - ${p.titulo}: ${p.descuentoPorcentaje}% OFF`);
       console.log(`     Original: ${fmtGs(p.precioOriginal)}`);
@@ -377,5 +377,5 @@ window.CartAPI = {
 };
 
 // Auto-verificar al cargar
-console.log("✅ CartAPI cargado con soporte de promociones");
-console.log("   Usa CartAPI.verificarCarrito() para ver el estado actual");
+console.log("CartAPI cargado con soporte de promociones");
+console.log("Usar CartAPI.verificarCarrito() para ver el estado actual");

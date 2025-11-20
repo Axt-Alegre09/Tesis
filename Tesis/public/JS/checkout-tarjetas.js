@@ -12,7 +12,7 @@ let tarjetaSeleccionadaId = null;
 
 // ========== INICIALIZACIÓN ==========
 document.addEventListener('DOMContentLoaded', async () => {
-  console.log('📱 Inicializando checkout-tarjetas.js');
+  console.log('Inicializando checkout-tarjetas.js');
   
   await cargarTarjetasGuardadas();
   configurarToggleTarjetas();
@@ -26,7 +26,7 @@ async function cargarTarjetasGuardadas() {
     const { data: { user } } = await supabase.auth.getUser();
     
     if (!user) {
-      console.log('⚠️ Usuario no autenticado - tarjetas guardadas no disponibles');
+      console.log('Usuario no autenticado - tarjetas guardadas no disponibles');
       return;
     }
 
@@ -40,17 +40,17 @@ async function cargarTarjetasGuardadas() {
 
     if (tarjetas && tarjetas.length > 0) {
       tarjetasGuardadas = tarjetas;
-      console.log(`✅ ${tarjetas.length} tarjeta(s) guardada(s) cargada(s)`);
+      console.log(` ${tarjetas.length} tarjeta(s) guardada(s) cargada(s)`);
       
       mostrarTarjetasGuardadas();
       document.getElementById('tarjetas-guardadas-container').style.display = 'block';
     } else {
-      console.log('ℹ️ No hay tarjetas guardadas');
+      console.log('ℹ No hay tarjetas guardadas');
       document.getElementById('tarjetas-guardadas-container').style.display = 'none';
     }
 
   } catch (error) {
-    console.error('❌ Error cargando tarjetas:', error);
+    console.error(' Error cargando tarjetas:', error);
     document.getElementById('tarjetas-guardadas-container').style.display = 'none';
   }
 }
@@ -124,7 +124,7 @@ function agregarEventosTarjetas() {
   document.addEventListener('change', (e) => {
     if (e.target.name === 'tarjeta-guardada') {
       tarjetaSeleccionadaId = e.target.value;
-      console.log('✅ Tarjeta seleccionada:', tarjetaSeleccionadaId);
+      console.log(' Tarjeta seleccionada:', tarjetaSeleccionadaId);
       
       // Limpiar campos manuales cuando se selecciona una guardada
       limpiarCamposTarjeta();
@@ -226,4 +226,4 @@ window.obtenerDatosTarjetaCheckout = function() {
   };
 };
 
-console.log('✅ checkout-tarjetas.js cargado correctamente');
+console.log('checkout-tarjetas.js cargado correctamente');

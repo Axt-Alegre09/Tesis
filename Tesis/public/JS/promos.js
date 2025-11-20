@@ -202,7 +202,7 @@ function renderProductosAsignar() {
 // ==================== CARGAR DATOS ====================
 
 async function loadPromos() {
-  console.log('🔄 Cargando promos...');
+  console.log('Cargando promos...');
   
   const tbody = document.getElementById('promosTableBody');
   if (!tbody) return;
@@ -227,7 +227,7 @@ async function loadPromos() {
 
     if (error) throw error;
     
-    console.log(`✅ ${data.length} promos cargadas`);
+    console.log(`${data.length} promos cargadas`);
     
     promosData = data.map(promo => ({
       ...promo,
@@ -257,7 +257,7 @@ async function loadPromos() {
 }
 
 async function loadProductos() {
-  console.log('🔄 Cargando productos...');
+  console.log('Cargando productos...');
   
   try {
     const { data, error } = await supabase
@@ -268,7 +268,7 @@ async function loadProductos() {
 
     if (error) throw error;
     
-    console.log(`✅ ${data.length} productos cargados`);
+    console.log(` ${data.length} productos cargados`);
     productosData = data;
     productosOriginal = [...data]; // Guardar copia original
     
@@ -450,7 +450,7 @@ async function editPromo(id) {
 
 async function deletePromo(id, nombre) {
   const confirmado = confirm(
-    `¿Estás seguro de eliminar la promo "${nombre}"?\n\n⚠️ Esta acción no se puede deshacer.`
+    `¿Estás seguro de eliminar la promo "${nombre}"?\n\n Esta acción no se puede deshacer.`
   );
   
   if (!confirmado) return;
@@ -708,7 +708,7 @@ async function saveAsignacionProductos() {
 // ==================== EVENT LISTENERS ====================
 
 document.addEventListener('DOMContentLoaded', async () => {
-  console.log('🚀 Inicializando módulo de promos...');
+  console.log(' Inicializando módulo de promos...');
   
   // Cargar datos
   await loadProductos();
@@ -724,7 +724,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('btnCancelarAsignar')?.addEventListener('click', () => closeModal('modalAsignarProductos'));
   document.getElementById('btnGuardarAsignar')?.addEventListener('click', saveAsignacionProductos);
   
-  console.log('✅ Módulo de promos inicializado');
+  console.log(' Módulo de promos inicializado');
 });
 
 // Exportar funciones globales para onclick handlers

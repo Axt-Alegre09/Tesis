@@ -53,9 +53,9 @@ async function migrar() {
     .upsert(rows, { onConflict: "sku" });
 
   if (error) {
-    console.error("❌ Error:", error);
+    console.error("error:", error);
   } else {
-    console.log("✅ Migración completada");
+    console.log("Migración completada");
   }
 }
 

@@ -1,9 +1,9 @@
 // ==================== MÓDULO CLIENTES - VERSIÓN COMPLETA CON TODAS LAS FUNCIONALIDADES ====================
-// ✅ Ver detalle
-// ✅ Editar cliente
-// ✅ Eliminar cliente (NUEVO)
-// ✅ Exportar CSV
-// ✅ Filtros y búsqueda
+// Ver detalle
+// Editar cliente
+// Eliminar cliente (NUEVO)
+// Exportar CSV
+// Filtros y búsqueda
 
 import { supabase } from './modules/supabase-config.js';
 
@@ -13,9 +13,6 @@ let clientesFiltrados = [];
 
 // ==================== INICIALIZACIÓN ====================
 
-/**
- * Inicializar el módulo de clientes
- */
 export async function initClientes() {
   console.log('🔄 Inicializando módulo de clientes...');
   
@@ -31,7 +28,7 @@ export async function initClientes() {
   // Actualizar estadísticas
   actualizarEstadisticas();
   
-  console.log('✅ Módulo de clientes inicializado');
+  console.log('Módulo de clientes inicializado');
 }
 
 // ==================== ACTUALIZAR VISTA HTML ====================
@@ -297,7 +294,7 @@ function createModals() {
 
 // ==================== CARGAR CLIENTES ====================
 async function cargarClientes() {
-  console.log('🔄 Cargando clientes...');
+  console.log('Cargando clientes...');
   
   const tbody = document.getElementById('clientesTableBody');
   if (!tbody) return;
@@ -323,14 +320,14 @@ async function cargarClientes() {
     clientesData = data || [];
     clientesFiltrados = [...clientesData];
     
-    console.log(`✅ ${clientesData.length} clientes cargados`);
+    console.log(`${clientesData.length} clientes cargados`);
     
     renderizarTablaClientes();
     cargarCiudadesFiltro();
     actualizarContador();
     
   } catch (error) {
-    console.error('❌ Error al cargar clientes:', error);
+    console.error('Error al cargar clientes:', error);
     
     tbody.innerHTML = `
       <tr>
@@ -501,7 +498,7 @@ async function actualizarEstadisticas() {
     if (emailElem) emailElem.textContent = conEmail;
     
   } catch (error) {
-    console.error('❌ Error al actualizar estadísticas:', error);
+    console.error('Error al actualizar estadísticas:', error);
   }
 }
 
@@ -550,7 +547,7 @@ function actualizarContador() {
  * @param {string} clienteId - ID del cliente
  */
 export function verDetalleCliente(clienteId) {
-  console.log('👁️ Viendo detalle del cliente:', clienteId);
+  console.log('Viendo detalle del cliente:', clienteId);
   
   const cliente = clientesData.find(c => c.id === clienteId);
   if (!cliente) {
@@ -560,7 +557,7 @@ export function verDetalleCliente(clienteId) {
   
   const modal = document.getElementById('modalDetalleCliente');
   if (!modal) {
-    console.error('❌ Modal de detalle no encontrado en el DOM');
+    console.error('Modal de detalle no encontrado en el DOM');
     return;
   }
   
@@ -592,7 +589,7 @@ export function verDetalleCliente(clienteId) {
   
   // Mostrar modal
   modal.style.display = 'flex';
-  console.log('✅ Modal de detalle abierto - display:', modal.style.display);
+  console.log('Modal de detalle abierto - display:', modal.style.display);
 }
 
 /**
@@ -600,7 +597,7 @@ export function verDetalleCliente(clienteId) {
  * @param {string} clienteId - ID del cliente
  */
 export function editarCliente(clienteId) {
-  console.log('✏️ Editando cliente:', clienteId);
+  console.log('Editando cliente:', clienteId);
   
   const cliente = clientesData.find(c => c.id === clienteId);
   if (!cliente) {
@@ -610,7 +607,7 @@ export function editarCliente(clienteId) {
   
   const modal = document.getElementById('modalEditarCliente');
   if (!modal) {
-    console.error('❌ Modal de edición no encontrado en el DOM');
+    console.error('Modal de edición no encontrado en el DOM');
     return;
   }
   
@@ -631,7 +628,7 @@ export function editarCliente(clienteId) {
   
   // Mostrar modal
   modal.style.display = 'flex';
-  console.log('✅ Modal de edición abierto - display:', modal.style.display);
+  console.log('Modal de edición abierto - display:', modal.style.display);
 }
 
 /**
@@ -640,7 +637,7 @@ export function editarCliente(clienteId) {
  * @param {string} nombreCliente - Nombre del cliente para confirmación
  */
 export async function eliminarCliente(clienteId, nombreCliente) {
-  console.log('🗑️ Eliminando cliente:', clienteId);
+  console.log('Eliminando cliente:', clienteId);
   
   // Confirmación
   const confirmar = confirm(
@@ -649,7 +646,7 @@ export async function eliminarCliente(clienteId, nombreCliente) {
   );
   
   if (!confirmar) {
-    console.log('❌ Eliminación cancelada por el usuario');
+    console.log('Eliminación cancelada por el usuario');
     return;
   }
   
@@ -664,15 +661,15 @@ export async function eliminarCliente(clienteId, nombreCliente) {
 
     if (error) throw error;
 
-    showToast('✅ Cliente eliminado correctamente', 'success');
+    showToast('Cliente eliminado correctamente', 'success');
     
     // Recargar la lista de clientes
     await cargarClientes();
     
-    console.log('✅ Cliente eliminado exitosamente');
+    console.log('Cliente eliminado exitosamente');
     
   } catch (error) {
-    console.error('❌ Error al eliminar cliente:', error);
+    console.error('Error al eliminar cliente:', error);
     showToast(`Error al eliminar: ${error.message}`, 'error');
   }
 }
@@ -687,7 +684,7 @@ async function guardarCambiosCliente(e) {
   const clienteId = document.getElementById('editClienteId').value;
   const btnGuardar = e.target.querySelector('button[type="submit"]');
   
-  console.log('💾 Guardando cambios del cliente:', clienteId);
+  console.log('Guardando cambios del cliente:', clienteId);
   
   btnGuardar.disabled = true;
   btnGuardar.innerHTML = '<i class="bi bi-hourglass-split"></i> Guardando...';
@@ -714,15 +711,15 @@ async function guardarCambiosCliente(e) {
 
     if (error) throw error;
 
-    showToast('✅ Cliente actualizado correctamente', 'success');
+    showToast('Cliente actualizado correctamente', 'success');
     document.getElementById('modalEditarCliente').style.display = 'none';
     document.body.classList.remove('modal-open');
     await cargarClientes();
     
-    console.log('✅ Cliente actualizado exitosamente');
+    console.log('Cliente actualizado exitosamente');
     
   } catch (error) {
-    console.error('❌ Error al actualizar cliente:', error);
+    console.error('Error al actualizar cliente:', error);
     showToast(`Error: ${error.message}`, 'error');
   } finally {
     btnGuardar.disabled = false;
@@ -732,7 +729,7 @@ async function guardarCambiosCliente(e) {
 
 // ==================== EXPORTAR CSV ====================
 export function exportarClientes() {
-  console.log('📥 Exportando clientes a CSV');
+  console.log('Exportando clientes a CSV');
   
   const csv = [
     ['Razón Social', 'RUC', 'Teléfono', 'Email', 'Ciudad', 'Barrio', 'Fecha Registro'],
@@ -753,33 +750,33 @@ export function exportarClientes() {
   link.download = `clientes_${new Date().toISOString().split('T')[0]}.csv`;
   link.click();
   
-  showToast('✅ CSV exportado correctamente', 'success');
-  console.log('✅ CSV descargado');
+  showToast('CSV exportado correctamente', 'success');
+  console.log('CSV descargado');
 }
 
 // ==================== EVENT LISTENERS ====================
 function setupEventListeners() {
-  console.log('🎧 Configurando event listeners de clientes...');
+  console.log('Configurando event listeners de clientes...');
   
   // Búsqueda
   const searchInput = document.getElementById('searchClientes');
   if (searchInput) {
     searchInput.addEventListener('input', aplicarFiltros);
-    console.log('✅ Listener de búsqueda configurado');
+    console.log('Listener de búsqueda configurado');
   }
   
   // Filtro ciudad
   const filterSelect = document.getElementById('filterCiudad');
   if (filterSelect) {
     filterSelect.addEventListener('change', aplicarFiltros);
-    console.log('✅ Listener de filtro configurado');
+    console.log('Listener de filtro configurado');
   }
   
   // Botón refresh
   const btnRefresh = document.getElementById('btnRefreshClientes');
   if (btnRefresh) {
     btnRefresh.addEventListener('click', cargarClientes);
-    console.log('✅ Listener de refresh configurado');
+    console.log('Listener de refresh configurado');
   }
   
   // Cerrar modales
@@ -811,14 +808,14 @@ function setupEventListeners() {
   const formEditar = document.getElementById('formEditarCliente');
   if (formEditar) {
     formEditar.addEventListener('submit', guardarCambiosCliente);
-    console.log('✅ Listener de formulario configurado');
+    console.log('Listener de formulario configurado');
   }
   
   // Exportar
   const btnExportar = document.getElementById('btnExportarClientes');
   if (btnExportar) {
     btnExportar.addEventListener('click', exportarClientes);
-    console.log('✅ Listener de exportar configurado');
+    console.log('Listener de exportar configurado');
   }
   
   // Cerrar modal al hacer clic fuera
@@ -976,7 +973,7 @@ if (oldStyle) {
 }
 
 document.head.appendChild(style);
-console.log('✅ Estilos de modal agregados al DOM');
+console.log('Estilos de modal agregados al DOM');
 
 // ==================== EXPORTAR PARA USO GLOBAL ====================
 if (typeof window !== 'undefined') {
@@ -989,7 +986,7 @@ if (typeof window !== 'undefined') {
     eliminarCliente,
     exportarClientes
   };
-  console.log('✅ Módulo clientes exportado a window.clientesModule');
+  console.log('Módulo clientes exportado a window.clientesModule');
 }
 
-console.log('📦 Módulo de Clientes cargado (versión completa con eliminación)');
+console.log('Módulo de Clientes cargado (versión completa con eliminación)');

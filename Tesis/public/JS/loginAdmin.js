@@ -37,13 +37,13 @@ document.getElementById("adminLoginForm")?.addEventListener("submit", async (e) 
 
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
-    alert("❌ Credenciales inválidas");
+    alert("Credenciales inválidas");
     return;
   }
   const role = await getProfileRole();
   if (role !== "admin") {
     await supabase.auth.signOut();
-    alert("⚠️ Tu cuenta no tiene permisos de administrador.");
+    alert("Tu cuenta no tiene permisos de administrador.");
     return;
   }
   window.location.href = "../admin-dashboard.html";         // ABSOLUTO

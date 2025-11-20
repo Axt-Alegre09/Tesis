@@ -40,9 +40,9 @@ export async function getProfile() {
   if (!user) return null;
   
   const { data, error } = await supabase
-    .from("profiles")  // ✅ Tu tabla real
-    .select("id, email, nombre, role")  // ✅ Campo 'role' (no 'rol')
-    .eq("id", user.id)  // ✅ Campo 'id' (no 'user_id')
+    .from("profiles")  
+    .select("id, email, nombre, role")  
+    .eq("id", user.id)  
     .maybeSingle();
     
   if (error) { 
@@ -98,9 +98,9 @@ export async function goByRole() {
     return;
   }
   
-  console.log('🔄 Redirigiendo según rol:', p.role);
+  console.log(' Redirigiendo según rol:', p.role);
   
-  // ✅ CORRECCIÓN: Usar 'role' en lugar de 'rol'
+  // CORRECCIÓN: Usar 'role' en lugar de 'rol'
   if (p.role === "admin") {
     go(HOME_ADMIN);
   } else {
@@ -204,12 +204,12 @@ async function wireLoginPage() {
     const { data } = await Promise.race([sessionPromise, timeoutPromise]);
     
     if (data?.session) {
-      console.log('✅ Sesión existente detectada, redirigiendo...');
+      console.log(' Sesión existente detectada, redirigiendo...');
       await goByRole();
       return;
     }
   } catch (error) {
-    console.log('⚠️ Error verificando sesión:', error.message);
+    console.log(' Error verificando sesión:', error.message);
   }
 
   // Login
@@ -287,7 +287,7 @@ async function wireLoginPage() {
     }
 
     if (isLoginPage) {
-      console.log('📄 Inicializando página de login...');
+      console.log(' Inicializando página de login...');
       await wireLoginPage();
     }
   } catch (e) {
@@ -306,4 +306,4 @@ export async function requireAuth() {
 
 window.supabase = supabase;
 
-console.log('✅ ScriptLogin.js cargado (versión para tabla profiles)');
+console.log(' ScriptLogin.js cargado (versión para tabla profiles)');

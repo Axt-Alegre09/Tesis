@@ -212,7 +212,7 @@ async function crearPedido(carrito) {
   // Éxito
   const total = fin?.[0]?.monto_total ?? 0;
   const puntos = fin?.[0]?.puntos_agregados ?? 0;
-  alert(`✅ Pedido confirmado.\nTotal: ${formatearGs(total)} — Puntos: ${puntos}`);
+  alert(`Pedido confirmado.\nTotal: ${formatearGs(total)} — Puntos: ${puntos}`);
 
   // Limpiar carrito y mostrar estado "comprado"
   productosEnCarrito = [];

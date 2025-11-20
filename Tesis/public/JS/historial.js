@@ -188,7 +188,7 @@ function aplicarFiltro() {
 
 async function cargarHistorial() {
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-  console.log("🔵 Cargando historial de pedidos...");
+  console.log(" Cargando historial de pedidos...");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
   contenedor.innerHTML = `
@@ -219,7 +219,7 @@ async function cargarHistorial() {
       return;
     }
 
-    console.log("✅ Usuario autenticado:", user.id);
+    console.log(" Usuario autenticado:", user.id);
 
     // 2. Cargar pedidos
     const { data, error, count } = await supabase
@@ -232,26 +232,26 @@ async function cargarHistorial() {
       .order("creado_en", { ascending: false });
 
     if (error) {
-      console.error("❌ Error al cargar pedidos:", error);
+      console.error(" Error al cargar pedidos:", error);
       throw error;
     }
 
-    console.log("✅ Pedidos cargados:", data?.length || 0);
+    console.log("Pedidos cargados:", data?.length || 0);
     console.log("   Total en BD:", count);
 
     if (!data || !data.length) {
-      console.log("ℹ️ No hay pedidos para este usuario");
+      console.log("ℹNo hay pedidos para este usuario");
       TODOS_LOS_PEDIDOS = [];
       aplicarFiltro();
       return;
     }
 
     TODOS_LOS_PEDIDOS = data;
-    console.log("✅ Pedidos guardados en memoria");
+    console.log("Pedidos guardados en memoria");
     aplicarFiltro();
 
   } catch (err) {
-    console.error("❌ Error completo:", err);
+    console.error("Error completo:", err);
     contenedor.innerHTML = `
       <div class="state-box">
         <i class="bi bi-exclamation-triangle"></i>
@@ -266,7 +266,7 @@ async function cargarHistorial() {
 
 async function descargarFactura(pedidoId, btnElement) {
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-  console.log("🔵 Iniciando descarga de factura");
+  console.log("Iniciando descarga de factura");
   console.log("   Pedido ID:", pedidoId);
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   
@@ -281,7 +281,7 @@ async function descargarFactura(pedidoId, btnElement) {
       throw new Error("Pedido no encontrado en memoria");
     }
     
-    console.log("✅ Pedido encontrado:", pedido);
+    console.log("Pedido encontrado:", pedido);
 
     // 2. Obtener items del pedido
     const { data: itemsData, error: itemsError } = await supabase
@@ -290,16 +290,16 @@ async function descargarFactura(pedidoId, btnElement) {
       .eq("pedido_id", pedidoId);
 
     if (itemsError) {
-      console.error("❌ Error al obtener items:", itemsError);
+      console.error("Error al obtener items:", itemsError);
       throw itemsError;
     }
     
-    console.log("✅ Items obtenidos:", itemsData?.length || 0);
+    console.log("Items obtenidos:", itemsData?.length || 0);
 
     // Si no hay items, crear un item genérico
     let items = [];
     if (!itemsData || itemsData.length === 0) {
-      console.log("⚠️ No hay items, creando genérico");
+      console.log("No hay items, creando genérico");
       
       let descripcion = "Pedido";
       if (pedido.metodo_pago) {
@@ -328,7 +328,7 @@ async function descargarFactura(pedidoId, btnElement) {
         
         if (!error && data) {
           productosData = data;
-          console.log("✅ Imágenes de productos obtenidas:", productosData.length);
+          console.log("Imágenes de productos obtenidas:", productosData.length);
         }
       }
 
@@ -345,7 +345,7 @@ async function descargarFactura(pedidoId, btnElement) {
       });
     }
 
-    console.log("✅ Items procesados:", items.length);
+    console.log("Items procesados:", items.length);
 
     // 3. Obtener datos del cliente
     const { data: clienteData, error: clienteError } = await supabase
@@ -355,9 +355,9 @@ async function descargarFactura(pedidoId, btnElement) {
       .single();
 
     if (clienteError) {
-      console.warn("⚠️ No se encontró perfil del cliente:", clienteError);
+      console.warn("No se encontró perfil del cliente:", clienteError);
     } else {
-      console.log("✅ Cliente obtenido:", clienteData?.razon);
+      console.log("Cliente obtenido:", clienteData?.razon);
     }
 
     // 4. Crear snapshot de factura
@@ -386,17 +386,17 @@ async function descargarFactura(pedidoId, btnElement) {
       total: Number(pedido.monto_total || 0),
     };
 
-    console.log("✅ Snapshot creado");
+    console.log("Snapshot creado");
 
     // 5. Cargar jsPDF si no está disponible
     await cargarJsPDF();
     
-    console.log("✅ jsPDF cargado");
+    console.log("jsPDF cargado");
 
     // 6. Generar PDF
     await generarFacturaPDF(facturaSnapshot);
     
-    console.log("✅ PDF generado exitosamente");
+    console.log("PDF generado exitosamente");
     console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
     // Mostrar mensaje de éxito
@@ -404,7 +404,7 @@ async function descargarFactura(pedidoId, btnElement) {
     
   } catch (err) {
     console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    console.error("❌ Error al descargar factura");
+    console.error("Error al descargar factura");
     console.error("   Mensaje:", err.message);
     console.error("   Stack:", err.stack);
     console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -422,34 +422,34 @@ async function cargarJsPDF() {
   return new Promise((resolve, reject) => {
     // Si ya está cargado, resolver inmediatamente
     if (window.jspdf) {
-      console.log("✅ jsPDF ya está cargado");
+      console.log("jsPDF ya está cargado");
       resolve();
       return;
     }
 
-    console.log("🔵 Cargando jsPDF...");
+    console.log("Cargando jsPDF...");
 
     // Cargar jsPDF
     const script1 = document.createElement("script");
     script1.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
     script1.onload = () => {
-      console.log("✅ jsPDF cargado");
+      console.log("jsPDF cargado");
       
       // Cargar autotable
       const script2 = document.createElement("script");
       script2.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.4/jspdf.plugin.autotable.min.js";
       script2.onload = () => {
-        console.log("✅ jsPDF autotable cargado");
+        console.log("jsPDF autotable cargado");
         resolve();
       };
       script2.onerror = (err) => {
-        console.error("❌ Error al cargar autotable:", err);
+        console.error("Error al cargar autotable:", err);
         reject(new Error("No se pudo cargar jsPDF autotable"));
       };
       document.head.appendChild(script2);
     };
     script1.onerror = (err) => {
-      console.error("❌ Error al cargar jsPDF:", err);
+      console.error("Error al cargar jsPDF:", err);
       reject(new Error("No se pudo cargar jsPDF"));
     };
     document.head.appendChild(script1);
@@ -459,7 +459,7 @@ async function cargarJsPDF() {
 /* ========== Generar PDF ========== */
 
 async function generarFacturaPDF(snapshot) {
-  console.log("🔵 Generando PDF con snapshot:", snapshot);
+  console.log("Generando PDF con snapshot:", snapshot);
   
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
@@ -524,7 +524,7 @@ async function generarFacturaPDF(snapshot) {
     const logoData = await toDataURL(EMP.logo);
     doc.addImage(logoData, "PNG", M + 15, y + 15, 80, 80);
   } catch (e) {
-    console.warn("⚠️ No se pudo cargar logo:", e);
+    console.warn(" No se pudo cargar logo:", e);
   }
 
   // Título centrado
@@ -920,7 +920,7 @@ async function generarFacturaPDF(snapshot) {
   cdcY += 10;
   doc.text("siguientes de la emisión", cdcX, cdcY);
 
-  console.log("✅ Guardando PDF...");
+  console.log("Guardando PDF...");
   doc.save(`Factura_${EMP.nombre}_${nroFactura}.pdf`);
 }
 

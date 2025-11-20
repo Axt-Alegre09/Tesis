@@ -87,23 +87,23 @@ function validateForm() {
   
   // Validar primera contraseña
   if (!newPassword) {
-    showMsg("❌ Por favor ingresa una contraseña", "danger");
+    showMsg(" Por favor ingresa una contraseña", "danger");
     return false;
   }
   
   if (!validatePassword(newPassword)) {
-    showMsg(`❌ La contraseña debe tener mínimo ${CONFIG.PASSWORD_MIN_LENGTH} caracteres`, "danger");
+    showMsg(` La contraseña debe tener mínimo ${CONFIG.PASSWORD_MIN_LENGTH} caracteres`, "danger");
     return false;
   }
   
   // Validar confirmación
   if (!confirmPassword) {
-    showMsg("❌ Por favor confirma tu contraseña", "danger");
+    showMsg(" Por favor confirma tu contraseña", "danger");
     return false;
   }
   
   if (!validatePasswordMatch(newPassword, confirmPassword)) {
-    showMsg("❌ Las contraseñas no coinciden", "danger");
+    showMsg(" Las contraseñas no coinciden", "danger");
     return false;
   }
   
@@ -163,12 +163,12 @@ async function handleResetSubmit(e) {
     const success = await updatePassword(newPassword);
 
     if (!success) {
-      showMsg("❌ No se pudo actualizar la contraseña", "danger");
+      showMsg("No se pudo actualizar la contraseña", "danger");
       setButtonLoading(false);
       return;
     }
 
-    showMsg("✅ ¡Contraseña actualizada! Redirigiendo al login...", "success");
+    showMsg("¡Contraseña actualizada! Redirigiendo al login...", "success");
 
     // Cerrar sesión y redirigir
     setTimeout(async () => {
@@ -179,9 +179,9 @@ async function handleResetSubmit(e) {
     console.error("[handleResetSubmit]", error);
     
     if (error.message.includes("token")) {
-      showMsg("⚠️ El enlace de recuperación ha expirado", "danger");
+      showMsg("El enlace de recuperación ha expirado", "danger");
     } else {
-      showMsg(`❌ ${error.message || "Error al actualizar la contraseña"}`, "danger");
+      showMsg(`${error.message || "Error al actualizar la contraseña"}`, "danger");
     }
 
     setButtonLoading(false);
@@ -275,7 +275,7 @@ function setupPasswordToggles() {
   } catch (error) {
     console.error("[init]", error);
     showLoading(false);
-    showMsg("❌ Error al cargar la página", "danger");
+    showMsg("Error al cargar la página", "danger");
   }
 })();
 

@@ -6,7 +6,7 @@ const SUPABASE_URL = "https://jyygevitfnbwrvxrjexp.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5eWdldml0Zm5id3J2eHJqZXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2OTQ2OTYsImV4cCI6MjA3MTI3MDY5Nn0.St0IiSZSeELESshctneazCJHXCDBi9wrZ28UkiEDXYo";
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-console.log("✅ Supabase inicializado");
+console.log(" Supabase inicializado");
 
 /* ========= Estados y Colores ========= */
 const ESTADOS_PEDIDO = {
@@ -40,7 +40,7 @@ let searchTerm = "";
 
 async function fetchAllPedidos() {
   try {
-    console.log("🔄 Cargando pedidos...");
+    console.log("Cargando pedidos...");
     
     // Cargar pedidos
     const { data: pedidos, error: errorPedidos } = await supabase
@@ -54,7 +54,7 @@ async function fetchAllPedidos() {
     }
 
     if (!pedidos || pedidos.length === 0) {
-      console.log("✅ Sin pedidos");
+      console.log("Sin pedidos");
       return [];
     }
 
@@ -76,23 +76,23 @@ async function fetchAllPedidos() {
     clientes = result.data || [];
     errorClientes = result.error;
     
-    console.log(`✅ Clientes obtenidos: ${clientes.length}`);
+    console.log(`Clientes obtenidos: ${clientes.length}`);
     if (errorClientes) {
-      console.warn("⚠️ Error en query clientes:", errorClientes.message);
+      console.warn("Error en query clientes:", errorClientes.message);
     }
     
     if (errorClientes) {
-      console.warn("⚠️ Error cargando clientes:", errorClientes.message);
+      console.warn("Error cargando clientes:", errorClientes.message);
     }
 
     // Mapear clientes por user_id
     const clientesMap = {};
     (clientes || []).forEach(c => {
       clientesMap[c.user_id] = c;
-      console.log(`   ✅ Cliente mapeado: ${c.user_id} -> ${c.razon}`);
+      console.log(`   Cliente mapeado: ${c.user_id} -> ${c.razon}`);
     });
 
-    console.log(`✅ Total ${Object.keys(clientesMap).length} clientes mapeados`);
+    console.log(` Total ${Object.keys(clientesMap).length} clientes mapeados`);
     console.log(`   Clientes esperados: ${userIds.length}`);
     console.log(`   Clientes encontrados: ${clientes.length}`);
 
@@ -122,7 +122,7 @@ async function fetchAllPedidos() {
       };
     });
     
-    console.log(`✅ ${resultado.length} pedidos procesados correctamente`);
+    console.log(`${resultado.length} pedidos procesados correctamente`);
     return resultado;
   } catch (err) {
     console.error("Error cargando pedidos:", err);
@@ -135,7 +135,7 @@ async function updatePedido(pedidoId, updates) {
   if (!pedidoId) throw new Error("ID de pedido requerido");
   
   try {
-    console.log("💾 Actualizando pedido:", pedidoId, updates);
+    console.log("Actualizando pedido:", pedidoId, updates);
     
     const { error } = await supabase
       .from("pedidos")
@@ -143,7 +143,7 @@ async function updatePedido(pedidoId, updates) {
       .eq("id", pedidoId);
     
     if (error) throw error;
-    console.log("✅ Pedido actualizado");
+    console.log("Pedido actualizado");
     return true;
   } catch (err) {
     console.error("Error actualizando pedido:", err);
@@ -155,7 +155,7 @@ async function fetchItemsByPedido(pedidoId) {
   if (!pedidoId) return [];
   
   try {
-    console.log("📦 Cargando items para pedido:", pedidoId);
+    console.log("Cargando items para pedido:", pedidoId);
     
     // Primero cargar los detalles del pedido
     const { data: detalles, error: errorDetalles } = await supabase
@@ -170,11 +170,11 @@ async function fetchItemsByPedido(pedidoId) {
     }
     
     if (!detalles || detalles.length === 0) {
-      console.log("📦 Sin ítems para este pedido");
+      console.log("Sin ítems para este pedido");
       return [];
     }
     
-    console.log(`✅ ${detalles.length} detalles encontrados`);
+    console.log(`${detalles.length} detalles encontrados`);
     
     // Luego cargar los productos por separado
     const productIds = detalles.map(d => d.producto_id).filter(Boolean);
@@ -219,7 +219,7 @@ async function fetchItemsByPedido(pedidoId) {
       };
     });
     
-    console.log(`✅ ${items.length} items procesados correctamente`);
+    console.log(`${items.length} items procesados correctamente`);
     return items;
   } catch (err) {
     console.error("Error en fetchItemsByPedido:", err);
@@ -268,7 +268,7 @@ function updateStats() {
   if (elFinalizados) elFinalizados.textContent = finalizados;
   if (elCancelados) elCancelados.textContent = cancelados;
   
-  console.log(`📊 Stats: Pendientes=${pendientes}, Finalizados=${finalizados}, Cancelados=${cancelados}`);
+  console.log(`Stats: Pendientes=${pendientes}, Finalizados=${finalizados}, Cancelados=${cancelados}`);
 }
 
 /* ========= Renderizado ========= */
@@ -277,7 +277,7 @@ function renderPedidos() {
   const grid = $("#grid");
   
   if (!grid) {
-    console.error("❌ No se encontró #grid");
+    console.error("No se encontró #grid");
     return;
   }
   
@@ -641,7 +641,7 @@ async function loadItemsForCard(pedidoId) {
       </table>
     `;
     
-    console.log(`✅ Items renderizados para pedido ${pedidoId}`);
+    console.log(`Items renderizados para pedido ${pedidoId}`);
   } catch (err) {
     console.error(`Error renderizando items para ${pedidoId}:`, err);
     container.innerHTML = `<p class="items-error">Error cargando ítems</p>`;
@@ -723,7 +723,7 @@ async function loadPedidos() {
   
   allPedidos = await fetchAllPedidos();
   
-  console.log("📦 Pedidos obtenidos:", allPedidos.length);
+  console.log("Pedidos obtenidos:", allPedidos.length);
   
   // Renderizar primero
   applyFilters();
@@ -738,11 +738,11 @@ async function loadPedidos() {
   
   if (loadingView) loadingView.style.display = "none";
   
-  console.log("✅ Todos los items cargados");
+  console.log("Todos los items cargados");
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("🚀 Inicializando módulo de pedidos pendientes...");
+  console.log("Inicializando módulo de pedidos pendientes...");
   
   setupEventListeners();
   loadPedidos();
@@ -750,5 +750,5 @@ document.addEventListener("DOMContentLoaded", () => {
   // Recargar cada 30 segundos
   setInterval(loadPedidos, 30000);
   
-  console.log("✅ Módulo de pedidos inicializado");
+  console.log("Módulo de pedidos inicializado");
 });

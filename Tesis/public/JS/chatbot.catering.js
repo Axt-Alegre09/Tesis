@@ -136,7 +136,7 @@ import { supabase, getUser, getProfile, getClientePerfil } from "./ScriptLogin.j
     const personas = data.invitados ? ` para ${data.invitados} personas` : "";
     return {
       ok:true,
-      text:`✅ ¡Reserva creada! ID #${data.id}. ${data.tipocomida} el **${data.fecha} ${data.hora}** en **${data.lugar}**${personas}. Estado: ${data.estado}.`
+      text:`¡Reserva creada! ID #${data.id}. ${data.tipocomida} el **${data.fecha} ${data.hora}** en **${data.lugar}**${personas}. Estado: ${data.estado}.`
     };
   }
 

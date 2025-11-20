@@ -14,7 +14,7 @@ let supabaseInstance = null;
 export function getSupabaseClient() {
   if (!supabaseInstance) {
     supabaseInstance = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    console.log('✅ Cliente Supabase inicializado (instancia única)');
+    console.log(' Cliente Supabase inicializado (instancia única)');
   }
   return supabaseInstance;
 }

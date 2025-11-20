@@ -69,7 +69,7 @@ function wireAside() {
   window.addEventListener("keydown", e => e.key === "Escape" && close());
 }
 
-/* 5) Búsqueda (delegá a tu main.js si corresponde) */
+/* 5) Búsqueda (delegá a  main.js si corresponde) */
 function wireSearch() {
   $("#searchForm")?.addEventListener("submit", (e) => {
     e.preventDefault();

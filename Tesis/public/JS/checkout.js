@@ -164,16 +164,16 @@
     const metodo = document.querySelector('input[name="metodo"]:checked')?.value;
     const { total, source, items } = getCheckoutData();
 
-    // ⭐ GUARDAR CARRITO EN localStorage ANTES DE NAVEGAR
+    //  GUARDAR CARRITO EN localStorage ANTES DE NAVEGAR
     try {
       const cartToSave = {
         items: items || [],
         total: total || 0
       };
       localStorage.setItem("carrito", JSON.stringify(cartToSave));
-      console.log("✅ Carrito guardado en localStorage:", cartToSave);
+      console.log("Carrito guardado en localStorage:", cartToSave);
     } catch (err) {
-      console.warn("⚠️ Error guardando carrito en localStorage:", err);
+      console.warn("Error guardando carrito en localStorage:", err);
     }
 
     if (source !== 'remote' && (!isFinite(total) || total <= 0)) {
@@ -193,18 +193,18 @@
     }
 
     if (metodo === 'tarjeta') {
-      // ✅ VERIFICAR SI HAY TARJETA GUARDADA SELECCIONADA
+      // VERIFICAR SI HAY TARJETA GUARDADA SELECCIONADA
       const tarjetaSeleccionada = document.querySelector('input[name="tarjeta-guardada"]:checked');
       
       if (tarjetaSeleccionada) {
-        // ✅ Tarjeta guardada seleccionada - Sin validación, solo simular
-        console.log('✅ Tarjeta guardada seleccionada - Procesando...');
+        // Tarjeta guardada seleccionada - Sin validación, solo simular
+        console.log('Tarjeta guardada seleccionada - Procesando...');
         alert('Pago aprobado. ¡Gracias por tu compra!');
         finalizeSuccess('tarjeta', { number: 'guardada' });
         return;
       }
 
-      // ❌ Si no hay tarjeta guardada, validar campos manuales
+      //  Si no hay tarjeta guardada, validar campos manuales
       const name = document.getElementById('card-name')?.value?.trim();
       const number = document.getElementById('card-number')?.value || '';
       const exp = document.getElementById('card-exp')?.value?.trim();

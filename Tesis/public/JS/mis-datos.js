@@ -91,7 +91,7 @@ async function handleRecoveryIfNeeded() {
 
   try {
     await updateAuthPasswordIfProvided(newPwd);
-    showMsg("✅ Contraseña actualizada. Usala a partir de ahora.", "ok");
+    showMsg("Contraseña actualizada. Usala a partir de ahora.", "ok");
   } catch (e) {
     showMsg("No se pudo actualizar la contraseña: " + (e?.message || ""), "error");
   } finally {

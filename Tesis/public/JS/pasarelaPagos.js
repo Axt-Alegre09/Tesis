@@ -9,16 +9,15 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-console.log("✅ Supabase inicializado con tracking de promociones");
+console.log("Supabase inicializado con tracking de promociones");
 
-// ============================================================================
 // OBTENER DATOS DEL FORMULARIO
 // ============================================================================
 
 function getFormData() {
   const form = document.querySelector("#checkout-form");
   if (!form) {
-    console.error("❌ Formulario no encontrado");
+    console.error("Formulario no encontrado");
     return null;
   }
 
@@ -29,7 +28,7 @@ function getFormData() {
     data[key] = value;
   }
 
-  console.log("📋 Datos del formulario capturados");
+  console.log("Datos del formulario capturados");
   return data;
 }
 
@@ -43,19 +42,19 @@ function getCartFromSessionStorage() {
   if (storedCartLocal) {
     try {
       const cartData = JSON.parse(storedCartLocal);
-      console.log("✅ Carrito obtenido desde localStorage");
+      console.log("Carrito obtenido desde localStorage");
       console.log("   Items:", cartData.items?.length || 0);
       console.log("   Total:", cartData.total || 0);
       
       // Detectar si hay promociones
       const tienePromos = cartData.items?.some(item => item.tienePromo);
       if (tienePromos) {
-        console.log("🎯 Se detectaron items con promoción!");
+        console.log("Se detectaron items con promoción!");
       }
       
       return cartData;
     } catch (err) {
-      console.warn("⚠️ Error parseando localStorage:", err);
+      console.warn("Error parseando localStorage:", err);
     }
   }
 
@@ -64,10 +63,10 @@ function getCartFromSessionStorage() {
   if (storedCart) {
     try {
       const cartData = JSON.parse(storedCart);
-      console.log("✅ Carrito obtenido desde sessionStorage");
+      console.log("Carrito obtenido desde sessionStorage");
       return cartData;
     } catch (err) {
-      console.warn("⚠️ Error parseando sessionStorage:", err);
+      console.warn("Error parseando sessionStorage:", err);
     }
   }
 
@@ -76,18 +75,17 @@ function getCartFromSessionStorage() {
   const monto = params.get("monto");
   
   if (monto) {
-    console.log("✅ Carrito obtenido desde URL param (monto):", monto);
+    console.log("Carrito obtenido desde URL param (monto):", monto);
     return {
       items: [],
       total: Number(monto)
     };
   }
 
-  console.error("❌ Carrito no encontrado");
+  console.error("Carrito no encontrado");
   return null;
 }
 
-// ============================================================================
 // CALCULAR DESCUENTOS TOTALES
 // ============================================================================
 
@@ -115,16 +113,16 @@ function calcularDescuentos(items) {
       const descuentoItem = (precioOriginal - precio) * cantidad;
       descuentoTotal += descuentoItem;
       
-      console.log(`   📦 ${item.titulo}: ${item.descuentoPorcentaje}% OFF`);
+      console.log(`  ${item.titulo}: ${item.descuentoPorcentaje}% OFF`);
       console.log(`      Original calculado: ${precioOriginal} x ${cantidad}`);
       console.log(`      Final: ${precio} x ${cantidad}`);
       console.log(`      Ahorro: ${descuentoItem}`);
     }
   });
 
-  console.log(`💰 Total sin descuento: ${totalSinDescuento}`);
-  console.log(`💰 Total con descuento: ${totalConDescuento}`);
-  console.log(`🎁 Ahorro total: ${descuentoTotal}`);
+  console.log(`Total sin descuento: ${totalSinDescuento}`);
+  console.log(`Total con descuento: ${totalConDescuento}`);
+  console.log(`Ahorro total: ${descuentoTotal}`);
 
   return {
     totalSinDescuento,
@@ -139,7 +137,7 @@ function calcularDescuentos(items) {
 // ============================================================================
 
 function buildPayload(cartData, formData, metodo) {
-  console.log("🔵 buildPayload() - Construyendo con tracking de promociones...");
+  console.log(" buildPayload() - Construyendo con tracking de promociones...");
 
   if (!cartData) {
     throw new Error("Cart data vacío");
@@ -210,7 +208,7 @@ function buildPayload(cartData, formData, metodo) {
     nro: formData?.nro || ""
   };
 
-  console.log("✅ Payload construido con datos de promociones");
+  console.log("Payload construido con datos de promociones");
   return payload;
 }
 
@@ -220,7 +218,7 @@ function buildPayload(cartData, formData, metodo) {
 
 async function guardarPedidoEnBD(usuario, email, cartData, formData, metodo) {
   try {
-    console.log("🔵 Guardando pedido con tracking de promociones...");
+    console.log("Guardando pedido con tracking de promociones...");
 
     const payload = buildPayload(cartData, formData, metodo);
 
@@ -231,18 +229,18 @@ async function guardarPedidoEnBD(usuario, email, cartData, formData, metodo) {
     });
 
     if (error) {
-      console.error("❌ Error en RPC:", error);
+      console.error("Error en RPC:", error);
       throw error;
     }
 
-    console.log("✅ Pedido creado");
+    console.log("Pedido creado");
 
     const resultado = data[0];
     const pedidoId = resultado.pedido_id;
 
     // 2. Si hay promociones, registrarlas
     if (payload.tienePromos && payload.descuentoTotal > 0) {
-      console.log("🎁 Registrando promociones aplicadas...");
+      console.log("Registrando promociones aplicadas...");
       
       const { error: errorPromo } = await supabase
         .from("pedidos_con_promo")
@@ -254,16 +252,16 @@ async function guardarPedidoEnBD(usuario, email, cartData, formData, metodo) {
         });
 
       if (errorPromo) {
-        console.error("⚠️ Error guardando promoción (no crítico):", errorPromo);
+        console.error("Error guardando promoción (no crítico):", errorPromo);
       } else {
-        console.log("✅ Promoción registrada correctamente");
+        console.log("Promoción registrada correctamente");
         console.log(`   Descuento total: Gs ${payload.descuentoTotal}`);
       }
     }
 
     // 3. Guardar detalle de items
     if (payload.itemsDetalle && payload.itemsDetalle.length > 0) {
-      console.log("📦 Guardando detalle de items...");
+      console.log("Guardando detalle de items...");
       
       const itemsConPedidoId = payload.itemsDetalle.map(item => ({
         ...item,
@@ -275,9 +273,9 @@ async function guardarPedidoEnBD(usuario, email, cartData, formData, metodo) {
         .insert(itemsConPedidoId);
 
       if (errorDetalle) {
-        console.error("⚠️ Error guardando detalle de items (no crítico):", errorDetalle);
+        console.error("Error guardando detalle de items (no crítico):", errorDetalle);
       } else {
-        console.log("✅ Detalle de items guardado");
+        console.log("Detalle de items guardado");
       }
     }
 
@@ -290,12 +288,11 @@ async function guardarPedidoEnBD(usuario, email, cartData, formData, metodo) {
     };
     
   } catch (err) {
-    console.error("❌ Error guardando pedido:", err);
+    console.error("Error guardando pedido:", err);
     throw err;
   }
 }
 
-// ============================================================================
 // INTERCEPTAR FORM SUBMIT
 // ============================================================================
 
@@ -303,18 +300,17 @@ function setupFormInterceptor() {
   const form = document.querySelector("#checkout-form");
 
   if (!form) {
-    console.log("⏳ Esperando formulario #checkout-form...");
+    console.log("Esperando formulario #checkout-form...");
     setTimeout(setupFormInterceptor, 100);
     return;
   }
 
-  console.log("✅ Formulario encontrado");
+  console.log("Formulario encontrado");
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
-    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    console.log("🔵 PROCESANDO PEDIDO");
+    console.log(" PROCESANDO PEDIDO");
     console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
     try {
@@ -353,11 +349,11 @@ function setupFormInterceptor() {
         metodoSeleccionado
       );
 
-      console.log("✅ Pedido creado exitosamente");
+      console.log("Pedido creado exitosamente");
       console.log("   ID: " + resultado.pedido_id);
       
       if (resultado.tienePromos) {
-        console.log("   🎁 Con promociones aplicadas");
+        console.log("  Con promociones aplicadas");
         console.log("   Ahorro total: Gs " + resultado.descuentoTotal);
       }
 
@@ -365,19 +361,19 @@ function setupFormInterceptor() {
       sessionStorage.removeItem("carrito");
       localStorage.removeItem("carrito");
       localStorage.removeItem("productos-en-carrito");
-      console.log("✅ Carrito limpiado");
+      console.log("Carrito limpiado");
 
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
       console.log("✅ PEDIDO COMPLETADO");
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
     } catch (err) {
-      console.error("❌ Error en submit:", err);
+      console.error("Error en submit:", err);
       alert("Error: " + err.message);
     }
   });
 
-  console.log("✅ Interceptor configurado");
+  console.log("Interceptor configurado");
 }
 
 // ============================================================================
@@ -385,23 +381,23 @@ function setupFormInterceptor() {
 // ============================================================================
 
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("🔵 pasarelaPagos.js - Versión con tracking de promociones");
+  console.log("pasarelaPagos.js - Versión con tracking de promociones");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
   setupFormInterceptor();
 
   const cartData = getCartFromSessionStorage();
   if (cartData) {
-    console.log("🛒 Carrito cargado:");
+    console.log("Carrito cargado:");
     console.log("   Items:", cartData.items?.length || 0);
     console.log("   Total:", new Intl.NumberFormat("es-PY").format(cartData.total || 0), "Gs");
     
     // Detectar promociones
     const tienePromos = cartData.items?.some(item => item.tienePromo);
     if (tienePromos) {
-      console.log("   🎁 Contiene items con promoción");
+      console.log(" Contiene items con promoción");
     }
   }
 
-  console.log("✅ Módulo listo");
+  console.log(" Módulo listo");
 });

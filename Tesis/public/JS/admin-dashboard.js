@@ -1,7 +1,7 @@
 // ==================== ADMIN DASHBOARD JS - VERSIÓN FINAL ====================
 // Cambios finales:
-// 1. ✅ Email dinámico del usuario autenticado
-// 2. ✅ Chatbot removido completamente
+// 1. Email dinámico del usuario autenticado
+// 2. Chatbot removido completamente
 
 import { supa } from './supabase-client.js';
 import { configuracionView, initConfiguracion } from './modules/configuracion-complete.js';
@@ -327,7 +327,7 @@ const views = {
   dashboard: `
     <div class="welcome-section" style="margin-bottom: 2rem;">
       <h2 style="font-size: 2.25rem; margin-bottom: 0.5rem; font-weight: 800; background: linear-gradient(135deg, var(--primary), var(--primary-light)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
-        ¡Bienvenido de vuelta! 👋
+        ¡Bienvenido de vuelta! 
       </h2>
       <p style="color: var(--text-secondary); font-size: 1.1rem;">Intelligence Center - Análisis en Tiempo Real</p>
     </div>
@@ -637,7 +637,7 @@ const views = {
 
 // ========== INICIALIZACIÓN DEL DASHBOARD ==========
 async function initDashboard() {
-  console.log('🚀 Inicializando Dashboard Intelligence...');
+  console.log(' Inicializando Dashboard Intelligence...');
 
   try {
     // 1. Usar la vista v_resumen_hoy
@@ -754,10 +754,10 @@ async function initDashboard() {
     document.getElementById('productosTotal').textContent = totalProductos || 0;
     document.getElementById('productosActivos').textContent = productosActivos || 0;
 
-    console.log('✅ Dashboard cargado correctamente');
+    console.log('Dashboard cargado correctamente');
 
   } catch (error) {
-    console.error('❌ Error cargando dashboard:', error);
+    console.error('Error cargando dashboard:', error);
     setDefaultValues();
   }
 }
@@ -941,7 +941,7 @@ export async function crearNotificacionGlobal(tipo, titulo, mensaje) {
       });
     
     if (error) throw error;
-    console.log('✅ Notificación creada:', titulo);
+    console.log('Notificación creada:', titulo);
     
     // Recargar notificaciones si el sistema está inicializado
     if (notificationSystem) {
@@ -954,7 +954,7 @@ export async function crearNotificacionGlobal(tipo, titulo, mensaje) {
 
 // ========== INICIALIZACIÓN ==========
 document.addEventListener('DOMContentLoaded', async () => {
-  console.log('🚀 Inicializando Admin Dashboard Final...');
+  console.log('Inicializando Admin Dashboard Final...');
   
   // Limpiar modales al inicio
   document.querySelectorAll('.modal-overlay').forEach(modal => {
@@ -973,7 +973,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (userNameElement) {
         userNameElement.textContent = user.email.split('@')[0];
       }
-      console.log('✅ Usuario autenticado:', user.email);
+      console.log('Usuario autenticado:', user.email);
     }
   } catch (error) {
     console.error('Error cargando usuario:', error);
@@ -1061,9 +1061,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     try {
       await supa.auth.signOut();
-      console.log('✅ Sesión cerrada correctamente');
+      console.log('Sesión cerrada correctamente');
     } catch (error) {
-      console.error('❌ Error al cerrar sesión:', error);
+      console.error('Error al cerrar sesión:', error);
     }
 
     window.location.href = 'loginAdmin.html';
@@ -1079,7 +1079,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     navigateTo(view);
   });
 
-  console.log('✅ Admin Dashboard inicializado correctamente');
+  console.log('Admin Dashboard inicializado correctamente');
 });
 
 // Agregar estilos CSS para botones de acción rápida

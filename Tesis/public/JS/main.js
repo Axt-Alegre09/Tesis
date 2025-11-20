@@ -166,8 +166,8 @@ async function fetchProductosCatalogo() {
     return [];
   }
 
-  console.log('✅ Productos cargados:', data?.length || 0);
-  console.log('🏷️ Con promo:', data?.filter(p => p.tiene_promo).length || 0);
+  console.log('Productos cargados:', data?.length || 0);
+  console.log('Con promo:', data?.filter(p => p.tiene_promo).length || 0);
 
   return (data || []).map((p) => ({
     id: p.id,

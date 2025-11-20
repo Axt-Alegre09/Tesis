@@ -215,7 +215,7 @@ function closeModal() {
 /* ========= Data Loading ========= */
 async function loadReservas() {
   try {
-    console.log('📥 Cargando reservas...');
+    console.log('Cargando reservas...');
     
     const { data, error } = await supabase
       .from('reservas_catering')
@@ -229,12 +229,12 @@ async function loadReservas() {
     }
     
     allReservas = data || [];
-    console.log(`✅ ${allReservas.length} reservas cargadas`);
+    console.log(`${allReservas.length} reservas cargadas`);
     
     applyFilters();
     
   } catch (error) {
-    console.error('❌ Error cargando reservas:', error);
+    console.error('Error cargando reservas:', error);
     showToast('Error al cargar las reservas. Revisa la conexión.', 'error');
     allReservas = [];
     applyFilters();
@@ -376,7 +376,7 @@ async function saveReserva() {
     
     if (isEditMode && selectedId) {
       // ===== MODO EDICIÓN =====
-      console.log('📝 Actualizando reserva ID:', selectedId);
+      console.log('Actualizando reserva ID:', selectedId);
       
       // Obtener la reserva actual para verificar si cambió la fecha
       const currentReserva = allReservas.find(r => r.id === selectedId);
@@ -428,7 +428,7 @@ async function saveReserva() {
       // Si cambió el estado, actualizarlo
       const newStatus = statusToBackend(elements.f_estado.value);
       if (currentReserva && currentReserva.estado !== newStatus) {
-        console.log('📊 Actualizando estado de', currentReserva.estado, 'a', newStatus);
+        console.log('Actualizando estado de', currentReserva.estado, 'a', newStatus);
         
         const { data: statusData, error: statusError } = await supabase.rpc('catering_set_estado', {
           p_id: selectedId,
@@ -496,7 +496,7 @@ async function saveReserva() {
     await loadReservas();
     
   } catch (error) {
-    console.error('❌ Error guardando reserva:', error);
+    console.error('Error guardando reserva:', error);
     showToast('Error inesperado. Revisa la consola.', 'error');
   }
 }
@@ -615,12 +615,12 @@ elements.f_fecha?.addEventListener('change', async () => {
     // Cargar datos iniciales
     await loadReservas();
     
-    console.log('✅ Panel de Catering inicializado correctamente');
-    console.log('📋 Estados disponibles: agendado, en_curso, finalizado, cancelado');
-    console.log('📅 Límites: 2 servicios/día (L-V), 3 servicios/día (S-D)');
+    console.log('Panel de Catering inicializado correctamente');
+    console.log('Estados disponibles: agendado, en_curso, finalizado, cancelado');
+    console.log('Límites: 2 servicios/día (L-V), 3 servicios/día (S-D)');
     
   } catch (error) {
-    console.error('❌ Error al inicializar:', error);
+    console.error('Error al inicializar:', error);
     // Si el error es de autenticación, redirigir al login
     if (error.message?.includes('auth') || error.message?.includes('session')) {
       window.location.href = 'login.html';
