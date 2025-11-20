@@ -22,7 +22,7 @@ let currentProductId = null;
  * Inicializar el módulo de productos
  */
 export async function initProductos() {
-  console.log('🔄 Inicializando módulo de productos...');
+  console.log(' Inicializando módulo de productos...');
   
   // Cargar datos
   await loadCategorias();
@@ -31,7 +31,7 @@ export async function initProductos() {
   // Configurar SOLO los event listeners que NO están en la tabla
   setupEventListeners();
   
-  console.log('✅ Módulo de productos inicializado');
+  console.log(' Módulo de productos inicializado');
 }
 
 // ==================== CARGAR DATOS ====================
@@ -40,7 +40,7 @@ export async function initProductos() {
  * Cargar productos desde Supabase
  */
 export async function loadProductos() {
-  console.log('🔄 Cargando productos...');
+  console.log(' Cargando productos...');
   
   const tbody = document.getElementById('productosTableBody');
   if (!tbody) return;
@@ -69,7 +69,7 @@ export async function loadProductos() {
 
     if (error) throw error;
     
-    console.log(`✅ ${data.length} productos cargados`);
+    console.log(` ${data.length} productos cargados`);
     
     // Procesar datos
     productosData = data.map(producto => ({
@@ -103,7 +103,7 @@ export async function loadProductos() {
  * Cargar categorías desde Supabase
  */
 export async function loadCategorias() {
-  console.log('🔄 Cargando categorías...');
+  console.log(' Cargando categorías...');
   
   try {
     const { data, error } = await supabase
@@ -113,7 +113,7 @@ export async function loadCategorias() {
 
     if (error) throw error;
     
-    console.log(`✅ ${data.length} categorías cargadas`);
+    console.log(` ${data.length} categorías cargadas`);
     categoriasData = data;
     
     // Llenar selects
@@ -152,7 +152,7 @@ function populateCategoriaSelects() {
 
 /**
  * Renderizar tabla de productos
- * ✅ ENFOQUE PROYECTO VIEJO: onclick inline
+ * ENFOQUE PROYECTO VIEJO: onclick inline
  * @param {Array} filteredData - Datos filtrados (opcional)
  */
 function renderProductosTable(filteredData = null) {
@@ -181,7 +181,7 @@ function renderProductosTable(filteredData = null) {
     const precioFormateado = formatPrice(producto.precio);
     const imagenUrl = getImageUrl(producto.imagen);
     
-    // ✅ Escapar comillas simples en el nombre para evitar romper onclick
+    //  Escapar comillas simples en el nombre para evitar romper onclick
     const nombreEscapado = producto.nombre.replace(/'/g, "\\'");
     
     return `
@@ -245,7 +245,7 @@ function renderProductosTable(filteredData = null) {
     </tr>
   `}).join('');
   
-  // ✅ YA NO NECESITAMOS attachTableEventListeners() porque usamos onclick inline
+  //  YA NO NECESITAMOS attachTableEventListeners() porque usamos onclick inline
 }
 
 // ==================== FILTROS ====================
@@ -277,7 +277,7 @@ export function filterProductos() {
   const total = productosData.length;
   
   if (searchTerm || categoriaId) {
-    console.log(`🔍 Mostrando ${count} de ${total} productos`);
+    console.log(` Mostrando ${count} de ${total} productos`);
   }
 }
 
@@ -287,7 +287,7 @@ export function filterProductos() {
  * Abrir modal para nuevo producto
  */
 export function openNewProductoModal() {
-  console.log('📝 Abriendo modal para nuevo producto');
+  console.log(' Abriendo modal para nuevo producto');
   currentProductId = null;
   
   const modal = document.getElementById('modalProducto');
@@ -296,13 +296,13 @@ export function openNewProductoModal() {
   const previewArea = document.getElementById('previewArea');
   
   if (!modal) {
-    console.error('❌ Modal no encontrado');
+    console.error(' Modal no encontrado');
     showToast('Error: Modal no encontrado', 'error');
     return;
   }
   
   if (!form) {
-    console.error('❌ Formulario no encontrado');
+    console.error(' Formulario no encontrado');
     showToast('Error: Formulario no encontrado', 'error');
     return;
   }
@@ -320,9 +320,9 @@ export function openNewProductoModal() {
     `;
   }
   
-  // ✅ CORRECCIÓN: Usar clase active en lugar de style.display
+  //  CORRECCIÓN: Usar clase active en lugar de style.display
   modal.classList.add('active');
-  console.log('✅ Modal abierto');
+  console.log(' Modal abierto');
 }
 
 /**
@@ -331,10 +331,10 @@ export function openNewProductoModal() {
 export function closeProductoModal() {
   const modal = document.getElementById('modalProducto');
   if (modal) {
-    // ✅ CORRECCIÓN: Remover clase active en lugar de cambiar display
+    // CORRECCIÓN: Remover clase active en lugar de cambiar display
     modal.classList.remove('active');
     currentProductId = null;
-    console.log('✅ Modal cerrado');
+    console.log(' Modal cerrado');
   }
 }
 
@@ -343,7 +343,7 @@ export function closeProductoModal() {
  * @param {string} id - ID del producto
  */
 export async function editProducto(id) {
-  console.log('✏️ Editando producto:', id);
+  console.log('Editando producto:', id);
   
   try {
     const { data, error } = await supabase
@@ -361,7 +361,7 @@ export async function editProducto(id) {
     const previewArea = document.getElementById('previewArea');
     
     if (!modal) {
-      console.error('❌ Modal no encontrado');
+      console.error(' Modal no encontrado');
       showToast('Error: Modal no encontrado', 'error');
       return;
     }
@@ -382,9 +382,9 @@ export async function editProducto(id) {
       `;
     }
 
-    // ✅ CORRECCIÓN: Usar clase active
+    //  CORRECCIÓN: Usar clase active
     modal.classList.add('active');
-    console.log('✅ Modal de edición abierto');
+    console.log(' Modal de edición abierto');
     
   } catch (error) {
     handleError(error, 'Error al cargar producto');
@@ -397,14 +397,14 @@ export async function editProducto(id) {
  * @param {string} nombre - Nombre del producto
  */
 export async function deleteProducto(id, nombre) {
-  console.log('🗑️ Intentando eliminar:', nombre);
+  console.log(' Intentando eliminar:', nombre);
   
   const confirmado = confirm(
     `¿Estás seguro de eliminar "${nombre}"?\n\n⚠️ Esta acción no se puede deshacer.`
   );
   
   if (!confirmado) {
-    console.log('❌ Eliminación cancelada');
+    console.log(' Eliminación cancelada');
     return;
   }
 
@@ -422,7 +422,7 @@ export async function deleteProducto(id, nombre) {
       .delete()
       .eq('id', id);
 
-    // ✅ Manejo inteligente de foreign key constraint
+    //  Manejo inteligente de foreign key constraint
     if (error) {
       if (error.code === '23503') {
         // Error de foreign key - producto está en uso
@@ -438,12 +438,12 @@ export async function deleteProducto(id, nombre) {
           
           if (updateError) throw updateError;
           
-          showToast('✅ Producto desactivado exitosamente', 'success');
-          console.log('✅ Producto desactivado:', nombre);
+          showToast(' Producto desactivado exitosamente', 'success');
+          console.log(' Producto desactivado:', nombre);
           await loadProductos();
           return;
         } else {
-          console.log('❌ Desactivación cancelada');
+          console.log(' Desactivación cancelada');
           return;
         }
       }
@@ -455,8 +455,8 @@ export async function deleteProducto(id, nombre) {
       await deleteImage(producto.imagen);
     }
 
-    showToast('✅ Producto eliminado exitosamente', 'success');
-    console.log('✅ Producto eliminado:', nombre);
+    showToast(' Producto eliminado exitosamente', 'success');
+    console.log(' Producto eliminado:', nombre);
     await loadProductos();
     
   } catch (error) {
@@ -487,15 +487,15 @@ export async function saveProducto(e) {
     // Subir imagen si hay una nueva
     const fileInput = document.getElementById('productoImagen');
     if (fileInput.files.length > 0) {
-      console.log('📤 Subiendo imagen...');
+      console.log(' Subiendo imagen...');
       const fileName = await uploadImage(fileInput.files[0]);
       formData.imagen = fileName;
-      console.log('✅ Imagen subida:', fileName);
+      console.log(' Imagen subida:', fileName);
     }
 
     if (currentProductId) {
       // ACTUALIZAR producto existente
-      console.log('📝 Actualizando producto existente');
+      console.log(' Actualizando producto existente');
       
       // Si no hay nueva imagen, mantener la anterior
       if (!formData.imagen) {
@@ -517,11 +517,11 @@ export async function saveProducto(e) {
 
       if (error) throw error;
       
-      showToast('✅ Producto actualizado exitosamente', 'success');
+      showToast(' Producto actualizado exitosamente', 'success');
       
     } else {
       // CREAR nuevo producto
-      console.log('🆕 Creando nuevo producto');
+      console.log(' Creando nuevo producto');
       formData.creado_en = new Date().toISOString();
       formData.actualizado_en = new Date().toISOString();
 
@@ -531,7 +531,7 @@ export async function saveProducto(e) {
 
       if (error) throw error;
       
-      showToast('✅ Producto creado exitosamente', 'success');
+      showToast(' Producto creado exitosamente', 'success');
     }
 
     closeProductoModal();
@@ -546,7 +546,7 @@ export async function saveProducto(e) {
 
 /**
  * Configurar event listeners
- * ✅ SOLO para elementos que NO están en la tabla
+ * SOLO para elementos que NO están en la tabla
  */
 function setupEventListeners() {
   console.log('🎧 Configurando event listeners...');
@@ -557,25 +557,25 @@ function setupEventListeners() {
   
   if (searchInput) {
     searchInput.addEventListener('input', filterProductos);
-    console.log('✅ Listener de búsqueda configurado');
+    console.log(' Listener de búsqueda configurado');
   }
   
   if (filterSelect) {
     filterSelect.addEventListener('change', filterProductos);
-    console.log('✅ Listener de filtro configurado');
+    console.log(' Listener de filtro configurado');
   }
   
-  // ✅ Botón Nuevo Producto
+  // Botón Nuevo Producto
   const btnNuevoProducto = document.getElementById('btnNuevoProducto');
   if (btnNuevoProducto) {
     btnNuevoProducto.addEventListener('click', (e) => {
       e.preventDefault();
-      console.log('🆕 Click en botón Nuevo Producto');
+      console.log(' Click en botón Nuevo Producto');
       openNewProductoModal();
     });
-    console.log('✅ Listener de Nuevo Producto configurado');
+    console.log(' Listener de Nuevo Producto configurado');
   } else {
-    console.warn('⚠️ Botón Nuevo Producto no encontrado');
+    console.warn(' Botón Nuevo Producto no encontrado');
   }
   
   // Preview de imagen
@@ -584,7 +584,7 @@ function setupEventListeners() {
   
   if (uploadArea && fileInput) {
     uploadArea.addEventListener('click', () => {
-      console.log('📁 Click en área de upload');
+      console.log(' Click en área de upload');
       fileInput.click();
     });
     
@@ -592,7 +592,7 @@ function setupEventListeners() {
       const file = e.target.files[0];
       if (!file) return;
       
-      console.log('🖼️ Imagen seleccionada:', file.name);
+      console.log(' Imagen seleccionada:', file.name);
       
       // Validar tamaño
       if (file.size > 5 * 1024 * 1024) {
@@ -613,7 +613,7 @@ function setupEventListeners() {
       };
       reader.readAsDataURL(file);
     });
-    console.log('✅ Listener de upload de imagen configurado');
+    console.log(' Listener de upload de imagen configurado');
   }
   
   // Botones del modal
@@ -623,17 +623,17 @@ function setupEventListeners() {
   
   if (closeModalBtn) {
     closeModalBtn.addEventListener('click', closeProductoModal);
-    console.log('✅ Listener de cerrar modal configurado');
+    console.log('Listener de cerrar modal configurado');
   }
   
   if (btnCancelar) {
     btnCancelar.addEventListener('click', closeProductoModal);
-    console.log('✅ Listener de cancelar configurado');
+    console.log(' Listener de cancelar configurado');
   }
   
   if (formProducto) {
     formProducto.addEventListener('submit', saveProducto);
-    console.log('✅ Listener de formulario configurado');
+    console.log(' Listener de formulario configurado');
   }
 }
 
@@ -650,7 +650,6 @@ function updateDashboardStats() {
 }
 
 // ==================== EXPORTAR PARA USO GLOBAL ====================
-// ✅ CRÍTICO: Hacer las funciones disponibles globalmente para onclick handlers
 if (typeof window !== 'undefined') {
   window.productosModule = {
     initProductos,
@@ -663,7 +662,7 @@ if (typeof window !== 'undefined') {
     deleteProducto,
     saveProducto
   };
-  console.log('✅ Módulo productos exportado a window.productosModule');
+  console.log(' Módulo productos exportado a window.productosModule');
 }
 
-console.log('📦 Módulo de Productos cargado (versión proyecto viejo con onclick inline)');
+console.log('Módulo de Productos cargado (versión proyecto viejo con onclick inline)');
