@@ -142,18 +142,21 @@ function mostrarPopupConfirmacion(datosPedido) {
   // Eventos de botones
   document.getElementById('btn-cerrar-popup').addEventListener('click', () => {
     overlay.remove();
+    // Recargar la página para asegurar que la UI se actualice
     window.location.href = 'index.html';
   });
 
   document.getElementById('btn-ver-pedidos').addEventListener('click', () => {
     overlay.remove();
-    window.location.href = './historial.html'; // Ajusta la URL según tu proyecto
+    // Ir a la página de historial de pedidos
+    window.location.href = 'historial.html';
   });
 
   // Cerrar al hacer clic fuera
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) {
       overlay.remove();
+      // Recargar la página para asegurar que la UI se actualice
       window.location.href = 'index.html';
     }
   });
@@ -407,10 +410,44 @@ async function procesarPagoConTarjetaGuardada(event) {
 
       console.log('✅ Pedido creado exitosamente:', data);
 
-      // Limpiar carrito
-      localStorage.removeItem('carrito');
-      sessionStorage.removeItem('carrito');
-      localStorage.removeItem('productos-en-carrito');
+      // ========== LIMPIAR CARRITO COMPLETAMENTE ==========
+      console.log('🧹 Limpiando carrito...');
+      
+      // 1. Limpiar localStorage
+      try {
+        localStorage.removeItem('carrito');
+        localStorage.removeItem('productos-en-carrito');
+        console.log('  ✓ localStorage limpiado');
+      } catch (e) {
+        console.warn('  ⚠️ Error limpiando localStorage:', e);
+      }
+      
+      // 2. Limpiar sessionStorage
+      try {
+        sessionStorage.removeItem('carrito');
+        sessionStorage.removeItem('productos-en-carrito');
+        console.log('  ✓ sessionStorage limpiado');
+      } catch (e) {
+        console.warn('  ⚠️ Error limpiando sessionStorage:', e);
+      }
+      
+      // 3. Vaciar usando CartAPI si está disponible
+      try {
+        if (window.CartAPI && typeof window.CartAPI.empty === 'function') {
+          await window.CartAPI.empty();
+          console.log('  ✓ CartAPI vaciado');
+        }
+        
+        // 4. Actualizar badge del carrito
+        if (window.CartAPI && typeof window.CartAPI.refreshBadge === 'function') {
+          window.CartAPI.refreshBadge();
+          console.log('  ✓ Badge actualizado');
+        }
+      } catch (e) {
+        console.warn('  ⚠️ Error con CartAPI:', e);
+      }
+      
+      console.log('✅ Carrito limpiado completamente');
 
       // Mostrar popup de confirmación
       mostrarPopupConfirmacion({

@@ -252,19 +252,56 @@
   function finalizeSuccess(metodo, extra = {}) {
     const snap = saveFacturaSnapshot({ metodo, extra });
 
+    // ========== LIMPIAR CARRITO COMPLETAMENTE ==========
+    console.log('🧹 Limpiando carrito después de pago exitoso...');
+    
     Promise.resolve()
-      .then(() => window.CartAPI?.empty?.())
-      .catch(() => {})
+      .then(() => {
+        // 1. Vaciar usando CartAPI
+        if (window.CartAPI && typeof window.CartAPI.empty === 'function') {
+          return window.CartAPI.empty();
+        }
+      })
+      .catch((e) => {
+        console.warn('⚠️ Error vaciando CartAPI:', e);
+      })
       .finally(() => {
-        try { localStorage.removeItem('productos-en-carrito'); } catch {}
+        // 2. Limpiar localStorage
+        try {
+          localStorage.removeItem('productos-en-carrito');
+          localStorage.removeItem('carrito');
+          console.log('  ✓ localStorage limpiado');
+        } catch (e) {
+          console.warn('  ⚠️ Error limpiando localStorage:', e);
+        }
+        
+        // 3. Limpiar sessionStorage
+        try {
+          sessionStorage.removeItem('carrito');
+          sessionStorage.removeItem('productos-en-carrito');
+          console.log('  ✓ sessionStorage limpiado');
+        } catch (e) {
+          console.warn('  ⚠️ Error limpiando sessionStorage:', e);
+        }
 
+        // 4. Actualizar UI
         form.classList.add('disabled');
         success.classList.remove('disabled');
         success.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
         if (btnFactura) btnFactura.onclick = () => generateInvoicePDF(snap || loadFacturaSnapshot());
         
-        try { window.CartAPI?.refreshBadge?.(); } catch {}
+        // 5. Refrescar badge del carrito
+        try { 
+          if (window.CartAPI && typeof window.CartAPI.refreshBadge === 'function') {
+            window.CartAPI.refreshBadge(); 
+            console.log('  ✓ Badge actualizado');
+          }
+        } catch (e) {
+          console.warn('  ⚠️ Error actualizando badge:', e);
+        }
+        
+        console.log('✅ Carrito limpiado completamente');
       });
   }
 
