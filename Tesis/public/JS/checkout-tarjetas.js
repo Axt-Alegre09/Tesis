@@ -348,13 +348,16 @@ function seleccionarTarjeta(id, tarjetas) {
 // ============================================================================
 
 async function procesarPagoConTarjetaGuardada(event) {
-  event.preventDefault();
-  
   const metodoRadio = document.querySelector('input[name="metodo"]:checked');
   const metodoSeleccionado = metodoRadio ? metodoRadio.value : 'transferencia';
   
   // Si el método es tarjeta Y hay una tarjeta guardada seleccionada
   if (metodoSeleccionado === 'tarjeta' && tarjetaSeleccionada) {
+    // DETENER TODO: prevenir default y detener propagación
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    
     console.log('🚀 Procesando pago con tarjeta guardada...');
     
     try {
@@ -421,33 +424,54 @@ async function procesarPagoConTarjetaGuardada(event) {
       alert('Error al procesar el pago. Por favor intenta de nuevo.');
     }
     
-    return; // Detener el procesamiento normal
+    // IMPORTANTE: Ya procesamos todo, no dejar que otros scripts se ejecuten
+    return;
   }
   
-  // Si no es tarjeta guardada, dejar que pasarelaPagos.js maneje el resto
-  console.log('Dejando que pasarelaPagos.js maneje el pago...');
+  // Si NO es tarjeta guardada, NO hacemos nada y dejamos que el evento continúe
+  // No llamamos a preventDefault() ni stopPropagation() para que pasarelaPagos.js lo maneje
+  console.log('No es pago con tarjeta guardada, dejando que otros scripts lo manejen...');
 }
 
 // Obtener carrito
 function obtenerCarrito() {
+  // 1. Intentar desde localStorage
   const storedCartLocal = localStorage.getItem("carrito");
   if (storedCartLocal) {
     try {
-      return JSON.parse(storedCartLocal);
+      const cartData = JSON.parse(storedCartLocal);
+      console.log('✓ Carrito obtenido desde localStorage');
+      return cartData;
     } catch (err) {
       console.warn("Error parseando localStorage:", err);
     }
   }
 
+  // 2. Intentar desde sessionStorage
   const storedCart = sessionStorage.getItem("carrito");
   if (storedCart) {
     try {
-      return JSON.parse(storedCart);
+      const cartData = JSON.parse(storedCart);
+      console.log('✓ Carrito obtenido desde sessionStorage');
+      return cartData;
     } catch (err) {
       console.warn("Error parseando sessionStorage:", err);
     }
   }
 
+  // 3. Fallback: URL param (para compatibilidad)
+  const params = new URLSearchParams(window.location.search);
+  const monto = params.get("monto");
+  
+  if (monto) {
+    console.log('✓ Carrito obtenido desde URL param (monto):', monto);
+    return {
+      items: [],
+      total: Number(monto)
+    };
+  }
+
+  console.error('❌ No se encontró carrito en ninguna fuente');
   return null;
 }
 
@@ -499,8 +523,8 @@ function interceptarFormularioPago() {
 
   console.log('✓ Formulario encontrado, interceptando submit...');
   
-  // Agregar listener ANTES que cualquier otro
-  form.addEventListener('submit', procesarPagoConTarjetaGuardada, true);
+  // Agregar listener en CAPTURE PHASE para ejecutarse PRIMERO
+  form.addEventListener('submit', procesarPagoConTarjetaGuardada, { capture: true });
 }
 
 // Inicializar cuando cargue el DOM
