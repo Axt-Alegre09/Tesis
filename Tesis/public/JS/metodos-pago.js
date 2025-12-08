@@ -464,6 +464,7 @@ function actualizarVistaPrevia() {
     displayNumero.appendChild(span);
   }
 
+  
   document.getElementById('card-display-name').textContent = nombre.toUpperCase();
   document.getElementById('card-display-exp').textContent = `${mes}/${anio}`;
 }
