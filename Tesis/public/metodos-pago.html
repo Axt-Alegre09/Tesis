@@ -179,7 +179,13 @@
         </div>
       </div>
     </main>
-                <!-- Scripts -->
-            <script type="module" src="JS/metodos-pago.js"></script>
+  </div>
+
+  <!-- Scripts en orden correcto -->
+  <!-- PRIMERO: ScriptLogin.js (inicializa Supabase) -->
+  <script type="module" src="JS/ScriptLogin.js"></script>
+  
+  <!-- DESPUÉS: metodos-pago.js (usa Supabase ya inicializado) -->
+  <script type="module" src="JS/metodos-pago.js"></script>
 </body>
 </html>

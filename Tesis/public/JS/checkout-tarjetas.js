@@ -1,229 +1,265 @@
-// JS/checkout-tarjetas.js - Integración de tarjetas guardadas en pasarela
+// JS/checkout-tarjetas.js - VERSIÓN CORREGIDA
+// Script para cargar y seleccionar tarjetas guardadas en la pasarela de pago
 
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+// ✅ Importar Supabase desde ScriptLogin (instancia compartida)
+import { supabase } from './ScriptLogin.js';
 
-const SUPABASE_URL = 'https://jyygevitfnbwrvxrjexp.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5eWdldml0Zm5id3J2eHJqZXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2OTQ2OTYsImV4cCI6MjA3MTI3MDY5Nn0.St0IiSZSeELESshctneazCJHXCDBi9wrZ28UkiEDXYo';
+console.log("✓ checkout-tarjetas.js cargado");
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+let tarjetaSeleccionada = null;
 
-let tarjetasGuardadas = [];
-let tarjetaSeleccionadaId = null;
-
-// ========== INICIALIZACIÓN ==========
-document.addEventListener('DOMContentLoaded', async () => {
-  console.log('Inicializando checkout-tarjetas.js');
-  
-  await cargarTarjetasGuardadas();
-  configurarToggleTarjetas();
-  agregarEventosTarjetas();
-  configurarCamposTarjeta();
-});
-
-// ========== CARGAR TARJETAS GUARDADAS ==========
+// Cargar tarjetas guardadas cuando el método de pago sea "tarjeta"
 async function cargarTarjetasGuardadas() {
+  const container = document.getElementById('tarjetas-guardadas-container');
+  const lista = document.getElementById('lista-tarjetas-guardadas');
+  
+  if (!container || !lista) {
+    console.log('Contenedor de tarjetas no encontrado');
+    return;
+  }
+
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    // Obtener usuario actual
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
     
-    if (!user) {
-      console.log('Usuario no autenticado - tarjetas guardadas no disponibles');
+    if (userError || !user) {
+      console.log('Usuario no autenticado');
       return;
     }
 
+    // Obtener tarjetas del usuario
     const { data: tarjetas, error } = await supabase
       .from('metodos_pago')
       .select('*')
       .eq('usuario_id', user.id)
-      .order('es_predeterminada', { ascending: false });
+      .order('es_predeterminada', { ascending: false })
+      .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error al cargar tarjetas:', error);
+      return;
+    }
 
-    if (tarjetas && tarjetas.length > 0) {
-      tarjetasGuardadas = tarjetas;
-      console.log(` ${tarjetas.length} tarjeta(s) guardada(s) cargada(s)`);
-      
-      mostrarTarjetasGuardadas();
-      document.getElementById('tarjetas-guardadas-container').style.display = 'block';
-    } else {
-      console.log('ℹ No hay tarjetas guardadas');
-      document.getElementById('tarjetas-guardadas-container').style.display = 'none';
+    if (!tarjetas || tarjetas.length === 0) {
+      container.style.display = 'none';
+      return;
+    }
+
+    // Mostrar container y renderizar tarjetas
+    container.style.display = 'block';
+    lista.innerHTML = tarjetas.map((tarjeta, index) => crearTarjetaCheckoutHTML(tarjeta, index === 0)).join('');
+
+    // Agregar eventos a las tarjetas
+    document.querySelectorAll('.tarjeta-guardada-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const id = item.dataset.id;
+        seleccionarTarjeta(id, tarjetas);
+      });
+    });
+
+    // Preseleccionar la primera tarjeta (predeterminada o más reciente)
+    if (tarjetas.length > 0) {
+      seleccionarTarjeta(tarjetas[0].id, tarjetas);
     }
 
   } catch (error) {
-    console.error(' Error cargando tarjetas:', error);
-    document.getElementById('tarjetas-guardadas-container').style.display = 'none';
+    console.error('Error en cargarTarjetasGuardadas:', error);
   }
 }
 
-// ========== MOSTRAR TARJETAS ==========
-function mostrarTarjetasGuardadas() {
-  const contenedor = document.getElementById('lista-tarjetas-guardadas');
+// Crear HTML de tarjeta para checkout
+function crearTarjetaCheckoutHTML(tarjeta, isFirst) {
+  const tipo = obtenerTipoTarjeta(tarjeta.numero_tarjeta);
+  const ultimos4 = tarjeta.numero_tarjeta.slice(-4);
   
-  contenedor.innerHTML = tarjetasGuardadas.map(tarjeta => {
-    const tipo = obtenerTipoTarjeta(tarjeta.numero_tarjeta);
-    const ultimos4 = tarjeta.numero_tarjeta.slice(-4);
-    const esPredeterminada = tarjeta.es_predeterminada;
-    
-    return `
-      <div class="tarjeta-checkout-item" style="border: 2px solid #ccc; padding: 15px; border-radius: 8px; margin-bottom: 10px; cursor: pointer;">
-        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-          <input type="radio" name="tarjeta-guardada" value="${tarjeta.id}" ${esPredeterminada ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer;">
-          <div style="flex: 1;">
-            <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-              <span style="background: #667eea; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">
-                ${tipo.nombre}
-              </span>
-              ${esPredeterminada ? '<span style="background: #fbbf24; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">⭐ Predeterminada</span>' : ''}
-            </div>
-            <div style="font-family: monospace; font-size: 16px; font-weight: bold; margin-bottom: 8px;">•••• •••• •••• ${ultimos4}</div>
-            <div style="display: flex; justify-content: space-between; font-size: 12px; color: #666;">
-              <span>${tarjeta.nombre_titular}</span>
-              <span>${tarjeta.mes_vencimiento}/${tarjeta.anio_vencimiento}</span>
-            </div>
-          </div>
-        </label>
+  return `
+    <div class="tarjeta-guardada-item ${isFirst ? 'selected' : ''}" data-id="${tarjeta.id}">
+      <div class="tarjeta-guardada-content">
+        <div class="tarjeta-tipo-badge ${tipo.clase}">
+          ${tipo.icono} ${tipo.nombre}
+        </div>
+        <div class="tarjeta-numero-display">
+          •••• •••• •••• ${ultimos4}
+        </div>
+        <div class="tarjeta-info-small">
+          ${tarjeta.nombre_titular} • ${tarjeta.mes_vencimiento}/${tarjeta.anio_vencimiento}
+        </div>
       </div>
-    `;
-  }).join('');
+      <div class="tarjeta-check">
+        <i class="bi bi-check-circle-fill"></i>
+      </div>
+    </div>
+  `;
 }
 
-// ========== TIPO DE TARJETA ==========
+// Obtener tipo de tarjeta
 function obtenerTipoTarjeta(numero) {
   const primerDigito = numero.charAt(0);
   const primerosDosDigitos = numero.substring(0, 2);
   
   if (primerDigito === '4') {
-    return { nombre: 'Visa', clase: 'visa' };
+    return { 
+      nombre: 'Visa', 
+      clase: 'visa',
+      icono: '<i class="bi bi-credit-card-2-front"></i>'
+    };
   } else if (['51', '52', '53', '54', '55'].includes(primerosDosDigitos)) {
-    return { nombre: 'Mastercard', clase: 'mastercard' };
+    return { 
+      nombre: 'Mastercard', 
+      clase: 'mastercard',
+      icono: '<i class="bi bi-credit-card"></i>'
+    };
   } else if (['34', '37'].includes(primerosDosDigitos)) {
-    return { nombre: 'American Express', clase: 'amex' };
+    return { 
+      nombre: 'Amex', 
+      clase: 'amex',
+      icono: '<i class="bi bi-credit-card-2-back"></i>'
+    };
   } else {
-    return { nombre: 'Tarjeta', clase: 'otra' };
+    return { 
+      nombre: 'Tarjeta', 
+      clase: 'otra',
+      icono: '<i class="bi bi-credit-card"></i>'
+    };
   }
 }
 
-// ========== CONFIGURAR TOGGLE ==========
-function configurarToggleTarjetas() {
-  const radios = document.querySelectorAll('input[name="metodo"]');
+// Seleccionar tarjeta
+function seleccionarTarjeta(id, tarjetas) {
+  // Quitar selección de todas
+  document.querySelectorAll('.tarjeta-guardada-item').forEach(item => {
+    item.classList.remove('selected');
+  });
+
+  // Seleccionar la clickeada
+  const item = document.querySelector(`[data-id="${id}"]`);
+  if (item) {
+    item.classList.add('selected');
+  }
+
+  // Guardar tarjeta seleccionada
+  tarjetaSeleccionada = tarjetas.find(t => t.id === id);
   
-  radios.forEach(radio => {
-    radio.addEventListener('change', (e) => {
-      if (e.target.value === 'tarjeta') {
-        // Mostrar u ocultar selector de tarjetas
-        if (tarjetasGuardadas.length > 0) {
-          document.getElementById('tarjetas-guardadas-container').style.display = 'block';
-        }
-      }
-    });
-  });
+  // Limpiar campos del formulario de nueva tarjeta
+  document.getElementById('card-name').value = '';
+  document.getElementById('card-number').value = '';
+  document.getElementById('card-exp').value = '';
+  document.getElementById('card-cvv').value = '';
+
+  console.log('Tarjeta seleccionada:', tarjetaSeleccionada);
 }
 
-// ========== EVENT LISTENERS ==========
-function agregarEventosTarjetas() {
-  document.addEventListener('change', (e) => {
-    if (e.target.name === 'tarjeta-guardada') {
-      tarjetaSeleccionadaId = e.target.value;
-      console.log(' Tarjeta seleccionada:', tarjetaSeleccionadaId);
-      
-      // Limpiar campos manuales cuando se selecciona una guardada
-      limpiarCamposTarjeta();
-      
-      // Destacar visualmente la selección
-      actualizarEstiloSeleccion();
-    }
-  });
+// Obtener tarjeta seleccionada (para usar en pasarelaPagos.js)
+export function getTarjetaSeleccionada() {
+  return tarjetaSeleccionada;
 }
 
-function actualizarEstiloSeleccion() {
-  document.querySelectorAll('.tarjeta-checkout-item').forEach(item => {
-    const radio = item.querySelector('input[type="radio"]');
-    if (radio && radio.checked) {
-      item.style.backgroundColor = '#f0f7ff';
-      item.style.borderColor = '#3b82f6';
-    } else {
-      item.style.backgroundColor = '';
-      item.style.borderColor = '#ccc';
-    }
-  });
-}
-
-// ========== CAMPOS DE TARJETA MANUAL ==========
-function configurarCamposTarjeta() {
-  const cardNumber = document.getElementById('card-number');
-  const cardExp = document.getElementById('card-exp');
-  const cardCvv = document.getElementById('card-cvv');
-
-  // Desseleccionar tarjeta guardada si se edita manual
-  if (cardNumber) {
-    cardNumber.addEventListener('input', (e) => {
-      if (e.target.value.trim() !== '') {
-        document.querySelectorAll('input[name="tarjeta-guardada"]').forEach(r => r.checked = false);
-        tarjetaSeleccionadaId = null;
-        actualizarEstiloSeleccion();
-      }
-    });
-  }
-
-  if (cardExp) {
-    cardExp.addEventListener('input', (e) => {
-      if (e.target.value.trim() !== '') {
-        document.querySelectorAll('input[name="tarjeta-guardada"]').forEach(r => r.checked = false);
-        tarjetaSeleccionadaId = null;
-        actualizarEstiloSeleccion();
-      }
-    });
-  }
-
-  if (cardCvv) {
-    cardCvv.addEventListener('input', (e) => {
-      if (e.target.value.trim() !== '') {
-        document.querySelectorAll('input[name="tarjeta-guardada"]').forEach(r => r.checked = false);
-        tarjetaSeleccionadaId = null;
-        actualizarEstiloSeleccion();
-      }
-    });
-  }
-}
-
-function limpiarCamposTarjeta() {
-  const cardName = document.getElementById('card-name');
-  const cardNumber = document.getElementById('card-number');
-  const cardExp = document.getElementById('card-exp');
-  const cardCvv = document.getElementById('card-cvv');
+// Inicializar cuando se cambie el método de pago
+function inicializarEventosMetodoPago() {
+  const radioTarjeta = document.querySelector('input[name="metodo"][value="tarjeta"]');
   
-  if (cardName) cardName.value = '';
-  if (cardNumber) cardNumber.value = '';
-  if (cardExp) cardExp.value = '';
-  if (cardCvv) cardCvv.value = '';
-}
+  if (radioTarjeta) {
+    // Cargar tarjetas cuando se seleccione el método "tarjeta"
+    radioTarjeta.addEventListener('change', (e) => {
+      if (e.target.checked) {
+        cargarTarjetasGuardadas();
+      }
+    });
 
-// ========== FUNCIÓN PARA OBTENER DATOS DE TARJETA EN CHECKOUT ==========
-window.obtenerDatosTarjetaCheckout = function() {
-  // Si hay tarjeta seleccionada, usarla
-  if (tarjetaSeleccionadaId) {
-    const tarjeta = tarjetasGuardadas.find(t => t.id === tarjetaSeleccionadaId);
-    if (tarjeta) {
-      return {
-        usaTarjetaGuardada: true,
-        numero: tarjeta.numero_tarjeta,
-        nombre: tarjeta.nombre_titular,
-        mes: tarjeta.mes_vencimiento,
-        anio: tarjeta.anio_vencimiento,
-        cvv: tarjeta.cvv
-      };
+    // Si ya está seleccionada, cargar inmediatamente
+    if (radioTarjeta.checked) {
+      cargarTarjetasGuardadas();
     }
   }
+}
 
-  // Si no, devolver datos manuales
-  return {
-    usaTarjetaGuardada: false,
-    numero: document.getElementById('card-number')?.value || '',
-    nombre: document.getElementById('card-name')?.value || '',
-    mes: null,
-    anio: null,
-    cvv: document.getElementById('card-cvv')?.value || ''
-  };
-};
+// Inicializar cuando cargue el DOM
+document.addEventListener('DOMContentLoaded', () => {
+  inicializarEventosMetodoPago();
+});
 
-console.log('checkout-tarjetas.js cargado correctamente');
+// Agregar estilos para las tarjetas guardadas (si no existen en CSS)
+const estilos = document.createElement('style');
+estilos.textContent = `
+  .tarjeta-guardada-item {
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: white;
+  }
+
+  .tarjeta-guardada-item:hover {
+    border-color: #007bff;
+    box-shadow: 0 4px 12px rgba(0,123,255,0.15);
+    transform: translateY(-2px);
+  }
+
+  .tarjeta-guardada-item.selected {
+    border-color: #007bff;
+    background: #f0f8ff;
+    box-shadow: 0 4px 16px rgba(0,123,255,0.2);
+  }
+
+  .tarjeta-guardada-content {
+    flex: 1;
+  }
+
+  .tarjeta-tipo-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  .tarjeta-tipo-badge.visa {
+    background: #1a1f71;
+    color: white;
+  }
+
+  .tarjeta-tipo-badge.mastercard {
+    background: #eb001b;
+    color: white;
+  }
+
+  .tarjeta-tipo-badge.amex {
+    background: #006fcf;
+    color: white;
+  }
+
+  .tarjeta-tipo-badge.otra {
+    background: #6c757d;
+    color: white;
+  }
+
+  .tarjeta-numero-display {
+    font-size: 1.1rem;
+    font-weight: 600;
+    letter-spacing: 2px;
+    margin: 8px 0;
+    color: #333;
+  }
+
+  .tarjeta-info-small {
+    font-size: 0.85rem;
+    color: #666;
+  }
+
+  .tarjeta-check {
+    font-size: 1.5rem;
+    color: #e0e0e0;
+    transition: color 0.3s ease;
+  }
+
+  .tarjeta-guardada-item.selected .tarjeta-check {
+    color: #007bff;
+  }
+`;
+document.head.appendChild(estilos);
