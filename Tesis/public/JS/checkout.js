@@ -1,4 +1,4 @@
-// JS/checkout.js - VERSIÓN CON GUARDAR CARRITO EN localStorage
+// JS/checkout.js - VERSIÓN CORREGIDA (compatible con checkout-tarjetas.js)
 (function () {
   // --------- DOM ---------
   const form = document.getElementById('checkout-form');
@@ -159,6 +159,10 @@
 
   // --------- Envío del formulario ---------
   form?.addEventListener("submit", (e) => {
+    // ⚠️ IMPORTANTE: checkout-tarjetas.js se ejecuta ANTES (capture phase)
+    // Si hay tarjeta guardada seleccionada, ese script detendrá el evento
+    // y este código NO se ejecutará
+    
     e.preventDefault();
 
     const metodo = document.querySelector('input[name="metodo"]:checked')?.value;
@@ -177,6 +181,7 @@
     }
 
     if (source !== 'remote' && (!isFinite(total) || total <= 0)) {
+      alert('El carrito está vacío');
       return;
     }
 
@@ -193,18 +198,12 @@
     }
 
     if (metodo === 'tarjeta') {
-      // VERIFICAR SI HAY TARJETA GUARDADA SELECCIONADA
-      const tarjetaSeleccionada = document.querySelector('input[name="tarjeta-guardada"]:checked');
+      // ⚠️ NOTA: Si llegamos aquí, checkout-tarjetas.js NO detuvo el evento
+      // Esto significa que NO hay tarjeta guardada seleccionada
+      // O el usuario quiere ingresar una tarjeta nueva manualmente
       
-      if (tarjetaSeleccionada) {
-        // Tarjeta guardada seleccionada - Sin validación, solo simular
-        console.log('Tarjeta guardada seleccionada - Procesando...');
-        alert('Pago aprobado. ¡Gracias por tu compra!');
-        finalizeSuccess('tarjeta', { number: 'guardada' });
-        return;
-      }
-
-      //  Si no hay tarjeta guardada, validar campos manuales
+      console.log('checkout.js: Validando tarjeta nueva ingresada manualmente');
+      
       const name = document.getElementById('card-name')?.value?.trim();
       const number = document.getElementById('card-number')?.value || '';
       const exp = document.getElementById('card-exp')?.value?.trim();
