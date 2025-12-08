@@ -147,7 +147,7 @@ function mostrarPopupConfirmacion(datosPedido) {
 
   document.getElementById('btn-ver-pedidos').addEventListener('click', () => {
     overlay.remove();
-    window.location.href = 'mispedidos.html'; // Ajusta la URL según tu proyecto
+    window.location.href = './historial.html'; // Ajusta la URL según tu proyecto
   });
 
   // Cerrar al hacer clic fuera
