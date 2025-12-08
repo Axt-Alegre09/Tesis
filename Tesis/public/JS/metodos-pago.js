@@ -1,13 +1,9 @@
-// JS/metodos-pago.js
+// JS/metodos-pago.js - VERSIÓN CORREGIDA
 
-// Importar Supabase
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+// ✅ Importar Supabase desde ScriptLogin (instancia compartida)
+import { supabase } from './ScriptLogin.js';
 
-// Configuración de Supabase - KEY ACTUALIZADA
-const SUPABASE_URL = 'https://jyygevitfnbwrvxrjexp.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5eWdldml0Zm5id3J2eHJqZXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2OTQ2OTYsImV4cCI6MjA3MTI3MDY5Nn0.St0IiSZSeELESshctneazCJHXCDBi9wrZ28UkiEDXYo';
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+console.log("✓ Supabase importado desde ScriptLogin");
 
 // Variables globales
 let usuarioActual = null;
