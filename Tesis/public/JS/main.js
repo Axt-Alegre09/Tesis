@@ -425,8 +425,9 @@
     async function init() {
       console.log('🚀 Ejecutando init()...');
       
-      const urlParams = new URLSearchParams(window.location.search);
-      const categoria = urlParams.get("categoria");
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const categoria = urlParams.get("categoria");
 
       if (categoria === "favoritos") {
         tituloPrincipal.textContent = "Mis Favoritos";
@@ -498,6 +499,18 @@
       });
       
       console.log('✅ init() completado');
+      
+      } catch (error) {
+        console.error('❌ ERROR EN INIT:', error);
+        console.error('Stack:', error.stack);
+        contenedorProductos.innerHTML = `
+          <div class="alerta-vacia">
+            <h3>Error al cargar productos</h3>
+            <p>${error.message}</p>
+            <button onclick="location.reload()">Recargar página</button>
+          </div>
+        `;
+      }
     }
 
     // User Menu Dropdown
