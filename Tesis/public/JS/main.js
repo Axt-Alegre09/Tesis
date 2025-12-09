@@ -1,13 +1,18 @@
-// JS/main.js - CON SOPORTE PARA PROMOS (FIXED)
-import { supabase } from "./ScriptLogin.js";
-console.log('🚀 MAIN.JS SE ESTÁ CARGANDO!!!'); 
+// JS/main.js - VERSIÓN FINAL QUE FUNCIONA
+const supabase = window.supabase;
+
+if (!supabase) {
+  console.error('❌ Supabase no está disponible');
+} else {
+  console.log('✅ main.js cargado con supabase');
+}
 
 const contenedorProductos = document.querySelector("#contenedor-productos");
 const botonesCategorias = document.querySelectorAll(".boton-categoria");
 const tituloPrincipal = document.querySelector("#titulo-principal");
 
-let CATALOGO = [];            // cache del catálogo público
-let FAVORITOS_IDS = new Set(); // IDs de productos favoritos
+let CATALOGO = [];
+let FAVORITOS_IDS = new Set();
 
 const IMG_FALLBACK = "https://placehold.co/512x512?text=Imagen";
 const STORAGE_BASE = "https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/";
@@ -32,7 +37,6 @@ const toImg = (v) => {
 
 /* =================== Favoritos =================== */
 
-// Cargar IDs de favoritos del usuario
 async function loadFavoritosIds() {
   try {
     const { data: { user } } = await supabase.auth.getUser();
@@ -47,7 +51,6 @@ async function loadFavoritosIds() {
   }
 }
 
-// Toggle favorito (agregar/quitar)
 async function toggleFavorito(productoId, btn) {
   try {
     const { data: { user } } = await supabase.auth.getUser();
@@ -69,14 +72,12 @@ async function toggleFavorito(productoId, btn) {
     const result = data[0];
     const esFavorito = result.es_favorito;
 
-    // Actualizar el Set local
     if (esFavorito) {
       FAVORITOS_IDS.add(productoId);
     } else {
       FAVORITOS_IDS.delete(productoId);
     }
 
-    // Actualizar UI del botón
     updateFavoritoButton(btn, esFavorito);
     showToast(result.mensaje, "success");
   } catch (error) {
@@ -87,7 +88,6 @@ async function toggleFavorito(productoId, btn) {
   }
 }
 
-// Actualizar UI del botón de favorito
 function updateFavoritoButton(btn, esFavorito) {
   const icon = btn.querySelector("i");
   if (!icon) return;
@@ -102,12 +102,10 @@ function updateFavoritoButton(btn, esFavorito) {
     btn.classList.remove("active");
   }
 
-  // animación de latido
   btn.classList.add("animate");
   setTimeout(() => btn.classList.remove("animate"), 400);
 }
 
-// Toast notification
 function showToast(message, type = "success") {
   const toast = document.createElement("div");
   toast.className = `toast toast-${type}`;
@@ -154,7 +152,6 @@ function showToast(message, type = "success") {
 
 /* =================== Data sources =================== */
 
-// 1) Catálogo público con promos (vista productos_con_promos)
 async function fetchProductosCatalogo() {
   const { data, error } = await supabase
     .from("productos_con_promos")
@@ -174,8 +171,8 @@ async function fetchProductosCatalogo() {
     nombre: p.nombre,
     titulo: p.nombre,
     imagen: toImg(p.imagen),
-    precio: parseFloat(p.precio_original), // Precio original
-    precioConPromo: parseFloat(p.precio_con_promo), // Precio con descuento
+    precio: parseFloat(p.precio_original),
+    precioConPromo: parseFloat(p.precio_con_promo),
     tienePromo: p.tiene_promo,
     descuentoPorcentaje: parseFloat(p.descuento_porcentaje || 0),
     ahorroGs: parseFloat(p.ahorro_gs || 0),
@@ -185,7 +182,6 @@ async function fetchProductosCatalogo() {
   }));
 }
 
-// 2) Populares para portada con promos
 async function fetchPopularesPortada(limit = 12) {
   const { data, error } = await supabase
     .from("productos_con_promos")
@@ -213,7 +209,6 @@ async function fetchPopularesPortada(limit = 12) {
   }));
 }
 
-// 3) Cargar favoritos (para página Mis Favoritos)
 async function fetchFavoritos() {
   try {
     const { data: { user } } = await supabase.auth.getUser();
@@ -273,7 +268,6 @@ function montar(productos, esFavoritos = false) {
     const tienePromo = producto.tienePromo;
     const descuento = Math.round(producto.descuentoPorcentaje || 0);
     
-    // Badge de descuento
     const badgePromo = tienePromo ? `
       <div class="promo-badge">
         <i class="bi bi-tag-fill"></i>
@@ -281,7 +275,6 @@ function montar(productos, esFavoritos = false) {
       </div>
     ` : '';
     
-    // Precios (con o sin promo)
     const preciosHTML = tienePromo ? `
       <div class="precios-con-promo">
         <span class="precio-original">${fmtGs(producto.precio)}</span>
@@ -316,7 +309,6 @@ function montar(productos, esFavoritos = false) {
     contenedorProductos.appendChild(div);
   }
 
-  // Handler botón favorito
   document.querySelectorAll(".btn-favorito").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -325,7 +317,6 @@ function montar(productos, esFavoritos = false) {
     });
   });
 
-  // Handler Agregar al carrito
   document.querySelectorAll(".producto-agregar").forEach((btn) => {
     btn.addEventListener("click", async (e) => {
       const id = e.currentTarget.dataset.id;
@@ -354,7 +345,6 @@ function montar(productos, esFavoritos = false) {
         })();
 
       try {
-        // Si tiene promo, agregar con precio con descuento
         const precioFinal = prod?.tienePromo ? prod.precioConPromo : prod?.precio || fallbackProd.precio;
         
         await window.CartAPI.addProduct({
@@ -439,12 +429,12 @@ async function buscar(q) {
 /* =================== Init =================== */
 
 async function init() {
-  // Detectar si estamos en la página de favoritos
+  console.log('🚀 Ejecutando init()...');
+  
   const urlParams = new URLSearchParams(window.location.search);
   const categoria = urlParams.get("categoria");
 
   if (categoria === "favoritos") {
-    // Cargar página de favoritos
     tituloPrincipal.textContent = "Mis Favoritos";
     const { error, productos } = await fetchFavoritos();
 
@@ -464,9 +454,8 @@ async function init() {
     return;
   }
 
-  // Flujo normal (catálogo)
   CATALOGO = await fetchProductosCatalogo();
-  await loadFavoritosIds(); // Cargar favoritos del usuario
+  await loadFavoritosIds();
 
   window.__PRODUCTS__ = CATALOGO.map((p) => ({
     id: p.id,
@@ -479,7 +468,6 @@ async function init() {
     descuentoPorcentaje: p.descuentoPorcentaje
   }));
 
-  // Home feed: Populares → Catálogo
   let itemsHome = [];
   try {
     const pop = await fetchPopularesPortada(12);
@@ -501,7 +489,6 @@ async function init() {
   wireCategorias();
   await window.CartAPI.refreshBadge();
 
-  // Búsqueda
   const form = document.getElementById("searchForm");
   const input = document.getElementById("searchInput");
   form?.addEventListener("submit", (e) => {
@@ -515,6 +502,8 @@ async function init() {
       montar(CATALOGO);
     }
   });
+  
+  console.log('✅ init() completado');
 }
 
 // === User Menu Dropdown ===
@@ -563,7 +552,7 @@ async function init() {
   });
 })();
 
-/* === Mobile aside toggle (hamburguesa) === */
+/* === Mobile aside toggle === */
 (() => {
   const body = document.body;
   const aside = document.getElementById("mobileAside");
@@ -572,7 +561,6 @@ async function init() {
 
   if (!aside || !toggleBtn) return;
 
-  // Crear backdrop si no existe
   let backdrop = document.querySelector(".backdrop");
   if (!backdrop) {
     backdrop = document.createElement("div");
@@ -583,7 +571,7 @@ async function init() {
   const mq = window.matchMedia("(max-width: 900px)");
 
   const openAside = () => {
-    if (!mq.matches) return; // solo en móvil/tablet
+    if (!mq.matches) return;
     body.classList.add("aside-open");
     toggleBtn.setAttribute("aria-expanded", "true");
   };
@@ -615,14 +603,12 @@ async function init() {
     closeAside();
   });
 
-  // Cerrar al agrandar ventana (pasar a desktop)
   window.addEventListener("resize", () => {
     if (!mq.matches) {
       closeAside();
     }
   });
 
-  // Cerrar con ESC
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && body.classList.contains("aside-open")) {
       closeAside();
@@ -632,17 +618,14 @@ async function init() {
 
 // === Event listeners del menú ===
 
-// Favoritos
 document.getElementById("favoritosBtn")?.addEventListener("click", () => {
   window.location.href = "index.html?categoria=favoritos";
 });
 
-// Métodos de pago
 document.getElementById("metodosBtn")?.addEventListener("click", () => {
   window.location.href = "metodos-pago.html";
 });
 
-// Soporte WhatsApp
 document.getElementById("soporteBtn")?.addEventListener("click", async () => {
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -674,4 +657,9 @@ document.getElementById("historialBtn")?.addEventListener("click", () => {
   window.location.href = "historial.html";
 });
 
-init();
+// EJECUTAR INIT
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
