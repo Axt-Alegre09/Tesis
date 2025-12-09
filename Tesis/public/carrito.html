@@ -65,21 +65,9 @@
     </main>
   </div>
 
-  <!-- ============================================ -->
-  <!-- SCRIPTS - ORDEN CORRECTO -->
-  <!-- ============================================ -->
-  
-  <!-- 1. cart-merger.js - Sistema de fusión -->
-  <script type="module" src="JS/cart-merger.js"></script>
-  
-  <!-- 2. checkout-interceptor.js - Interceptor de compra -->
-  <script type="module" src="JS/checkout-interceptor.js"></script>
-
-  <!-- 3. Script principal del carrito -->
+  <!-- Script de la API del carrito (efecto lateral) -->
   <script type="module">
     import "./JS/cart-api.js";
-
-    console.log("📦 Script principal del carrito cargado");
 
     const contVacio   = document.getElementById("carrito-vacio");
     const contProds   = document.getElementById("carrito-productos");
@@ -106,113 +94,106 @@
     }
 
     async function render() {
-      console.log("🎨 Renderizando carrito...");
+      const snap = await window.CartAPI.getSnapshot();
+      const items = snap.items || [];
       
-      try {
-        const snap = await window.CartAPI.getSnapshot();
-        const items = snap.items || [];
+      // Calcular totales
+      let totalSinDescuento = 0;
+      let totalConDescuento = 0;
+      
+      items.forEach(it => {
+        const precioOriginal = Number(it.precioOriginal || it.precio);
+        const precioFinal = it.tienePromo ? Number(it.precio) : precioOriginal;
+        const cantidad = Number(it.cantidad || 1);
         
-        console.log(`📦 Carrito tiene ${items.length} productos`);
-        
-        let totalSinDescuento = 0;
-        let totalConDescuento = 0;
-        
-        items.forEach(it => {
-          const precioOriginal = Number(it.precioOriginal || it.precio);
-          const precioFinal = it.tienePromo ? Number(it.precio) : precioOriginal;
-          const cantidad = Number(it.cantidad || 1);
-          
-          totalSinDescuento += precioOriginal * cantidad;
-          totalConDescuento += precioFinal * cantidad;
-        });
+        totalSinDescuento += precioOriginal * cantidad;
+        totalConDescuento += precioFinal * cantidad;
+      });
 
-        const ahorroTotal = totalSinDescuento - totalConDescuento;
+      const ahorroTotal = totalSinDescuento - totalConDescuento;
 
-        totalEl.textContent = fmtGs(snap.total || 0);
+      totalEl.textContent = fmtGs(snap.total || 0);
 
-        if (ahorroTotal > 0) {
-          ahorroMontoEl.textContent = fmtGs(ahorroTotal);
-          totalAhorroEl.style.display = 'block';
-        } else {
-          totalAhorroEl.style.display = 'none';
-        }
+      // Mostrar ahorro si hay promos
+      if (ahorroTotal > 0) {
+        ahorroMontoEl.textContent = fmtGs(ahorroTotal);
+        totalAhorroEl.style.display = 'block';
+      } else {
+        totalAhorroEl.style.display = 'none';
+      }
 
-        if (!items.length) {
-          contProds.innerHTML = "";
-          setEstado(true);
-          console.log("ℹ️ Carrito vacío");
-          return;
-        }
-
-        setEstado(false);
+      if (!items.length) {
         contProds.innerHTML = "";
+        setEstado(true);
+        return;
+      }
 
-        for (const it of items) {
-          const row = document.createElement("div");
-          row.className = "carrito-producto";
-          
-          if (it.tienePromo) {
-            row.classList.add("has-promo");
-            row.setAttribute("data-descuento", Math.round(it.descuentoPorcentaje));
-          }
+      setEstado(false);
+      contProds.innerHTML = "";
 
-          const idAttrKey = snap.mode === "remote" ? "data-itemid" : "data-id";
-          const resolvedId = snap.mode === "remote"
-            ? (it.itemId ?? it._itemId ?? it.id)
-            : it.id;
-          const idAttrVal = String(resolvedId);
-
-          let precioHTML;
-          if (it.tienePromo) {
-            precioHTML = `
-              <div class="precio-con-promo">
-                <span class="precio-original-carrito">${fmtGs(it.precioOriginal)}</span>
-                <span class="precio-promo-carrito">${fmtGs(it.precio)}</span>
-              </div>
-            `;
-          } else {
-            precioHTML = `<p>${fmtGs(it.precio)}</p>`;
-          }
-
-          row.innerHTML = `
-            <img class="carrito-producto-imagen" src="${it.imagen || IMG_FALLBACK}" alt="${it.titulo}">
-            <div class="carrito-producto-titulo">
-              <h6>Producto</h6>
-              <h4>${it.titulo}</h4>
-            </div>
-            <div class="carrito-producto-cantidad">
-              <h6>Cantidad</h6>
-              <div class="qty-ctrl">
-                <button class="qty-btn" data-action="dec" ${idAttrKey}="${idAttrVal}" aria-label="Disminuir">−</button>
-                <span class="qty" data-qty>${Number(it.cantidad||1)}</span>
-                <button class="qty-btn" data-action="inc" ${idAttrKey}="${idAttrVal}" aria-label="Aumentar">+</button>
-              </div>
-            </div>
-            <div class="carrito-producto-precio">
-              <h6>Precio</h6>
-              ${precioHTML}
-            </div>
-            <div class="carrito-producto-subtotal">
-              <h6>Subtotal</h6>
-              <p>${fmtGs(it.precio * (it.cantidad||1))}</p>
-            </div>
-            <button class="carrito-producto-eliminar" title="Eliminar" ${idAttrKey}="${idAttrVal}">
-              <i class="bi bi-trash"></i>
-            </button>
-          `;
-          
-          row.querySelector(".carrito-producto-imagen")?.addEventListener("error", (e)=> e.currentTarget.src = IMG_FALLBACK);
-          contProds.appendChild(row);
+      for (const it of items) {
+        const row = document.createElement("div");
+        row.className = "carrito-producto";
+        
+        // Agregar clase y data attribute si tiene promo
+        if (it.tienePromo) {
+          row.classList.add("has-promo");
+          row.setAttribute("data-descuento", Math.round(it.descuentoPorcentaje));
         }
+
+        // Remoto usa itemId (id de carrito_items). Hacemos fallback por si vino _itemId o id.
+        const idAttrKey = snap.mode === "remote" ? "data-itemid" : "data-id";
+        const resolvedId = snap.mode === "remote"
+          ? (it.itemId ?? it._itemId ?? it.id)
+          : it.id;
+        const idAttrVal = String(resolvedId);
+
+        // HTML del precio (con o sin promo)
+        let precioHTML;
+        if (it.tienePromo) {
+          precioHTML = `
+            <div class="precio-con-promo">
+              <span class="precio-original-carrito">${fmtGs(it.precioOriginal)}</span>
+              <span class="precio-promo-carrito">${fmtGs(it.precio)}</span>
+            </div>
+          `;
+        } else {
+          precioHTML = `<p>${fmtGs(it.precio)}</p>`;
+        }
+
+        row.innerHTML = `
+          <img class="carrito-producto-imagen" src="${it.imagen || IMG_FALLBACK}" alt="${it.titulo}">
+          <div class="carrito-producto-titulo">
+            <h6>Producto</h6>
+            <h4>${it.titulo}</h4>
+          </div>
+          <div class="carrito-producto-cantidad">
+            <h6>Cantidad</h6>
+            <div class="qty-ctrl">
+              <button class="qty-btn" data-action="dec" ${idAttrKey}="${idAttrVal}" aria-label="Disminuir">−</button>
+              <span class="qty" data-qty>${Number(it.cantidad||1)}</span>
+              <button class="qty-btn" data-action="inc" ${idAttrKey}="${idAttrVal}" aria-label="Aumentar">+</button>
+            </div>
+          </div>
+          <div class="carrito-producto-precio">
+            <h6>Precio</h6>
+            ${precioHTML}
+          </div>
+          <div class="carrito-producto-subtotal">
+            <h6>Subtotal</h6>
+            <p>${fmtGs(it.precio * (it.cantidad||1))}</p>
+          </div>
+          <button class="carrito-producto-eliminar" title="Eliminar" ${idAttrKey}="${idAttrVal}">
+            <i class="bi bi-trash"></i>
+          </button>
+        `;
         
-        console.log("✅ Carrito renderizado correctamente");
-        
-      } catch (error) {
-        console.error("❌ Error renderizando carrito:", error);
+        row.querySelector(".carrito-producto-imagen")?.addEventListener("error", (e)=> e.currentTarget.src = IMG_FALLBACK);
+        contProds.appendChild(row);
       }
     }
 
-    // Event delegation para +/- y eliminar
+    // Delegación de eventos (+/− y eliminar)
     contProds.addEventListener("click", async (e) => {
       const btn = e.target.closest(".qty-btn, .carrito-producto-eliminar");
       if (!btn) return;
@@ -222,6 +203,7 @@
       const idVal = btn.getAttribute(idKey);
 
       if (btn.classList.contains("carrito-producto-eliminar")) {
+        // Animación de salida
         const row = btn.closest(".carrito-producto");
         row.style.animation = "slideOut 0.3s ease";
         await new Promise(r => setTimeout(r, 300));
@@ -233,7 +215,7 @@
       }
 
       if (btn.classList.contains("qty-btn")) {
-        const action = btn.getAttribute("data-action");
+        const action = btn.getAttribute("data-action"); // inc/dec
         const row = btn.closest(".carrito-producto");
         const qEl = row?.querySelector("[data-qty]");
         const qty = Number(qEl?.textContent || "1");
@@ -244,7 +226,7 @@
       }
     });
 
-    // Vaciar carrito
+    // Vaciar carrito con confirmación
     btnVaciar.addEventListener("click", async () => {
       if (!confirm("¿Estás seguro de que quieres vaciar el carrito?")) return;
       
@@ -253,18 +235,47 @@
       await window.CartAPI.refreshBadge?.();
     });
 
-    // ============================================
-    // 🔴 NO CONFIGURAR btnComprar AQUÍ
-    // Es manejado por checkout-interceptor.js
-    // ============================================
+    // Comprar ahora: guarda SNAPSHOT y navega con ?monto=<total> (flujo local)
+    btnComprar.addEventListener("click", async () => {
+      const snap = await window.CartAPI.getSnapshot();
+      const items = snap.items || [];
+      if (!items.length) { 
+        alert("Tu carrito está vacío."); 
+        return; 
+      }
 
-    // Renderizar inmediatamente (sin esperar DOMContentLoaded)
-    // Esto funciona porque el script está al final del body
-    render().then(() => {
-      console.log("✅ Inicialización completada");
-    }).catch(error => {
-      console.error("❌ Error en inicialización:", error);
+      const payload = {
+        source: "local",
+        items: items.map(it => ({
+          id: it.id,
+          titulo: it.titulo,
+          precio: Number(it.precio || 0),
+          cantidad: Number(it.cantidad || 1),
+          tienePromo: it.tienePromo || false,
+          descuentoPorcentaje: Number(it.descuentoPorcentaje || 0)
+        })),
+        total: Number(snap.total || 0),
+        ts: Date.now()
+      };
+
+      sessionStorage.setItem("checkout_snapshot", JSON.stringify(payload));
+      sessionStorage.setItem("checkout", JSON.stringify(payload));
+
+      const url = new URL("./pasarelaPagos.html", window.location.href);
+      url.searchParams.set("monto", String(payload.total));
+      window.location.assign(url.toString());
     });
+
+    // Animación de entrada adicional
+    document.addEventListener("DOMContentLoaded", () => {
+      document.body.style.opacity = "0";
+      setTimeout(() => {
+        document.body.style.transition = "opacity 0.3s ease";
+        document.body.style.opacity = "1";
+      }, 100);
+    });
+
+    await render();
   </script>
 
   <style>

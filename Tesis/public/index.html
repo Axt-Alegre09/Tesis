@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="CSS/styleschat.css" />
   <link rel="stylesheet" href="CSS/reco-popup.css" />
 
+
   <style>
     /* Overlay de cierre de sesión */
     #logoutOverlay {
@@ -316,6 +317,7 @@
   </button>
 
   <div class="chat-container" id="chat-container">
+    <!-- HEADER del chat -->
     <header class="chat-header">
       <div class="chat-header-icon">
         🥐
@@ -325,7 +327,11 @@
         <div class="chat-header-status">En línea · Responde al instante</div>
       </div>
     </header>
+
+    <!-- CUERPO del chat -->
     <div class="chatbox" id="chat-body"></div>
+
+    <!-- FORMULARIO de entrada -->
     <form id="chat-form">
       <input 
         id="chat-input" 
@@ -340,25 +346,9 @@
     </form>
   </div>
 
-  <!-- ============================================ -->
-  <!-- SCRIPTS - ORDEN CRÍTICO -->
-  <!-- ============================================ -->
-  
-  <!-- 1. ScriptLogin PRIMERO (base de todo) -->
-  <script type="module" src="JS/ScriptLogin.js"></script>
-  
-  <!-- 2. cart-api.js (requerido por main.js) -->
-  <script type="module" src="JS/cart-api.js"></script>
-  
-  <!-- 3. cart-merger.js (fusión de carrito) -->
-  <script type="module" src="JS/cart-merger.js"></script>
-  
-  <!-- 4. main.js (catálogo de productos) - SIN type="module" -->
-  <script src="JS/main.js"></script>
-  
-  <!-- 5. Scripts adicionales -->
+  <!-- Scripts -->
+  <script type="module" src="JS/main.js"></script>
   <script type="module" src="JS/reco-popup.js"></script>
   <script type="module" src="JS/script-chatbot.js"></script>
-  
 </body>
 </html>
