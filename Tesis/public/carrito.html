@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="CSS/main.css">
   <link rel="stylesheet" href="CSS/carrito.css">
 </head>
-<body>
+<body style="opacity: 0;">
   <div class="wrapper">
     <aside>
       <header>
@@ -65,7 +65,17 @@
     </main>
   </div>
 
-  <!-- Script de la API del carrito (efecto lateral) -->
+  <!-- ============================================ -->
+  <!-- SCRIPTS - ORDEN CORRECTO -->
+  <!-- ============================================ -->
+  
+  <!-- 1. cart-merger.js - Sistema de fusión -->
+  <script type="module" src="JS/cart-merger.js"></script>
+  
+  <!-- 2. checkout-interceptor.js - Interceptor de compra -->
+  <script type="module" src="JS/checkout-interceptor.js"></script>
+
+  <!-- 3. Script principal del carrito -->
   <script type="module">
     import "./JS/cart-api.js";
 
@@ -97,7 +107,6 @@
       const snap = await window.CartAPI.getSnapshot();
       const items = snap.items || [];
       
-      // Calcular totales
       let totalSinDescuento = 0;
       let totalConDescuento = 0;
       
@@ -114,7 +123,6 @@
 
       totalEl.textContent = fmtGs(snap.total || 0);
 
-      // Mostrar ahorro si hay promos
       if (ahorroTotal > 0) {
         ahorroMontoEl.textContent = fmtGs(ahorroTotal);
         totalAhorroEl.style.display = 'block';
@@ -135,20 +143,17 @@
         const row = document.createElement("div");
         row.className = "carrito-producto";
         
-        // Agregar clase y data attribute si tiene promo
         if (it.tienePromo) {
           row.classList.add("has-promo");
           row.setAttribute("data-descuento", Math.round(it.descuentoPorcentaje));
         }
 
-        // Remoto usa itemId (id de carrito_items). Hacemos fallback por si vino _itemId o id.
         const idAttrKey = snap.mode === "remote" ? "data-itemid" : "data-id";
         const resolvedId = snap.mode === "remote"
           ? (it.itemId ?? it._itemId ?? it.id)
           : it.id;
         const idAttrVal = String(resolvedId);
 
-        // HTML del precio (con o sin promo)
         let precioHTML;
         if (it.tienePromo) {
           precioHTML = `
@@ -193,7 +198,7 @@
       }
     }
 
-    // Delegación de eventos (+/− y eliminar)
+    // Event delegation para +/- y eliminar
     contProds.addEventListener("click", async (e) => {
       const btn = e.target.closest(".qty-btn, .carrito-producto-eliminar");
       if (!btn) return;
@@ -203,7 +208,6 @@
       const idVal = btn.getAttribute(idKey);
 
       if (btn.classList.contains("carrito-producto-eliminar")) {
-        // Animación de salida
         const row = btn.closest(".carrito-producto");
         row.style.animation = "slideOut 0.3s ease";
         await new Promise(r => setTimeout(r, 300));
@@ -215,7 +219,7 @@
       }
 
       if (btn.classList.contains("qty-btn")) {
-        const action = btn.getAttribute("data-action"); // inc/dec
+        const action = btn.getAttribute("data-action");
         const row = btn.closest(".carrito-producto");
         const qEl = row?.querySelector("[data-qty]");
         const qty = Number(qEl?.textContent || "1");
@@ -226,7 +230,7 @@
       }
     });
 
-    // Vaciar carrito con confirmación
+    // Vaciar carrito
     btnVaciar.addEventListener("click", async () => {
       if (!confirm("¿Estás seguro de que quieres vaciar el carrito?")) return;
       
@@ -235,47 +239,22 @@
       await window.CartAPI.refreshBadge?.();
     });
 
-    // Comprar ahora: guarda SNAPSHOT y navega con ?monto=<total> (flujo local)
-    btnComprar.addEventListener("click", async () => {
-      const snap = await window.CartAPI.getSnapshot();
-      const items = snap.items || [];
-      if (!items.length) { 
-        alert("Tu carrito está vacío."); 
-        return; 
-      }
+    // ============================================
+    // 🔴 NO CONFIGURAR btnComprar AQUÍ
+    // Es manejado por checkout-interceptor.js
+    // ============================================
 
-      const payload = {
-        source: "local",
-        items: items.map(it => ({
-          id: it.id,
-          titulo: it.titulo,
-          precio: Number(it.precio || 0),
-          cantidad: Number(it.cantidad || 1),
-          tienePromo: it.tienePromo || false,
-          descuentoPorcentaje: Number(it.descuentoPorcentaje || 0)
-        })),
-        total: Number(snap.total || 0),
-        ts: Date.now()
-      };
-
-      sessionStorage.setItem("checkout_snapshot", JSON.stringify(payload));
-      sessionStorage.setItem("checkout", JSON.stringify(payload));
-
-      const url = new URL("./pasarelaPagos.html", window.location.href);
-      url.searchParams.set("monto", String(payload.total));
-      window.location.assign(url.toString());
+    // Inicialización cuando el DOM está listo
+    document.addEventListener("DOMContentLoaded", async () => {
+      // Animación de entrada
+      document.body.style.transition = "opacity 0.3s ease";
+      document.body.style.opacity = "1";
+      
+      // Renderizar carrito
+      await render();
+      
+      console.log("✅ Carrito inicializado");
     });
-
-    // Animación de entrada adicional
-    document.addEventListener("DOMContentLoaded", () => {
-      document.body.style.opacity = "0";
-      setTimeout(() => {
-        document.body.style.transition = "opacity 0.3s ease";
-        document.body.style.opacity = "1";
-      }, 100);
-    });
-
-    await render();
   </script>
 
   <style>

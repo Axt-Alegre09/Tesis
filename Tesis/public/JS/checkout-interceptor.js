@@ -1,223 +1,194 @@
-// JS/cart-merger.js - Módulo INDEPENDIENTE para fusionar carrito de invitado
-// NO modifica cart-api.js, trabaja como capa adicional
+// JS/checkout-interceptor.js
+// Intercepta el botón "Comprar ahora" para pedir login si es necesario
 
 import { supabase } from './ScriptLogin.js';
 
-console.log('🔄 cart-merger.js cargado');
+console.log('🛡️ checkout-interceptor.js cargado');
 
 // ============================================================================
-// CAPTURAR CARRITO ANTES DE QUE SE LIMPIE
+// VERIFICAR SI USUARIO ESTÁ AUTENTICADO
 // ============================================================================
 
-let carritoCapturado = null;
-
-function capturarCarritoActual() {
+async function isUserAuthenticated() {
   try {
-    const cartString = localStorage.getItem('productos-en-carrito');
-    if (cartString && cartString !== '[]') {
-      const cart = JSON.parse(cartString);
-      if (cart && cart.length > 0) {
-        carritoCapturado = [...cart]; // Copia profunda
-        console.log(`💾 Carrito capturado: ${cart.length} productos`);
-        console.log('Productos:', cart.map(p => `${p.titulo} x${p.cantidad}`));
-        return true;
-      }
-    }
-  } catch (error) {
-    console.error('Error capturando carrito:', error);
-  }
-  return false;
-}
-
-// ============================================================================
-// FUSIONAR CARRITO AL HACER LOGIN
-// ============================================================================
-
-async function fusionarCarrito() {
-  try {
-    console.log('🔄 ===== INICIANDO FUSIÓN DE CARRITO =====');
-    
-    // Verificar si hay carrito capturado
-    if (!carritoCapturado || carritoCapturado.length === 0) {
-      console.log('ℹ️ No hay carrito capturado para fusionar');
-      return;
-    }
-
-    console.log(`📦 Productos a fusionar: ${carritoCapturado.length}`);
-
-    // Verificar que el usuario esté autenticado
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      console.log('⚠️ Usuario no autenticado');
-      return;
-    }
-
-    console.log(`✅ Usuario: ${user.email}`);
-
-    // Asegurar que existe un carrito remoto
-    const { data: carritoId, error: errCarrito } = await supabase.rpc('asegurar_carrito');
-    if (errCarrito) {
-      console.error('❌ Error al asegurar carrito:', errCarrito);
-      return;
-    }
-
-    console.log(`✅ Carrito remoto ID: ${carritoId}`);
-
-    // Fusionar cada producto
-    let exitosos = 0;
-    let errores = 0;
-
-    for (const producto of carritoCapturado) {
-      try {
-        console.log(`➕ Fusionando: ${producto.titulo}`);
-        console.log(`   ID: ${producto.id}`);
-        console.log(`   Cantidad: ${producto.cantidad}`);
-
-        // Verificar si el producto ya existe en el carrito remoto
-        const { data: itemExistente, error: errCheck } = await supabase
-          .from('carrito_items')
-          .select('id, cantidad')
-          .eq('carrito_id', carritoId)
-          .eq('producto_id', producto.id)
-          .maybeSingle();
-
-        if (errCheck) {
-          console.error(`   ❌ Error verificando producto:`, errCheck);
-          errores++;
-          continue;
-        }
-
-        if (itemExistente) {
-          // El producto ya existe, sumar cantidades
-          const nuevaCantidad = Number(itemExistente.cantidad) + Number(producto.cantidad);
-          console.log(`   📝 Actualizando cantidad: ${itemExistente.cantidad} → ${nuevaCantidad}`);
-
-          const { error: errUpdate } = await supabase
-            .from('carrito_items')
-            .update({ cantidad: nuevaCantidad })
-            .eq('id', itemExistente.id);
-
-          if (errUpdate) {
-            console.error(`   ❌ Error actualizando:`, errUpdate);
-            errores++;
-          } else {
-            console.log(`   ✅ Cantidad actualizada`);
-            exitosos++;
-          }
-        } else {
-          // El producto no existe, insertarlo
-          console.log(`   📝 Insertando nuevo producto`);
-
-          const { error: errInsert } = await supabase
-            .from('carrito_items')
-            .insert({
-              carrito_id: carritoId,
-              producto_id: producto.id,
-              cantidad: Number(producto.cantidad)
-            });
-
-          if (errInsert) {
-            console.error(`   ❌ Error insertando:`, errInsert);
-            errores++;
-          } else {
-            console.log(`   ✅ Producto insertado`);
-            exitosos++;
-          }
-        }
-
-        // Pequeña pausa entre operaciones
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-      } catch (error) {
-        console.error(`❌ Error procesando ${producto.titulo}:`, error);
-        errores++;
-      }
-    }
-
-    console.log('📊 ===== RESULTADO DE FUSIÓN =====');
-    console.log(`   Total: ${carritoCapturado.length}`);
-    console.log(`   ✅ Exitosos: ${exitosos}`);
-    console.log(`   ❌ Errores: ${errores}`);
-
-    if (exitosos > 0) {
-      console.log('✅ Fusión completada exitosamente');
-      
-      // Limpiar carrito local SOLO si la fusión fue exitosa
-      localStorage.removeItem('productos-en-carrito');
-      localStorage.removeItem('carrito');
-      console.log('🧹 Carrito local limpiado');
-
-      // Limpiar carrito capturado
-      carritoCapturado = null;
-
-      // Refrescar badge si existe CartAPI
-      if (window.CartAPI && typeof window.CartAPI.refreshBadge === 'function') {
-        await window.CartAPI.refreshBadge();
-        console.log('🔄 Badge actualizado');
-      }
-
-      // Refrescar la página si estamos en carrito.html
-      if (window.location.pathname.includes('carrito.html')) {
-        console.log('🔄 Recargando página del carrito...');
-        setTimeout(() => window.location.reload(), 500);
-      }
-    } else {
-      console.warn('⚠️ No se pudo fusionar ningún producto');
-    }
-
+    return user !== null;
   } catch (error) {
-    console.error('❌ Error crítico en fusión:', error);
+    console.error('Error verificando autenticación:', error);
+    return false;
   }
 }
 
 // ============================================================================
-// LISTENER DE AUTH STATE CHANGE
+// REDIRIGIR A LOGIN CON RETURN URL
 // ============================================================================
 
-supabase.auth.onAuthStateChange(async (event, session) => {
-  console.log(`🔑 Auth event: ${event}`);
-
-  if (event === 'SIGNED_IN' && session) {
-    console.log('✅ Usuario hizo login');
-    
-    // Esperar un momento para que todo se estabilice
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    // Fusionar carrito
-    await fusionarCarrito();
-  }
-
-  if (event === 'SIGNED_OUT') {
-    console.log('👋 Usuario cerró sesión');
-    carritoCapturado = null;
-  }
-});
-
-// ============================================================================
-// CAPTURAR CARRITO AL CARGAR LA PÁGINA
-// ============================================================================
-
-document.addEventListener('DOMContentLoaded', () => {
-  console.log('📄 Página cargada, verificando carrito...');
+function redirectToLogin() {
+  console.log('🔐 Preparando redirección a login...');
   
-  // Capturar el carrito actual por si acaso
-  if (capturarCarritoActual()) {
-    console.log('✅ Carrito capturado preventivamente');
+  // Usar CartMerger para capturar el carrito
+  if (window.CartMerger && typeof window.CartMerger.capturar === 'function') {
+    const capturado = window.CartMerger.capturar();
+    if (capturado) {
+      console.log('✅ Carrito capturado por CartMerger');
+    }
+  } else {
+    console.warn('⚠️ CartMerger no disponible, intentando backup manual...');
+    
+    // Backup manual si CartMerger no está disponible
+    try {
+      const currentCart = localStorage.getItem('productos-en-carrito');
+      if (currentCart) {
+        sessionStorage.setItem('backup-cart-before-login', currentCart);
+        console.log('💾 Backup manual creado');
+      }
+    } catch (error) {
+      console.error('Error en backup manual:', error);
+    }
+  }
+  
+  // Guardar URL actual
+  const currentUrl = window.location.href;
+  sessionStorage.setItem('returnUrl', currentUrl);
+  sessionStorage.setItem('fromCheckout', 'true');
+  
+  console.log('➡️ Redirigiendo a login...');
+  window.location.href = 'login.html';
+}
+
+// ============================================================================
+// INTERCEPTAR BOTÓN "COMPRAR AHORA"
+// ============================================================================
+
+export async function setupCheckoutInterceptor(buttonSelector = '#btn-comprar') {
+  const btnComprar = document.querySelector(buttonSelector);
+  
+  if (!btnComprar) {
+    console.warn('⚠️ Botón de compra no encontrado');
+    return;
+  }
+
+  console.log('✅ Interceptor configurado en botón:', buttonSelector);
+
+  // Guardar el handler original si existe
+  const originalHandler = btnComprar.onclick;
+
+  // Reemplazar con nuestro interceptor
+  btnComprar.onclick = async function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    console.log('🛒 Click en "Comprar ahora"');
+
+    // Verificar que el carrito no esté vacío
+    const snap = await window.CartAPI?.getSnapshot();
+    if (!snap || !snap.items || snap.items.length === 0) {
+      alert('Tu carrito está vacío');
+      return;
+    }
+
+    console.log(`📦 Carrito tiene ${snap.items.length} productos`);
+
+    // Verificar autenticación
+    const isAuthenticated = await isUserAuthenticated();
+
+    if (!isAuthenticated) {
+      // Usuario NO logueado → Pedir login
+      console.log('❌ Usuario no autenticado');
+      
+      const confirmar = confirm(
+        '🔐 Necesitas iniciar sesión para completar tu compra.\n\n' +
+        'Tus productos se mantendrán en el carrito.\n\n' +
+        '¿Deseas iniciar sesión ahora?'
+      );
+
+      if (confirmar) {
+        redirectToLogin();
+      }
+      return;
+    }
+
+    // Usuario SÍ logueado → Continuar con compra
+    console.log('✅ Usuario autenticado, continuando con compra...');
+
+    // Ejecutar el handler original si existe
+    if (originalHandler) {
+      originalHandler.call(btnComprar, e);
+    } else {
+      // Si no hay handler original, redirigir a pasarela
+      proceedToCheckout(snap);
+    }
+  };
+}
+
+// ============================================================================
+// PROCEDER AL CHECKOUT
+// ============================================================================
+
+function proceedToCheckout(snap) {
+  const payload = {
+    source: "local",
+    items: snap.items.map(it => ({
+      id: it.id,
+      titulo: it.titulo,
+      precio: Number(it.precio || 0),
+      cantidad: Number(it.cantidad || 1),
+      tienePromo: it.tienePromo || false,
+      descuentoPorcentaje: Number(it.descuentoPorcentaje || 0),
+      precioOriginal: Number(it.precioOriginal || it.precio)
+    })),
+    total: Number(snap.total || 0),
+    ts: Date.now()
+  };
+
+  sessionStorage.setItem("checkout_snapshot", JSON.stringify(payload));
+  sessionStorage.setItem("checkout", JSON.stringify(payload));
+
+  const url = new URL("./pasarelaPagos.html", window.location.href);
+  url.searchParams.set("monto", String(payload.total));
+  
+  console.log('➡️ Redirigiendo a pasarela de pagos');
+  window.location.assign(url.toString());
+}
+
+// ============================================================================
+// MANEJAR RETORNO DESPUÉS DEL LOGIN
+// ============================================================================
+
+export async function handleReturnFromLogin() {
+  const fromCheckout = sessionStorage.getItem('fromCheckout');
+  const returnUrl = sessionStorage.getItem('returnUrl');
+
+  if (fromCheckout === 'true') {
+    console.log('🔙 Usuario regresó después de hacer login');
+    
+    // Limpiar flags
+    sessionStorage.removeItem('fromCheckout');
+    sessionStorage.removeItem('returnUrl');
+
+    // Esperar un momento para que se fusione el carrito
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Refrescar la página si es necesario
+    if (returnUrl && returnUrl.includes('carrito.html')) {
+      console.log('🔄 Recargando carrito...');
+      window.location.reload();
+    }
+  }
+}
+
+// ============================================================================
+// AUTO-INICIALIZACIÓN
+// ============================================================================
+
+// Manejar retorno desde login
+document.addEventListener('DOMContentLoaded', async () => {
+  await handleReturnFromLogin();
+  
+  // Configurar interceptor si estamos en la página del carrito
+  if (window.location.pathname.includes('carrito.html')) {
+    setupCheckoutInterceptor('#btn-comprar');
   }
 });
 
-// ============================================================================
-// EXPORTAR FUNCIÓN PARA USO MANUAL
-// ============================================================================
-
-window.CartMerger = {
-  capturar: capturarCarritoActual,
-  fusionar: fusionarCarrito,
-  verCapturado: () => {
-    console.log('Carrito capturado:', carritoCapturado);
-    return carritoCapturado;
-  }
-};
-
-console.log('✅ cart-merger.js inicializado');
-console.log('💡 Usar CartMerger.verCapturado() para ver el carrito capturado');
+console.log('✅ checkout-interceptor.js inicializado');
