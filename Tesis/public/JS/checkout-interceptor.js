@@ -24,6 +24,22 @@ async function isUserAuthenticated() {
 // ============================================================================
 
 function redirectToLogin() {
+  console.log('🔐 Preparando redirección a login...');
+  
+  // Guardar carrito actual en sessionStorage como backup
+  try {
+    const currentCart = localStorage.getItem('productos-en-carrito');
+    if (currentCart) {
+      sessionStorage.setItem('backup-cart-before-login', currentCart);
+      console.log('💾 Carrito respaldado en sessionStorage');
+      
+      const productos = JSON.parse(currentCart);
+      console.log(`📦 ${productos.length} productos respaldados`);
+    }
+  } catch (error) {
+    console.error('Error respaldando carrito:', error);
+  }
+  
   // Guardar URL actual para volver después del login
   const currentUrl = window.location.href;
   sessionStorage.setItem('returnUrl', currentUrl);
@@ -31,7 +47,7 @@ function redirectToLogin() {
   // Guardar flag indicando que viene de intento de compra
   sessionStorage.setItem('fromCheckout', 'true');
   
-  console.log('🔐 Redirigiendo a login...');
+  console.log('➡️ Redirigiendo a login...');
   window.location.href = 'login.html';
 }
 
@@ -170,4 +186,4 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
-console.log('✅ checkout-interceptor.js inicializado'); 
+console.log('✅ checkout-interceptor.js inicializado');

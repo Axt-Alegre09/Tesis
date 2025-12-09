@@ -239,43 +239,88 @@ async function _emptyRemote() {
 // ---------- FUSIÓN DE CARRITO DE INVITADO ----------
 async function mergeGuestCartOnLogin() {
   try {
-    console.log('🔄 Verificando si hay carrito de invitado para fusionar...');
+    console.log('🔄 ======= INICIANDO FUSIÓN DE CARRITO =======');
+    console.log('📂 localStorage completo:', { ...localStorage });
     
-    // Obtener carrito local (de invitado)
+    // IMPORTANTE: Leer el carrito ANTES de cualquier otra operación
     const guestCart = _readLocal();
+    console.log('📦 Carrito local leído:', {
+      cantidad: guestCart.length,
+      productos: guestCart.map(p => ({ titulo: p.titulo, cantidad: p.cantidad, id: p.id }))
+    });
     
     if (!guestCart || guestCart.length === 0) {
-      console.log('ℹ️ No hay carrito de invitado para fusionar');
+      console.log('ℹ️ No hay productos en el carrito local para fusionar');
       return;
     }
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      console.log('⚠️ Usuario no autenticado, no se puede fusionar');
+      console.log('⚠️ Usuario no autenticado, guardando carrito para más tarde');
+      // Guardar en sessionStorage como backup
+      sessionStorage.setItem('pending-cart-merge', JSON.stringify(guestCart));
       return;
     }
 
-    console.log(`🔄 Fusionando ${guestCart.length} productos del carrito de invitado...`);
+    console.log(`✅ Usuario autenticado: ${user.email}`);
+    console.log(`🔄 Fusionando ${guestCart.length} productos...`);
+
+    // Contador de éxito
+    let exitosos = 0;
+    let errores = 0;
 
     // Agregar cada producto del carrito local al carrito remoto
     for (const item of guestCart) {
       try {
+        console.log(`➕ Intentando agregar: ${item.titulo}`);
+        console.log(`   ID: ${item.id}`);
+        console.log(`   Cantidad: ${item.cantidad}`);
+        
         await _addRemote(item.id, item.cantidad);
-        console.log(`  ✅ ${item.titulo} (x${item.cantidad})`);
+        exitosos++;
+        console.log(`   ✅ Agregado exitosamente`);
       } catch (error) {
-        console.error(`  ❌ Error agregando ${item.titulo}:`, error);
+        errores++;
+        console.error(`   ❌ Error agregando ${item.titulo}:`, {
+          message: error.message,
+          code: error.code,
+          details: error.details
+        });
       }
+      
+      // Pequeña pausa entre productos
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
 
-    // Limpiar carrito local después de fusionar
-    _emptyLocal();
-    console.log('✅ Carrito fusionado y limpiado');
+    console.log(`📊 ======= RESULTADO DE FUSIÓN =======`);
+    console.log(`   Total productos: ${guestCart.length}`);
+    console.log(`   ✅ Exitosos: ${exitosos}`);
+    console.log(`   ❌ Errores: ${errores}`);
+
+    if (exitosos > 0) {
+      console.log('🧹 Limpiando carrito local...');
+      _emptyLocal();
+      // Limpiar también el backup
+      sessionStorage.removeItem('pending-cart-merge');
+      console.log('✅ Carrito local limpiado');
+    } else {
+      console.warn('⚠️ No se agregó ningún producto exitosamente');
+      console.warn('⚠️ Manteniendo carrito local para reintento');
+    }
 
     // Refrescar badge
+    console.log('🔄 Refrescando badge...');
     await refreshBadge();
+    
+    console.log('✅ ======= FUSIÓN COMPLETADA =======');
 
   } catch (error) {
-    console.error('❌ Error fusionando carrito:', error);
+    console.error('❌ ======= ERROR CRÍTICO EN FUSIÓN =======');
+    console.error('Detalles:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
   }
 }
 
@@ -284,6 +329,27 @@ function setupGuestCartMerge() {
   supabase.auth.onAuthStateChange(async (event, session) => {
     if (event === 'SIGNED_IN' && session) {
       console.log('🔑 Usuario hizo login, fusionando carrito...');
+      
+      // Intentar restaurar backup si existe
+      try {
+        const backup = sessionStorage.getItem('backup-cart-before-login');
+        if (backup) {
+          console.log('📂 Encontrado backup de carrito');
+          const currentCart = localStorage.getItem('productos-en-carrito');
+          
+          if (!currentCart || currentCart === '[]') {
+            console.log('🔄 Restaurando carrito desde backup...');
+            localStorage.setItem('productos-en-carrito', backup);
+          }
+          
+          // Limpiar backup después de usarlo
+          sessionStorage.removeItem('backup-cart-before-login');
+        }
+      } catch (error) {
+        console.error('Error restaurando backup:', error);
+      }
+      
+      // Proceder con la fusión
       await mergeGuestCartOnLogin();
     }
   });
