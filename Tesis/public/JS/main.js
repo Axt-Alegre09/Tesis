@@ -441,6 +441,14 @@
       console.log('🚀 Ejecutando init()...');
       
       try {
+        // Si hay usuario logueado, esperar a que cart-merger termine
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          console.log('⏳ Usuario detectado, esperando 2s para cart-merger...');
+          await new Promise(r => setTimeout(r, 2000));
+          console.log('✅ Esperado completado');
+        }
+        
         const urlParams = new URLSearchParams(window.location.search);
         const categoria = urlParams.get("categoria");
         
