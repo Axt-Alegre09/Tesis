@@ -13,7 +13,6 @@
   <link rel="stylesheet" href="CSS/styleschat.css" />
   <link rel="stylesheet" href="CSS/reco-popup.css" />
 
-
   <style>
     /* Overlay de cierre de sesión */
     #logoutOverlay {
@@ -346,10 +345,19 @@
     </form>
   </div>
 
-  <!-- Scripts -->
+  <!-- ============================================ -->
+  <!-- SCRIPTS - ORDEN CORRECTO CRÍTICO -->
+  <!-- ============================================ -->
+  
+  <!-- 1. cart-merger.js PRIMERO (para captura preventiva) -->
+  <script type="module" src="JS/cart-merger.js"></script>
+  
+  <!-- 2. main.js (carga catálogo y renderiza productos) -->
   <script type="module" src="JS/main.js"></script>
+  
+  <!-- 3. Scripts adicionales -->
   <script type="module" src="JS/reco-popup.js"></script>
   <script type="module" src="JS/script-chatbot.js"></script>
-    <script type="module" src="JS/cart-merger.js"></script>
+  
 </body>
 </html>
