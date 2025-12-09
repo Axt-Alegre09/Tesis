@@ -1,38 +1,27 @@
-// JS/cart-merger.js - Fusión de Carrito v2 con Auto-Diagnóstico
+// JS/cart-merger.js - VERSIÓN CORREGIDA (usa session directamente)
 import { supabase } from './ScriptLogin.js';
 
 console.log('🟢🟢🟢 CART-MERGER.JS CARGADO CORRECTAMENTE 🟢🟢🟢');
 console.log('%c✅ Módulo de fusión de carrito activo', 'background: #00ff00; color: #000; font-size: 16px; padding: 5px;');
 
-// ============================================================================
-// VARIABLES GLOBALES
-// ============================================================================
-
 let carritoCapturado = null;
 let fusionEnProceso = false;
-
-// ============================================================================
-// AUTO-DIAGNÓSTICO
-// ============================================================================
 
 function autoDiagnostico() {
   console.log('🔍 === AUTO-DIAGNÓSTICO ===');
   
-  // Verificar Supabase
   if (!supabase) {
     console.error('❌ Supabase no disponible');
     return false;
   }
   console.log('✅ Supabase disponible');
   
-  // Verificar CartAPI
   if (!window.CartAPI) {
     console.warn('⚠️ CartAPI no disponible aún');
   } else {
     console.log('✅ CartAPI disponible');
   }
   
-  // Verificar localStorage
   try {
     const test = localStorage.getItem('test');
     console.log('✅ localStorage funcional');
@@ -44,10 +33,6 @@ function autoDiagnostico() {
   console.log('✅ Todo OK para funcionar');
   return true;
 }
-
-// ============================================================================
-// CAPTURAR CARRITO
-// ============================================================================
 
 function capturarCarrito() {
   try {
@@ -68,15 +53,13 @@ function capturarCarrito() {
       return false;
     }
     
-    // Guardar copia del carrito
-    carritoCapturado = JSON.parse(JSON.stringify(cart)); // Deep copy
+    carritoCapturado = JSON.parse(JSON.stringify(cart));
     
     console.log(`%c💾 CARRITO CAPTURADO: ${cart.length} productos`, 'background: #4CAF50; color: white; font-size: 14px; padding: 4px;');
     cart.forEach((p, i) => {
       console.log(`   ${i + 1}. ${p.titulo} x${p.cantidad} (ID: ${p.id})`);
     });
     
-    // También guardar en sessionStorage como backup
     sessionStorage.setItem('carrito-capturado-backup', JSON.stringify(cart));
     
     return true;
@@ -88,10 +71,10 @@ function capturarCarrito() {
 }
 
 // ============================================================================
-// FUSIONAR CARRITO
+// FUSIONAR CARRITO - USA SESSION DIRECTAMENTE (NO getUser)
 // ============================================================================
 
-async function fusionarCarrito() {
+async function fusionarCarritoConSession(session) {
   if (fusionEnProceso) {
     console.log('⏳ Fusión ya en proceso, esperando...');
     return;
@@ -123,16 +106,10 @@ async function fusionarCarrito() {
     
     console.log(`📦 Productos a fusionar: ${carritoCapturado.length}`);
     
-    // Verificar autenticación
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
-    if (userError || !user) {
-      console.log('⚠️ Usuario no autenticado, guardando para después');
-      fusionEnProceso = false;
-      return;
-    }
-    
+    // ✅ USAR SESSION DIRECTAMENTE (no llamar getUser de nuevo)
+    const user = session.user;
     console.log(`✅ Usuario autenticado: ${user.email}`);
+    console.log(`✅ User ID: ${user.id}`);
     
     // Asegurar carrito remoto
     console.log('🔄 Asegurando carrito remoto...');
@@ -140,6 +117,7 @@ async function fusionarCarrito() {
     
     if (errCarrito) {
       console.error('❌ Error asegurando carrito:', errCarrito);
+      console.error('Detalles:', JSON.stringify(errCarrito, null, 2));
       fusionEnProceso = false;
       return;
     }
@@ -208,6 +186,7 @@ async function fusionarCarrito() {
           
           if (errInsert) {
             console.error(`   ❌ Error insertando:`, errInsert.message);
+            console.error(`   Detalles:`, errInsert);
             errores++;
           } else {
             console.log(`   ✅ Producto insertado`);
@@ -276,7 +255,8 @@ async function fusionarCarrito() {
     console.error('═══════════════════════════════════════════════════');
     console.error('❌ ERROR CRÍTICO EN FUSIÓN');
     console.error('═══════════════════════════════════════════════════');
-    console.error(error);
+    console.error('Error:', error);
+    console.error('Stack:', error.stack);
     console.error('═══════════════════════════════════════════════════');
   } finally {
     fusionEnProceso = false;
@@ -284,7 +264,7 @@ async function fusionarCarrito() {
 }
 
 // ============================================================================
-// LISTENER DE AUTH
+// LISTENER DE AUTH - USA SESSION DIRECTAMENTE
 // ============================================================================
 
 console.log('🔌 Configurando listener de autenticación...');
@@ -300,8 +280,8 @@ supabase.auth.onAuthStateChange(async (event, session) => {
     console.log('⏳ Esperando 500ms...');
     await new Promise(resolve => setTimeout(resolve, 500));
     
-    // Ejecutar fusión
-    await fusionarCarrito();
+    // ✅ EJECUTAR FUSIÓN PASANDO EL SESSION
+    await fusionarCarritoConSession(session);
   }
   
   if (event === 'SIGNED_OUT') {
@@ -316,11 +296,9 @@ console.log('✅ Listener configurado');
 // INICIALIZACIÓN
 // ============================================================================
 
-// Auto-diagnóstico al cargar
 setTimeout(() => {
   autoDiagnostico();
   
-  // Capturar carrito preventivamente
   if (capturarCarrito()) {
     console.log('%c✅ Carrito capturado preventivamente', 'background: #2196F3; color: white; font-size: 12px; padding: 4px;');
   }
@@ -332,7 +310,14 @@ setTimeout(() => {
 
 window.CartMerger = {
   capturar: capturarCarrito,
-  fusionar: fusionarCarrito,
+  fusionar: async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      await fusionarCarritoConSession(session);
+    } else {
+      console.error('No hay sesión activa');
+    }
+  },
   verCapturado: () => {
     console.log('Carrito capturado:', carritoCapturado);
     return carritoCapturado;
