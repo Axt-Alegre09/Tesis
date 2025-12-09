@@ -316,7 +316,6 @@
   </button>
 
   <div class="chat-container" id="chat-container">
-    <!-- HEADER del chat -->
     <header class="chat-header">
       <div class="chat-header-icon">
         🥐
@@ -326,11 +325,7 @@
         <div class="chat-header-status">En línea · Responde al instante</div>
       </div>
     </header>
-
-    <!-- CUERPO del chat -->
     <div class="chatbox" id="chat-body"></div>
-
-    <!-- FORMULARIO de entrada -->
     <form id="chat-form">
       <input 
         id="chat-input" 
@@ -346,16 +341,22 @@
   </div>
 
   <!-- ============================================ -->
-  <!-- SCRIPTS - ORDEN CORRECTO CRÍTICO -->
+  <!-- SCRIPTS - ORDEN CRÍTICO -->
   <!-- ============================================ -->
   
-  <!-- 1. cart-merger.js PRIMERO (para captura preventiva) -->
+  <!-- 1. ScriptLogin PRIMERO (base de todo) -->
+  <script type="module" src="JS/ScriptLogin.js"></script>
+  
+  <!-- 2. cart-api.js (requerido por main.js) -->
+  <script type="module" src="JS/cart-api.js"></script>
+  
+  <!-- 3. cart-merger.js (fusión de carrito) -->
   <script type="module" src="JS/cart-merger.js"></script>
   
-  <!-- 2. main.js (carga catálogo y renderiza productos) -->
+  <!-- 4. main.js (catálogo de productos) -->
   <script type="module" src="JS/main.js"></script>
   
-  <!-- 3. Scripts adicionales -->
+  <!-- 5. Scripts adicionales -->
   <script type="module" src="JS/reco-popup.js"></script>
   <script type="module" src="JS/script-chatbot.js"></script>
   
