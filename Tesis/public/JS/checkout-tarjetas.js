@@ -57,6 +57,13 @@ async function cargarTarjetasGuardadas() {
 function mostrarTarjetasGuardadas() {
   const contenedor = document.getElementById('lista-tarjetas-guardadas');
   
+  // Pre-seleccionar la tarjeta predeterminada
+  const tarjetaPredeterminada = tarjetasGuardadas.find(t => t.es_predeterminada);
+  if (tarjetaPredeterminada) {
+    tarjetaSeleccionadaId = tarjetaPredeterminada.id;
+    console.log('✅ Tarjeta predeterminada pre-seleccionada:', tarjetaSeleccionadaId);
+  }
+  
   contenedor.innerHTML = tarjetasGuardadas.map(tarjeta => {
     const tipo = obtenerTipoTarjeta(tarjeta.numero_tarjeta);
     const ultimos4 = tarjeta.numero_tarjeta.slice(-4);
