@@ -1,5 +1,5 @@
 // JS/cart-api.js
-// CartAPI CON SOPORTE COMPLETO DE PROMOS
+// CartAPI CON SOPORTE COMPLETO DE PROMOS Y FUSIÓN DE CARRITO DE INVITADO
 import { supabase } from "./ScriptLogin.js";
 
 // ---------- Utils ----------
@@ -36,7 +36,7 @@ function _writeLocal(cart) {
   };
   localStorage.setItem("carrito", JSON.stringify(cartData));
   
-  console.log("Carrito guardado:", {
+  console.log("💾 Carrito guardado:", {
     items: cart.length,
     conPromo: cart.filter(p => p.tienePromo).length,
     sinPromo: cart.filter(p => !p.tienePromo).length
@@ -83,7 +83,7 @@ function _addLocal(prod, qty=1) {
     descuentoPorcentaje = Math.round(((precioOriginal - precioFinal) / precioOriginal) * 100);
   }
   
-  console.log("Agregando producto:", {
+  console.log("➕ Agregando producto:", {
     nombre: prod.titulo || prod.nombre,
     tienePromo,
     precioOriginal,
@@ -236,6 +236,59 @@ async function _emptyRemote() {
   return true;
 }
 
+// ---------- FUSIÓN DE CARRITO DE INVITADO ----------
+async function mergeGuestCartOnLogin() {
+  try {
+    console.log('🔄 Verificando si hay carrito de invitado para fusionar...');
+    
+    // Obtener carrito local (de invitado)
+    const guestCart = _readLocal();
+    
+    if (!guestCart || guestCart.length === 0) {
+      console.log('ℹ️ No hay carrito de invitado para fusionar');
+      return;
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      console.log('⚠️ Usuario no autenticado, no se puede fusionar');
+      return;
+    }
+
+    console.log(`🔄 Fusionando ${guestCart.length} productos del carrito de invitado...`);
+
+    // Agregar cada producto del carrito local al carrito remoto
+    for (const item of guestCart) {
+      try {
+        await _addRemote(item.id, item.cantidad);
+        console.log(`  ✅ ${item.titulo} (x${item.cantidad})`);
+      } catch (error) {
+        console.error(`  ❌ Error agregando ${item.titulo}:`, error);
+      }
+    }
+
+    // Limpiar carrito local después de fusionar
+    _emptyLocal();
+    console.log('✅ Carrito fusionado y limpiado');
+
+    // Refrescar badge
+    await refreshBadge();
+
+  } catch (error) {
+    console.error('❌ Error fusionando carrito:', error);
+  }
+}
+
+// Configurar listener para fusionar carrito al hacer login
+function setupGuestCartMerge() {
+  supabase.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_IN' && session) {
+      console.log('🔑 Usuario hizo login, fusionando carrito...');
+      await mergeGuestCartOnLogin();
+    }
+  });
+}
+
 // ---------- API pública ----------
 async function getSnapshot() {
   const uid = await getUserId();
@@ -262,7 +315,7 @@ async function getSnapshot() {
   const cart = _readLocal();
   const total = _totalLocal(cart);
   
-  console.log("Snapshot local:", {
+  console.log("📊 Snapshot local:", {
     items: cart.length,
     conPromo: cart.filter(i => i.tienePromo).length,
     total
@@ -347,13 +400,13 @@ function verificarCarrito() {
   const conPromo = cart.filter(p => p.tienePromo);
   const sinPromo = cart.filter(p => !p.tienePromo);
   
-  console.log("Estado del carrito:");
+  console.log("🛒 Estado del carrito:");
   console.log(`   Total: ${cart.length} productos`);
   console.log(`   Con promoción: ${conPromo.length}`);
   console.log(`   Sin promoción: ${sinPromo.length}`);
   
   if (conPromo.length > 0) {
-    console.log("Productos con descuento:");
+    console.log("🎁 Productos con descuento:");
     conPromo.forEach(p => {
       console.log(`   - ${p.titulo}: ${p.descuentoPorcentaje}% OFF`);
       console.log(`     Original: ${fmtGs(p.precioOriginal)}`);
@@ -373,9 +426,14 @@ window.CartAPI = {
   // helpers UI
   refreshBadge,
   // debugging
-  verificarCarrito
+  verificarCarrito,
+  // fusión de carrito
+  mergeGuestCart: mergeGuestCartOnLogin
 };
 
+// Auto-inicializar fusión de carrito
+setupGuestCartMerge();
+
 // Auto-verificar al cargar
-console.log("CartAPI cargado con soporte de promociones");
-console.log("Usar CartAPI.verificarCarrito() para ver el estado actual");
+console.log("✅ CartAPI cargado con soporte de promociones y fusión de carrito de invitado");
+console.log("💡 Usar CartAPI.verificarCarrito() para ver el estado actual");
