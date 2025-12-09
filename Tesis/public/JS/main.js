@@ -153,33 +153,48 @@
     }
 
     async function fetchProductosCatalogo() {
-      const { data, error } = await supabase
-        .from("productos_con_promos")
-        .select("*")
-        .order("nombre");
+      console.log('📥 Iniciando fetchProductosCatalogo...');
+      
+      try {
+        console.log('📡 Haciendo query a Supabase...');
+        const { data, error } = await supabase
+          .from("productos_con_promos")
+          .select("*")
+          .order("nombre");
 
-      if (error) {
-        console.error("Carga catálogo:", error);
+        console.log('📦 Query completada');
+        console.log('   Data:', data?.length || 0, 'productos');
+        console.log('   Error:', error);
+
+        if (error) {
+          console.error("Carga catálogo:", error);
+          return [];
+        }
+
+        console.log('Productos cargados:', data?.length || 0);
+        console.log('Con promo:', data?.filter(p => p.tiene_promo).length || 0);
+
+        const resultado = (data || []).map((p) => ({
+          id: p.id,
+          nombre: p.nombre,
+          titulo: p.nombre,
+          imagen: toImg(p.imagen),
+          precio: parseFloat(p.precio_original),
+          precioConPromo: parseFloat(p.precio_con_promo),
+          tienePromo: p.tiene_promo,
+          descuentoPorcentaje: parseFloat(p.descuento_porcentaje || 0),
+          ahorroGs: parseFloat(p.ahorro_gs || 0),
+          promoNombre: p.promo_nombre,
+          promoFin: p.promo_fin,
+          categoria: { id: slug(p.categoria_nombre || ""), nombre: p.categoria_nombre },
+        }));
+        
+        console.log('✅ fetchProductosCatalogo completado:', resultado.length);
+        return resultado;
+      } catch (err) {
+        console.error('❌ ERROR en fetchProductosCatalogo:', err);
         return [];
       }
-
-      console.log('Productos cargados:', data?.length || 0);
-      console.log('Con promo:', data?.filter(p => p.tiene_promo).length || 0);
-
-      return (data || []).map((p) => ({
-        id: p.id,
-        nombre: p.nombre,
-        titulo: p.nombre,
-        imagen: toImg(p.imagen),
-        precio: parseFloat(p.precio_original),
-        precioConPromo: parseFloat(p.precio_con_promo),
-        tienePromo: p.tiene_promo,
-        descuentoPorcentaje: parseFloat(p.descuento_porcentaje || 0),
-        ahorroGs: parseFloat(p.ahorro_gs || 0),
-        promoNombre: p.promo_nombre,
-        promoFin: p.promo_fin,
-        categoria: { id: slug(p.categoria_nombre || ""), nombre: p.categoria_nombre },
-      }));
     }
 
     async function fetchPopularesPortada(limit = 12) {
@@ -428,8 +443,11 @@
       try {
         const urlParams = new URLSearchParams(window.location.search);
         const categoria = urlParams.get("categoria");
+        
+        console.log('   Categoria:', categoria);
 
       if (categoria === "favoritos") {
+        console.log('   → Cargando favoritos...');
         tituloPrincipal.textContent = "Mis Favoritos";
         const { error, productos } = await fetchFavoritos();
 
@@ -449,9 +467,15 @@
         return;
       }
 
+      console.log('   → Cargando catálogo completo...');
       CATALOGO = await fetchProductosCatalogo();
+      console.log('   ✅ CATALOGO tiene', CATALOGO.length, 'productos');
+      
+      console.log('   → Cargando favoritos IDs...');
       await loadFavoritosIds();
+      console.log('   ✅ Favoritos cargados');
 
+      console.log('   → Creando window.__PRODUCTS__...');
       window.__PRODUCTS__ = CATALOGO.map((p) => ({
         id: p.id,
         nombre: p.nombre,
@@ -462,7 +486,9 @@
         tienePromo: p.tienePromo,
         descuentoPorcentaje: p.descuentoPorcentaje
       }));
+      console.log('   ✅ window.__PRODUCTS__ creado');
 
+      console.log('   → Cargando feed de home...');
       let itemsHome = [];
       try {
         const pop = await fetchPopularesPortada(12);
@@ -480,9 +506,17 @@
         itemsHome = CATALOGO;
       }
 
+      console.log('   → Montando', itemsHome.length, 'productos...');
       montar(itemsHome);
+      console.log('   ✅ Productos montados en DOM');
+      
+      console.log('   → Wiring categorías...');
       wireCategorias();
+      console.log('   ✅ Categorías listas');
+      
+      console.log('   → Refrescando badge del carrito...');
       await window.CartAPI.refreshBadge();
+      console.log('   ✅ Badge actualizado');
 
       const form = document.getElementById("searchForm");
       const input = document.getElementById("searchInput");
