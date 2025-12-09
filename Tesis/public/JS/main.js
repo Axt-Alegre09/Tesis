@@ -1,6 +1,5 @@
 // JS/main.js - CON SOPORTE PARA PROMOS (FIXED)
 import { supabase } from "./ScriptLogin.js";
-import "./cart-api.js"; // asegura CartAPI en window
 
 const contenedorProductos = document.querySelector("#contenedor-productos");
 const botonesCategorias = document.querySelectorAll(".boton-categoria");
