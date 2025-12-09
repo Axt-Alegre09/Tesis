@@ -1,5 +1,5 @@
 // JS/cart-api.js
-// CartAPI CON SOPORTE COMPLETO DE PROMOS Y FUSIÓN DE CARRITO DE INVITADO
+// CartAPI CON SOPORTE COMPLETO DE PROMOS (VERSIÓN FUNCIONAL ORIGINAL)
 import { supabase } from "./ScriptLogin.js";
 
 // ---------- Utils ----------
@@ -29,18 +29,11 @@ function _readLocal() {
 function _writeLocal(cart) {
   localStorage.setItem("productos-en-carrito", JSON.stringify(cart || []));
   
-  // IMPORTANTE: También guardar en formato "carrito" para checkout
   const cartData = {
     items: cart,
     total: _totalLocal(cart)
   };
   localStorage.setItem("carrito", JSON.stringify(cartData));
-  
-  console.log("💾 Carrito guardado:", {
-    items: cart.length,
-    conPromo: cart.filter(p => p.tienePromo).length,
-    sinPromo: cart.filter(p => !p.tienePromo).length
-  });
   
   refreshBadge();
 }
@@ -60,36 +53,24 @@ function _addLocal(prod, qty=1) {
   const id = String(prod.id);
   const i = cart.findIndex(p => String(p.id) === id);
   
-  // Detectar si el título indica promoción (fallback)
   const tituloIndicaPromo = prod.titulo && (
     prod.titulo.includes('% OFF') || 
     prod.titulo.includes('descuento') ||
     prod.titulo.includes('promo')
   );
   
-  // Determinar si tiene promo
   const tienePromo = prod.tienePromo || tituloIndicaPromo || false;
   
-  // Calcular precios
   const precioOriginal = Number(prod.precioOriginal || prod.precio || 0);
   const precioConPromo = tienePromo && prod.precioConPromo 
     ? Number(prod.precioConPromo) 
     : Number(prod.precio);
   const precioFinal = tienePromo ? precioConPromo : precioOriginal;
   
-  // Calcular descuento
   let descuentoPorcentaje = Number(prod.descuentoPorcentaje || 0);
   if (tienePromo && !descuentoPorcentaje && precioOriginal > precioFinal) {
     descuentoPorcentaje = Math.round(((precioOriginal - precioFinal) / precioOriginal) * 100);
   }
-  
-  console.log("➕ Agregando producto:", {
-    nombre: prod.titulo || prod.nombre,
-    tienePromo,
-    precioOriginal,
-    precioFinal,
-    descuentoPorcentaje: descuentoPorcentaje + "%"
-  });
   
   if (i >= 0) {
     cart[i].cantidad = Number(cart[i].cantidad||1) + qty;
@@ -130,7 +111,7 @@ function _removeLocal(id) {
 
 function _emptyLocal() {
   _writeLocal([]);
-  localStorage.removeItem("carrito"); // También limpiar el snapshot
+  localStorage.removeItem("carrito");
   return true;
 }
 
@@ -182,7 +163,6 @@ async function _fetchRemoteItems() {
 
   const ids = items.map(i => i.producto_id);
   
-  // Usar la vista con promos
   const { data: prods, error: errProds } = await supabase
     .from("productos_con_promos")
     .select("*")
@@ -236,125 +216,6 @@ async function _emptyRemote() {
   return true;
 }
 
-// ---------- FUSIÓN DE CARRITO DE INVITADO ----------
-async function mergeGuestCartOnLogin() {
-  try {
-    console.log('🔄 ======= INICIANDO FUSIÓN DE CARRITO =======');
-    console.log('📂 localStorage completo:', { ...localStorage });
-    
-    // IMPORTANTE: Leer el carrito ANTES de cualquier otra operación
-    const guestCart = _readLocal();
-    console.log('📦 Carrito local leído:', {
-      cantidad: guestCart.length,
-      productos: guestCart.map(p => ({ titulo: p.titulo, cantidad: p.cantidad, id: p.id }))
-    });
-    
-    if (!guestCart || guestCart.length === 0) {
-      console.log('ℹ️ No hay productos en el carrito local para fusionar');
-      return;
-    }
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      console.log('⚠️ Usuario no autenticado, guardando carrito para más tarde');
-      // Guardar en sessionStorage como backup
-      sessionStorage.setItem('pending-cart-merge', JSON.stringify(guestCart));
-      return;
-    }
-
-    console.log(`✅ Usuario autenticado: ${user.email}`);
-    console.log(`🔄 Fusionando ${guestCart.length} productos...`);
-
-    // Contador de éxito
-    let exitosos = 0;
-    let errores = 0;
-
-    // Agregar cada producto del carrito local al carrito remoto
-    for (const item of guestCart) {
-      try {
-        console.log(`➕ Intentando agregar: ${item.titulo}`);
-        console.log(`   ID: ${item.id}`);
-        console.log(`   Cantidad: ${item.cantidad}`);
-        
-        await _addRemote(item.id, item.cantidad);
-        exitosos++;
-        console.log(`   ✅ Agregado exitosamente`);
-      } catch (error) {
-        errores++;
-        console.error(`   ❌ Error agregando ${item.titulo}:`, {
-          message: error.message,
-          code: error.code,
-          details: error.details
-        });
-      }
-      
-      // Pequeña pausa entre productos
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-
-    console.log(`📊 ======= RESULTADO DE FUSIÓN =======`);
-    console.log(`   Total productos: ${guestCart.length}`);
-    console.log(`   ✅ Exitosos: ${exitosos}`);
-    console.log(`   ❌ Errores: ${errores}`);
-
-    if (exitosos > 0) {
-      console.log('🧹 Limpiando carrito local...');
-      _emptyLocal();
-      // Limpiar también el backup
-      sessionStorage.removeItem('pending-cart-merge');
-      console.log('✅ Carrito local limpiado');
-    } else {
-      console.warn('⚠️ No se agregó ningún producto exitosamente');
-      console.warn('⚠️ Manteniendo carrito local para reintento');
-    }
-
-    // Refrescar badge
-    console.log('🔄 Refrescando badge...');
-    await refreshBadge();
-    
-    console.log('✅ ======= FUSIÓN COMPLETADA =======');
-
-  } catch (error) {
-    console.error('❌ ======= ERROR CRÍTICO EN FUSIÓN =======');
-    console.error('Detalles:', {
-      message: error.message,
-      stack: error.stack,
-      name: error.name
-    });
-  }
-}
-
-// Configurar listener para fusionar carrito al hacer login
-function setupGuestCartMerge() {
-  supabase.auth.onAuthStateChange(async (event, session) => {
-    if (event === 'SIGNED_IN' && session) {
-      console.log('🔑 Usuario hizo login, fusionando carrito...');
-      
-      // Intentar restaurar backup si existe
-      try {
-        const backup = sessionStorage.getItem('backup-cart-before-login');
-        if (backup) {
-          console.log('📂 Encontrado backup de carrito');
-          const currentCart = localStorage.getItem('productos-en-carrito');
-          
-          if (!currentCart || currentCart === '[]') {
-            console.log('🔄 Restaurando carrito desde backup...');
-            localStorage.setItem('productos-en-carrito', backup);
-          }
-          
-          // Limpiar backup después de usarlo
-          sessionStorage.removeItem('backup-cart-before-login');
-        }
-      } catch (error) {
-        console.error('Error restaurando backup:', error);
-      }
-      
-      // Proceder con la fusión
-      await mergeGuestCartOnLogin();
-    }
-  });
-}
-
 // ---------- API pública ----------
 async function getSnapshot() {
   const uid = await getUserId();
@@ -366,12 +227,6 @@ async function getSnapshot() {
         return a + Number(precio) * Number(p.cantidad||1);
       }, 0);
       
-      console.log("📊 Snapshot remoto:", {
-        items: items.length,
-        conPromo: items.filter(i => i.tienePromo).length,
-        total
-      });
-      
       return { mode: "remote", items, total };
     } catch {
       // fallback local si falla
@@ -380,12 +235,6 @@ async function getSnapshot() {
   
   const cart = _readLocal();
   const total = _totalLocal(cart);
-  
-  console.log("📊 Snapshot local:", {
-    items: cart.length,
-    conPromo: cart.filter(i => i.tienePromo).length,
-    total
-  });
   
   return {
     mode: "local",
@@ -404,11 +253,9 @@ async function addById(productoId, qty=1) {
   return _addLocal(prod, qty);
 }
 
-// FUNCIÓN PRINCIPAL - con soporte completo de promos
 async function addProduct(productObj, qty=1) {
   const uid = await getUserId();
   
-  // Asegurar que el objeto tenga toda la info de promo
   const productoCompleto = {
     ...productObj,
     tienePromo: productObj.tienePromo || false,
@@ -418,12 +265,6 @@ async function addProduct(productObj, qty=1) {
       ? Number(productObj.precio) 
       : Number(productObj.precioOriginal || productObj.precio)
   };
-  
-  console.log("CartAPI.addProduct:", {
-    nombre: productoCompleto.titulo || productoCompleto.nombre,
-    tienePromo: productoCompleto.tienePromo,
-    descuento: productoCompleto.descuentoPorcentaje + "%"
-  });
   
   if (uid && productObj?.id) {
     return _addRemote(String(productObj.id), qty);
@@ -460,7 +301,6 @@ async function refreshBadge() {
   el.textContent = String(totalQty);
 }
 
-// Función de verificación para debugging
 function verificarCarrito() {
   const cart = _readLocal();
   const conPromo = cart.filter(p => p.tienePromo);
@@ -482,24 +322,15 @@ function verificarCarrito() {
 }
 
 window.CartAPI = {
-  // core
   getSnapshot, 
   addById, 
   addProduct, 
   setQty, 
   remove, 
   empty,
-  // helpers UI
   refreshBadge,
-  // debugging
-  verificarCarrito,
-  // fusión de carrito
-  mergeGuestCart: mergeGuestCartOnLogin
+  verificarCarrito
 };
 
-// Auto-inicializar fusión de carrito
-setupGuestCartMerge();
-
-// Auto-verificar al cargar
-console.log("✅ CartAPI cargado con soporte de promociones y fusión de carrito de invitado");
+console.log("✅ CartAPI cargado con soporte de promociones");
 console.log("💡 Usar CartAPI.verificarCarrito() para ver el estado actual");
