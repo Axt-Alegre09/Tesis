@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="CSS/main.css">
   <link rel="stylesheet" href="CSS/carrito.css">
 </head>
-<body style="opacity: 0;">
+<body>
   <div class="wrapper">
     <aside>
       <header>
@@ -79,6 +79,8 @@
   <script type="module">
     import "./JS/cart-api.js";
 
+    console.log("📦 Script principal del carrito cargado");
+
     const contVacio   = document.getElementById("carrito-vacio");
     const contProds   = document.getElementById("carrito-productos");
     const contAcc     = document.getElementById("carrito-acciones");
@@ -104,97 +106,109 @@
     }
 
     async function render() {
-      const snap = await window.CartAPI.getSnapshot();
-      const items = snap.items || [];
+      console.log("🎨 Renderizando carrito...");
       
-      let totalSinDescuento = 0;
-      let totalConDescuento = 0;
-      
-      items.forEach(it => {
-        const precioOriginal = Number(it.precioOriginal || it.precio);
-        const precioFinal = it.tienePromo ? Number(it.precio) : precioOriginal;
-        const cantidad = Number(it.cantidad || 1);
+      try {
+        const snap = await window.CartAPI.getSnapshot();
+        const items = snap.items || [];
         
-        totalSinDescuento += precioOriginal * cantidad;
-        totalConDescuento += precioFinal * cantidad;
-      });
-
-      const ahorroTotal = totalSinDescuento - totalConDescuento;
-
-      totalEl.textContent = fmtGs(snap.total || 0);
-
-      if (ahorroTotal > 0) {
-        ahorroMontoEl.textContent = fmtGs(ahorroTotal);
-        totalAhorroEl.style.display = 'block';
-      } else {
-        totalAhorroEl.style.display = 'none';
-      }
-
-      if (!items.length) {
-        contProds.innerHTML = "";
-        setEstado(true);
-        return;
-      }
-
-      setEstado(false);
-      contProds.innerHTML = "";
-
-      for (const it of items) {
-        const row = document.createElement("div");
-        row.className = "carrito-producto";
+        console.log(`📦 Carrito tiene ${items.length} productos`);
         
-        if (it.tienePromo) {
-          row.classList.add("has-promo");
-          row.setAttribute("data-descuento", Math.round(it.descuentoPorcentaje));
-        }
+        let totalSinDescuento = 0;
+        let totalConDescuento = 0;
+        
+        items.forEach(it => {
+          const precioOriginal = Number(it.precioOriginal || it.precio);
+          const precioFinal = it.tienePromo ? Number(it.precio) : precioOriginal;
+          const cantidad = Number(it.cantidad || 1);
+          
+          totalSinDescuento += precioOriginal * cantidad;
+          totalConDescuento += precioFinal * cantidad;
+        });
 
-        const idAttrKey = snap.mode === "remote" ? "data-itemid" : "data-id";
-        const resolvedId = snap.mode === "remote"
-          ? (it.itemId ?? it._itemId ?? it.id)
-          : it.id;
-        const idAttrVal = String(resolvedId);
+        const ahorroTotal = totalSinDescuento - totalConDescuento;
 
-        let precioHTML;
-        if (it.tienePromo) {
-          precioHTML = `
-            <div class="precio-con-promo">
-              <span class="precio-original-carrito">${fmtGs(it.precioOriginal)}</span>
-              <span class="precio-promo-carrito">${fmtGs(it.precio)}</span>
-            </div>
-          `;
+        totalEl.textContent = fmtGs(snap.total || 0);
+
+        if (ahorroTotal > 0) {
+          ahorroMontoEl.textContent = fmtGs(ahorroTotal);
+          totalAhorroEl.style.display = 'block';
         } else {
-          precioHTML = `<p>${fmtGs(it.precio)}</p>`;
+          totalAhorroEl.style.display = 'none';
         }
 
-        row.innerHTML = `
-          <img class="carrito-producto-imagen" src="${it.imagen || IMG_FALLBACK}" alt="${it.titulo}">
-          <div class="carrito-producto-titulo">
-            <h6>Producto</h6>
-            <h4>${it.titulo}</h4>
-          </div>
-          <div class="carrito-producto-cantidad">
-            <h6>Cantidad</h6>
-            <div class="qty-ctrl">
-              <button class="qty-btn" data-action="dec" ${idAttrKey}="${idAttrVal}" aria-label="Disminuir">−</button>
-              <span class="qty" data-qty>${Number(it.cantidad||1)}</span>
-              <button class="qty-btn" data-action="inc" ${idAttrKey}="${idAttrVal}" aria-label="Aumentar">+</button>
+        if (!items.length) {
+          contProds.innerHTML = "";
+          setEstado(true);
+          console.log("ℹ️ Carrito vacío");
+          return;
+        }
+
+        setEstado(false);
+        contProds.innerHTML = "";
+
+        for (const it of items) {
+          const row = document.createElement("div");
+          row.className = "carrito-producto";
+          
+          if (it.tienePromo) {
+            row.classList.add("has-promo");
+            row.setAttribute("data-descuento", Math.round(it.descuentoPorcentaje));
+          }
+
+          const idAttrKey = snap.mode === "remote" ? "data-itemid" : "data-id";
+          const resolvedId = snap.mode === "remote"
+            ? (it.itemId ?? it._itemId ?? it.id)
+            : it.id;
+          const idAttrVal = String(resolvedId);
+
+          let precioHTML;
+          if (it.tienePromo) {
+            precioHTML = `
+              <div class="precio-con-promo">
+                <span class="precio-original-carrito">${fmtGs(it.precioOriginal)}</span>
+                <span class="precio-promo-carrito">${fmtGs(it.precio)}</span>
+              </div>
+            `;
+          } else {
+            precioHTML = `<p>${fmtGs(it.precio)}</p>`;
+          }
+
+          row.innerHTML = `
+            <img class="carrito-producto-imagen" src="${it.imagen || IMG_FALLBACK}" alt="${it.titulo}">
+            <div class="carrito-producto-titulo">
+              <h6>Producto</h6>
+              <h4>${it.titulo}</h4>
             </div>
-          </div>
-          <div class="carrito-producto-precio">
-            <h6>Precio</h6>
-            ${precioHTML}
-          </div>
-          <div class="carrito-producto-subtotal">
-            <h6>Subtotal</h6>
-            <p>${fmtGs(it.precio * (it.cantidad||1))}</p>
-          </div>
-          <button class="carrito-producto-eliminar" title="Eliminar" ${idAttrKey}="${idAttrVal}">
-            <i class="bi bi-trash"></i>
-          </button>
-        `;
+            <div class="carrito-producto-cantidad">
+              <h6>Cantidad</h6>
+              <div class="qty-ctrl">
+                <button class="qty-btn" data-action="dec" ${idAttrKey}="${idAttrVal}" aria-label="Disminuir">−</button>
+                <span class="qty" data-qty>${Number(it.cantidad||1)}</span>
+                <button class="qty-btn" data-action="inc" ${idAttrKey}="${idAttrVal}" aria-label="Aumentar">+</button>
+              </div>
+            </div>
+            <div class="carrito-producto-precio">
+              <h6>Precio</h6>
+              ${precioHTML}
+            </div>
+            <div class="carrito-producto-subtotal">
+              <h6>Subtotal</h6>
+              <p>${fmtGs(it.precio * (it.cantidad||1))}</p>
+            </div>
+            <button class="carrito-producto-eliminar" title="Eliminar" ${idAttrKey}="${idAttrVal}">
+              <i class="bi bi-trash"></i>
+            </button>
+          `;
+          
+          row.querySelector(".carrito-producto-imagen")?.addEventListener("error", (e)=> e.currentTarget.src = IMG_FALLBACK);
+          contProds.appendChild(row);
+        }
         
-        row.querySelector(".carrito-producto-imagen")?.addEventListener("error", (e)=> e.currentTarget.src = IMG_FALLBACK);
-        contProds.appendChild(row);
+        console.log("✅ Carrito renderizado correctamente");
+        
+      } catch (error) {
+        console.error("❌ Error renderizando carrito:", error);
       }
     }
 
@@ -244,16 +258,12 @@
     // Es manejado por checkout-interceptor.js
     // ============================================
 
-    // Inicialización cuando el DOM está listo
-    document.addEventListener("DOMContentLoaded", async () => {
-      // Animación de entrada
-      document.body.style.transition = "opacity 0.3s ease";
-      document.body.style.opacity = "1";
-      
-      // Renderizar carrito
-      await render();
-      
-      console.log("✅ Carrito inicializado");
+    // Renderizar inmediatamente (sin esperar DOMContentLoaded)
+    // Esto funciona porque el script está al final del body
+    render().then(() => {
+      console.log("✅ Inicialización completada");
+    }).catch(error => {
+      console.error("❌ Error en inicialización:", error);
     });
   </script>
 
