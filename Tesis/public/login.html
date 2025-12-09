@@ -12,136 +12,22 @@
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Devonshire&family=Poppins:wght@100;200;300;400;500;600;700;800;900&display=swap');
 
-    /* ===== BOTÓN ADMIN PROFESIONAL ===== */
-    .admin-badge {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      z-index: 1000;
-      padding: 0;
-      border: none;
-      background: transparent;
+    /* Botón flotante ADMIN */
+    .admin-entry{
+      position: fixed; right: 22px; top: 18px; z-index: 50;
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      width: 56px; height: 56px; border-radius: 999px;
+      border: 2px solid #3c2e1a; background: #fff; color: #3c2e1a;
+      text-decoration: none; font-weight: 800;
+      box-shadow: 0 12px 28px rgba(0,0,0,.18);
+      transition: transform .15s ease, background .15s ease;
     }
-
-    .admin-badge .badge-content {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 16px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      border-radius: 50px;
-      text-decoration: none;
-      font-weight: 600;
-      font-size: 0.9rem;
-      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-      transition: all 0.3s ease;
-      border: 2px solid rgba(255, 255, 255, 0.2);
-    }
-
-    .admin-badge .badge-content:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
-      border-color: rgba(255, 255, 255, 0.4);
-    }
-
-    .admin-badge .badge-content i {
-      font-size: 1.2rem;
-    }
-
-    @media (max-width: 768px) {
-      .admin-badge {
-        top: 10px;
-        right: 10px;
-      }
-      
-      .admin-badge .badge-content {
-        padding: 8px 12px;
-        font-size: 0.85rem;
-      }
-      
-      .admin-badge .badge-content span {
-        display: none;
-      }
-      
-      .admin-badge .badge-content i {
-        font-size: 1.3rem;
-      }
-    }
-
-    /* ===== BOTÓN INVITADO ===== */
-    .guest-access {
-      margin-top: 20px;
-      text-align: center;
-    }
-
-    .guest-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 12px 24px;
-      background: transparent;
-      border: 2px solid rgba(111, 92, 56, 0.3);
-      color: #6f5c38;
-      border-radius: 12px;
-      text-decoration: none;
-      font-weight: 600;
-      font-size: 0.95rem;
-      transition: all 0.3s ease;
-      cursor: pointer;
-    }
-
-    .guest-btn:hover {
-      background: rgba(111, 92, 56, 0.05);
-      border-color: rgba(111, 92, 56, 0.5);
-      color: #6f5c38;
-      transform: translateY(-1px);
-    }
-
-    .guest-btn i {
-      font-size: 1.1rem;
-    }
-
-    /* Divider */
-    .divider {
-      display: flex;
-      align-items: center;
-      text-align: center;
-      margin: 20px 0;
-      color: rgba(0, 0, 0, 0.4);
-      font-size: 0.85rem;
-    }
-
-    .divider::before,
-    .divider::after {
-      content: '';
-      flex: 1;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-    }
-
-    .divider span {
-      padding: 0 10px;
-    }
-
-    /* Ajuste para el formulario de login */
-    .form-box.login {
-      padding: 40px;
-    }
-
-    /* Animación suave */
-    @keyframes fadeIn {
-      from {
-        opacity: 0;
-        transform: translateY(10px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    .guest-access {
-      animation: fadeIn 0.5s ease 0.3s both;
+    .admin-entry .icon{ font-size: 22px; line-height: 0; }
+    .admin-entry small{ font-size: 10px; letter-spacing: .3px; margin-top: -2px; }
+    .admin-entry:hover{ background: #f2eadf; transform: translateY(-1px); }
+    @media (max-width: 480px){
+      .admin-entry{ width: 50px; height: 50px; right: 14px; top: 12px; }
+      .admin-entry .icon{ font-size: 20px; }
     }
   </style>
 </head>
@@ -149,13 +35,11 @@
   <!-- Contenedor de alertas -->
   <div id="msg" aria-live="polite" role="region"></div>
 
-  <!-- Botón ADMIN Profesional -->
-  <div class="admin-badge">
-    <a href="loginAdmin.html" class="badge-content" aria-label="Acceso de administrador">
-      <i class="bi bi-shield-lock"></i>
-      <span>Admin</span>
-    </a>
-  </div>
+  <!-- Acceso rápido a login de Administrador -->
+  <a class="admin-entry" href="loginAdmin.html" aria-label="Acceso de administrador">
+    <span class="icon"><i class="bi bi-person-gear"></i></span>
+    <small>ADMIN</small>
+  </a>
 
   <div class="wrapper" id="authWrapper">
     <!-- Login -->
@@ -178,19 +62,6 @@
         </div>
 
         <button type="submit" class="btn" id="loginSubmit">Ingresar</button>
-
-        <!-- Divider -->
-        <div class="divider">
-          <span>o</span>
-        </div>
-
-        <!-- Botón Continuar como Invitado -->
-        <div class="guest-access">
-          <button type="button" class="guest-btn" id="guestBtn">
-            <i class="bi bi-person"></i>
-            Continuar como invitado
-          </button>
-        </div>
       </form>
     </div>
 
@@ -210,19 +81,6 @@
         </div>
 
         <button type="submit" class="btn" id="registerSubmit">Registrarse</button>
-
-        <!-- Divider -->
-        <div class="divider">
-          <span>o</span>
-        </div>
-
-        <!-- Botón Continuar como Invitado (también en registro) -->
-        <div class="guest-access">
-          <button type="button" class="guest-btn" id="guestBtnRegister">
-            <i class="bi bi-person"></i>
-            Continuar como invitado
-          </button>
-        </div>
       </form>
     </div>
 
@@ -244,4 +102,4 @@
   <!-- Lógica -->
   <script type="module" src="JS/ScriptLogin.js"></script>
 </body>
-</html> 
+</html>

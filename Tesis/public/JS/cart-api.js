@@ -1,5 +1,5 @@
 // JS/cart-api.js
-// CartAPI CON SOPORTE COMPLETO DE PROMOS Y FUSIÓN DE CARRITO DE INVITADO
+// CartAPI CON SOPORTE COMPLETO DE PROMOS
 import { supabase } from "./ScriptLogin.js";
 
 // ---------- Utils ----------
@@ -36,7 +36,7 @@ function _writeLocal(cart) {
   };
   localStorage.setItem("carrito", JSON.stringify(cartData));
   
-  console.log("💾 Carrito guardado:", {
+  console.log("Carrito guardado:", {
     items: cart.length,
     conPromo: cart.filter(p => p.tienePromo).length,
     sinPromo: cart.filter(p => !p.tienePromo).length
@@ -83,7 +83,7 @@ function _addLocal(prod, qty=1) {
     descuentoPorcentaje = Math.round(((precioOriginal - precioFinal) / precioOriginal) * 100);
   }
   
-  console.log("➕ Agregando producto:", {
+  console.log("Agregando producto:", {
     nombre: prod.titulo || prod.nombre,
     tienePromo,
     precioOriginal,
@@ -236,125 +236,6 @@ async function _emptyRemote() {
   return true;
 }
 
-// ---------- FUSIÓN DE CARRITO DE INVITADO ----------
-async function mergeGuestCartOnLogin() {
-  try {
-    console.log('🔄 ======= INICIANDO FUSIÓN DE CARRITO =======');
-    console.log('📂 localStorage completo:', { ...localStorage });
-    
-    // IMPORTANTE: Leer el carrito ANTES de cualquier otra operación
-    const guestCart = _readLocal();
-    console.log('📦 Carrito local leído:', {
-      cantidad: guestCart.length,
-      productos: guestCart.map(p => ({ titulo: p.titulo, cantidad: p.cantidad, id: p.id }))
-    });
-    
-    if (!guestCart || guestCart.length === 0) {
-      console.log('ℹ️ No hay productos en el carrito local para fusionar');
-      return;
-    }
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      console.log('⚠️ Usuario no autenticado, guardando carrito para más tarde');
-      // Guardar en sessionStorage como backup
-      sessionStorage.setItem('pending-cart-merge', JSON.stringify(guestCart));
-      return;
-    }
-
-    console.log(`✅ Usuario autenticado: ${user.email}`);
-    console.log(`🔄 Fusionando ${guestCart.length} productos...`);
-
-    // Contador de éxito
-    let exitosos = 0;
-    let errores = 0;
-
-    // Agregar cada producto del carrito local al carrito remoto
-    for (const item of guestCart) {
-      try {
-        console.log(`➕ Intentando agregar: ${item.titulo}`);
-        console.log(`   ID: ${item.id}`);
-        console.log(`   Cantidad: ${item.cantidad}`);
-        
-        await _addRemote(item.id, item.cantidad);
-        exitosos++;
-        console.log(`   ✅ Agregado exitosamente`);
-      } catch (error) {
-        errores++;
-        console.error(`   ❌ Error agregando ${item.titulo}:`, {
-          message: error.message,
-          code: error.code,
-          details: error.details
-        });
-      }
-      
-      // Pequeña pausa entre productos
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-
-    console.log(`📊 ======= RESULTADO DE FUSIÓN =======`);
-    console.log(`   Total productos: ${guestCart.length}`);
-    console.log(`   ✅ Exitosos: ${exitosos}`);
-    console.log(`   ❌ Errores: ${errores}`);
-
-    if (exitosos > 0) {
-      console.log('🧹 Limpiando carrito local...');
-      _emptyLocal();
-      // Limpiar también el backup
-      sessionStorage.removeItem('pending-cart-merge');
-      console.log('✅ Carrito local limpiado');
-    } else {
-      console.warn('⚠️ No se agregó ningún producto exitosamente');
-      console.warn('⚠️ Manteniendo carrito local para reintento');
-    }
-
-    // Refrescar badge
-    console.log('🔄 Refrescando badge...');
-    await refreshBadge();
-    
-    console.log('✅ ======= FUSIÓN COMPLETADA =======');
-
-  } catch (error) {
-    console.error('❌ ======= ERROR CRÍTICO EN FUSIÓN =======');
-    console.error('Detalles:', {
-      message: error.message,
-      stack: error.stack,
-      name: error.name
-    });
-  }
-}
-
-// Configurar listener para fusionar carrito al hacer login
-function setupGuestCartMerge() {
-  supabase.auth.onAuthStateChange(async (event, session) => {
-    if (event === 'SIGNED_IN' && session) {
-      console.log('🔑 Usuario hizo login, fusionando carrito...');
-      
-      // Intentar restaurar backup si existe
-      try {
-        const backup = sessionStorage.getItem('backup-cart-before-login');
-        if (backup) {
-          console.log('📂 Encontrado backup de carrito');
-          const currentCart = localStorage.getItem('productos-en-carrito');
-          
-          if (!currentCart || currentCart === '[]') {
-            console.log('🔄 Restaurando carrito desde backup...');
-            localStorage.setItem('productos-en-carrito', backup);
-          }
-          
-          // Limpiar backup después de usarlo
-          sessionStorage.removeItem('backup-cart-before-login');
-        }
-      } catch (error) {
-        console.error('Error restaurando backup:', error);
-      }
-      
-      // Proceder con la fusión
-      await mergeGuestCartOnLogin();
-    }
-  });
-}
-
 // ---------- API pública ----------
 async function getSnapshot() {
   const uid = await getUserId();
@@ -381,7 +262,7 @@ async function getSnapshot() {
   const cart = _readLocal();
   const total = _totalLocal(cart);
   
-  console.log("📊 Snapshot local:", {
+  console.log("Snapshot local:", {
     items: cart.length,
     conPromo: cart.filter(i => i.tienePromo).length,
     total
@@ -466,13 +347,13 @@ function verificarCarrito() {
   const conPromo = cart.filter(p => p.tienePromo);
   const sinPromo = cart.filter(p => !p.tienePromo);
   
-  console.log("🛒 Estado del carrito:");
+  console.log("Estado del carrito:");
   console.log(`   Total: ${cart.length} productos`);
   console.log(`   Con promoción: ${conPromo.length}`);
   console.log(`   Sin promoción: ${sinPromo.length}`);
   
   if (conPromo.length > 0) {
-    console.log("🎁 Productos con descuento:");
+    console.log("Productos con descuento:");
     conPromo.forEach(p => {
       console.log(`   - ${p.titulo}: ${p.descuentoPorcentaje}% OFF`);
       console.log(`     Original: ${fmtGs(p.precioOriginal)}`);
@@ -492,14 +373,9 @@ window.CartAPI = {
   // helpers UI
   refreshBadge,
   // debugging
-  verificarCarrito,
-  // fusión de carrito
-  mergeGuestCart: mergeGuestCartOnLogin
+  verificarCarrito
 };
 
-// Auto-inicializar fusión de carrito
-setupGuestCartMerge();
-
 // Auto-verificar al cargar
-console.log("✅ CartAPI cargado con soporte de promociones y fusión de carrito de invitado");
-console.log("💡 Usar CartAPI.verificarCarrito() para ver el estado actual");
+console.log("CartAPI cargado con soporte de promociones");
+console.log("Usar CartAPI.verificarCarrito() para ver el estado actual");

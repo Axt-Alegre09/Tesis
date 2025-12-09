@@ -1,4 +1,4 @@
-// JS/checkout.js - VERSIÓN COMPATIBLE CON FLUJO ORIGINAL + TARJETAS GUARDADAS
+// JS/checkout.js - VERSIÓN CORREGIDA (compatible con checkout-tarjetas.js)
 (function () {
   // --------- DOM ---------
   const form = document.getElementById('checkout-form');
@@ -159,21 +159,25 @@
 
   // --------- Envío del formulario ---------
   form?.addEventListener("submit", (e) => {
+    // ⚠️ IMPORTANTE: checkout-tarjetas.js se ejecuta ANTES (capture phase)
+    // Si hay tarjeta guardada seleccionada, ese script detendrá el evento
+    // y este código NO se ejecutará
+    
     e.preventDefault();
 
     const metodo = document.querySelector('input[name="metodo"]:checked')?.value;
     const { total, source, items } = getCheckoutData();
 
-    // ⭐ GUARDAR CARRITO EN localStorage ANTES DE NAVEGAR
+    //  GUARDAR CARRITO EN localStorage ANTES DE NAVEGAR
     try {
       const cartToSave = {
         items: items || [],
         total: total || 0
       };
       localStorage.setItem("carrito", JSON.stringify(cartToSave));
-      console.log("✅ Carrito guardado en localStorage:", cartToSave);
+      console.log("Carrito guardado en localStorage:", cartToSave);
     } catch (err) {
-      console.warn("⚠️ Error guardando carrito en localStorage:", err);
+      console.warn("Error guardando carrito en localStorage:", err);
     }
 
     if (source !== 'remote' && (!isFinite(total) || total <= 0)) {
@@ -194,18 +198,12 @@
     }
 
     if (metodo === 'tarjeta') {
-      // ✅ VERIFICAR SI HAY TARJETA GUARDADA SELECCIONADA (usando función de checkout-tarjetas.js)
-      const tarjetaGuardadaId = window.getTarjetaGuardadaSeleccionada ? window.getTarjetaGuardadaSeleccionada() : null;
+      // ⚠️ NOTA: Si llegamos aquí, checkout-tarjetas.js NO detuvo el evento
+      // Esto significa que NO hay tarjeta guardada seleccionada
+      // O el usuario quiere ingresar una tarjeta nueva manualmente
       
-      if (tarjetaGuardadaId) {
-        // ✅ Tarjeta guardada seleccionada - SIN VALIDACIÓN, directo al pago
-        console.log('✅ Pago con tarjeta guardada - Sin validación');
-        alert('Pago aprobado. ¡Gracias por tu compra!');
-        finalizeSuccess('tarjeta', { number: 'guardada' });
-        return;
-      }
-
-      // ❌ Si NO hay tarjeta guardada, validar campos manuales (FLUJO ORIGINAL)
+      console.log('checkout.js: Validando tarjeta nueva ingresada manualmente');
+      
       const name = document.getElementById('card-name')?.value?.trim();
       const number = document.getElementById('card-number')?.value || '';
       const exp = document.getElementById('card-exp')?.value?.trim();
@@ -250,39 +248,60 @@
     alert('Seleccioná un método de pago.');
   });
 
-  // --------- Éxito + Factura (TU FLUJO ORIGINAL) ---------
+  // --------- Éxito + Factura ---------
   function finalizeSuccess(metodo, extra = {}) {
     const snap = saveFacturaSnapshot({ metodo, extra });
 
-    console.log('🧹 Limpiando carrito después del pago...');
-
+    // ========== LIMPIAR CARRITO COMPLETAMENTE ==========
+    console.log('🧹 Limpiando carrito después de pago exitoso...');
+    
     Promise.resolve()
-      .then(() => window.CartAPI?.empty?.())
-      .catch(() => {})
+      .then(() => {
+        // 1. Vaciar usando CartAPI
+        if (window.CartAPI && typeof window.CartAPI.empty === 'function') {
+          return window.CartAPI.empty();
+        }
+      })
+      .catch((e) => {
+        console.warn('⚠️ Error vaciando CartAPI:', e);
+      })
       .finally(() => {
-        // Limpiar todos los storages
-        try { 
-          localStorage.removeItem('productos-en-carrito'); 
+        // 2. Limpiar localStorage
+        try {
+          localStorage.removeItem('productos-en-carrito');
           localStorage.removeItem('carrito');
-          console.log('✅ localStorage limpiado');
-        } catch {}
-
+          console.log('  ✓ localStorage limpiado');
+        } catch (e) {
+          console.warn('  ⚠️ Error limpiando localStorage:', e);
+        }
+        
+        // 3. Limpiar sessionStorage
         try {
           sessionStorage.removeItem('carrito');
           sessionStorage.removeItem('productos-en-carrito');
-          console.log('✅ sessionStorage limpiado');
-        } catch {}
+          console.log('  ✓ sessionStorage limpiado');
+        } catch (e) {
+          console.warn('  ⚠️ Error limpiando sessionStorage:', e);
+        }
 
-        // Mostrar sección de éxito (TU FLUJO ORIGINAL)
+        // 4. Actualizar UI
         form.classList.add('disabled');
         success.classList.remove('disabled');
         success.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
         if (btnFactura) btnFactura.onclick = () => generateInvoicePDF(snap || loadFacturaSnapshot());
         
-        try { window.CartAPI?.refreshBadge?.(); } catch {}
-
-        console.log('✅ Carrito limpiado y sección de éxito mostrada');
+        // 5. Refrescar badge del carrito
+        try { 
+          if (window.CartAPI && typeof window.CartAPI.refreshBadge === 'function') {
+            window.CartAPI.refreshBadge(); 
+            console.log('  ✓ Badge actualizado');
+          }
+        } catch (e) {
+          console.warn('  ⚠️ Error actualizando badge:', e);
+        }
+        
+        console.log('✅ Carrito limpiado completamente');
       });
   }
 
@@ -303,7 +322,7 @@
     });
   }
 
-  // ========== FACTURA PDF ESTILO STARSOFT (COMPLETA) ==========
+  // ========== FACTURA PDF ESTILO STARSOFT ==========
   async function generateInvoicePDF(snapshot) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
@@ -367,7 +386,7 @@
 
     let y = M;
 
-    // ========== HEADER CON BORDE ==========
+    // ========== HEADER CON BORDE (como Starsoft) ==========
     const headerH = 110;
     doc.setDrawColor(...C_BORDER);
     doc.setLineWidth(1.5);
@@ -470,7 +489,7 @@
     doc.setFont('helvetica','normal');
     doc.text('Guaraní', pw - M - 90, cy);
 
-    // ========== TABLA ==========
+    // ========== TABLA ESTILO STARSOFT CON COLUMNAS CUADRADAS ==========
     y += clienteH + 10;
 
     const tableData = items.map(it => {
@@ -479,9 +498,11 @@
       const descuento = tienePromo ? Math.round(it.descuentoPorcentaje || 0) : 0;
       const tituloDisplay = tienePromo ? `${titulo} (${descuento}% OFF)` : titulo;
       
+      const precioOrig = Number(it.precioOriginal || it.precio);
       const precioFinal = Number(it.precio);
       const cantidad = Number(it.cantidad || 1);
       
+      // Formatear números correctamente
       const formatter = new Intl.NumberFormat('es-PY', { 
         minimumFractionDigits: 0,
         maximumFractionDigits: 0,
@@ -502,20 +523,24 @@
         subtotalStr
       ];
     });
+
+    // ========== ANCHOS PERFECTAMENTE CUADRADOS ==========
+    // Total disponible: 595pt - 60pt (márgenes) = 535pt
+    // Distribución: 50 + 175 + 85 + 70 + 55 + 45 + 55 = 535pt ✓
     
     doc.autoTable({
       head: [['Cantida', 'Descripción', 'Precio unitario', 'Descuento', 'Exentas', '5%', '10%']],
       body: tableData,
       startY: y,
       margin: { left: M, right: M },
-      tableWidth: 'auto',
+      tableWidth: 'auto',  // Permite que las columnas usen cellWidth exactos
       styles: {
         fontSize: 9,
         cellPadding: 5,
         textColor: C_TXT,
         lineColor: C_BORDER,
         lineWidth: 1,
-        overflow: 'linebreak',
+        overflow: 'linebreak',  // Permite wrap en textos largos
         halign: 'left',
         font: 'helvetica',
         minCellHeight: 20,
@@ -531,20 +556,21 @@
         valign: 'middle'
       },
       columnStyles: {
-        0: { halign: 'center', cellWidth: 50 },
-        1: { halign: 'left', cellWidth: 175 },
-        2: { halign: 'right', cellWidth: 85 },
-        3: { halign: 'center', cellWidth: 70 },
-        4: { halign: 'right', cellWidth: 55 },
-        5: { halign: 'right', cellWidth: 45 },
-        6: { halign: 'right', cellWidth: 55 }
+        0: { halign: 'center', cellWidth: 50 },    // Cantida: 50pt
+        1: { halign: 'left', cellWidth: 175 },     // Descripción: 175pt
+        2: { halign: 'right', cellWidth: 85 },     // Precio unitario: 85pt
+        3: { halign: 'center', cellWidth: 70 },    // Descuento: 70pt
+        4: { halign: 'right', cellWidth: 55 },     // Exentas: 55pt
+        5: { halign: 'right', cellWidth: 45 },     // 5%: 45pt
+        6: { halign: 'right', cellWidth: 55 }      // 10%: 55pt (CORREGIDO)
       },
       theme: 'grid'
     });
 
-    // ========== TOTALES ==========
+    // ========== TOTALES DENTRO DE LA TABLA ==========
     y = doc.lastAutoTable.finalY;
     
+    // Función para convertir números a texto
     function numeroATexto(num) {
       if (num === 0) return 'CERO';
       if (num >= 1000000) return 'UN MILLON O MAS';
@@ -595,7 +621,7 @@
       body: totalsData,
       startY: y,
       margin: { left: M, right: M },
-      tableWidth: 'auto',
+      tableWidth: 'auto',  // Usar mismo sistema
       styles: {
         fontSize: 9,
         cellPadding: 5,
@@ -608,18 +634,18 @@
         minCellHeight: 20
       },
       columnStyles: {
-        0: { fontStyle: 'bold', cellWidth: 110, halign: 'left' },
-        1: { cellWidth: 130, halign: 'left' },
-        2: { halign: 'right', cellWidth: 60 },
-        3: { cellWidth: 50, halign: 'left' },
-        4: { halign: 'right', cellWidth: 70 },
-        5: { halign: 'right', fontStyle: 'bold', cellWidth: 60 },
-        6: { halign: 'right', fontStyle: 'bold', cellWidth: 55 }
+        0: { fontStyle: 'bold', cellWidth: 110, halign: 'left' },   // Label
+        1: { cellWidth: 130, halign: 'left' },                      // Texto/5%
+        2: { halign: 'right', cellWidth: 60 },                      // 0,00
+        3: { cellWidth: 50, halign: 'left' },                       // 10%
+        4: { halign: 'right', cellWidth: 70 },                      // Valor IVA
+        5: { halign: 'right', fontStyle: 'bold', cellWidth: 60 },   // TOTAL IVA
+        6: { halign: 'right', fontStyle: 'bold', cellWidth: 55 }    // Valor final (CORREGIDO: 55pt)
       },
       theme: 'grid'
     });
 
-    // Badge de promo
+    // Badge de promo si aplica
     if (tienePromos && ahorroTotal > 0) {
       y = doc.lastAutoTable.finalY + 10;
       doc.setFont('helvetica','bold').setFontSize(9).setTextColor(220, 38, 38);
@@ -639,6 +665,7 @@
       const qrData = await toDataURL(QR_SRC);
       doc.addImage(qrData, 'PNG', M + 15, y + 15, 100, 100);
       
+      // Indicador CDC
       doc.setFillColor(50, 115, 220);
       doc.rect(M + 95, y + 105, 20, 10, 'F');
       doc.rect(M + 105, y + 95, 10, 20, 'F');
@@ -649,6 +676,7 @@
     let cdcY = y + 22;
     
     doc.setFont('helvetica','bold').setFontSize(10).setTextColor(...C_TXT);
+    const maxWidth = pw - 2*M - 145;
     doc.text('Consulte la validez de esta Factura Electrónica con el número de CDC', cdcX, cdcY);
     
     cdcY += 16;
@@ -657,6 +685,7 @@
     
     cdcY += 22;
     doc.setFont('helvetica','bold').setFontSize(11).setTextColor(...C_TXT);
+    // Dividir CDC en grupos de 10 para mejor legibilidad
     const cdcPart1 = cdc.substring(0, 10);
     const cdcPart2 = cdc.substring(10, 20);
     const cdcPart3 = cdc.substring(20, 30);

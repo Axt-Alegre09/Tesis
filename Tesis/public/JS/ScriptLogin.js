@@ -1,4 +1,4 @@
-// JS/ScriptLogin.js - CON SOPORTE DE MODO INVITADO
+// JS/ScriptLogin.js - VERSIÓN FINAL CORREGIDA PARA TUS TABLAS REALES
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 /* ========= Config ========= */
@@ -26,28 +26,15 @@ function showMsg(text, type = "info") {
   box.innerHTML = `<div class="alert alert-${type}" role="alert">${text}</div>`;
 }
 
-/* ========= Modo Invitado ========= */
-export function isGuestMode() {
-  return localStorage.getItem('is-guest-mode') === 'true';
-}
-
-export function enableGuestMode() {
-  localStorage.setItem('is-guest-mode', 'true');
-  console.log('👤 Modo invitado habilitado');
-}
-
-export function disableGuestMode() {
-  localStorage.removeItem('is-guest-mode');
-  console.log('🔐 Modo invitado deshabilitado');
-}
-
 /* ========= Sesión ========= */
 export async function getUser() {
   const { data } = await supabase.auth.getUser();
   return data?.user ?? null;
 }
 
-/* ========= Perfiles ========= */
+/* ========= Perfiles =========
+   CORRECCIÓN: Usar tabla 'profiles' con campo 'role' y 'id'
+*/
 export async function getProfile() {
   const user = await getUser();
   if (!user) return null;
@@ -85,13 +72,7 @@ export async function getClientePerfil() {
 /* ========= Nombre visible en el chip ========= */
 async function getDisplayName() {
   const user = await getUser();
-  if (!user) {
-    // Si está en modo invitado, mostrar "Invitado"
-    if (isGuestMode()) {
-      return "Invitado";
-    }
-    return "";
-  }
+  if (!user) return "";
 
   const cp = await getClientePerfil();
   const razon = cp?.razon?.trim();
@@ -117,8 +98,9 @@ export async function goByRole() {
     return;
   }
   
-  console.log('🔄 Redirigiendo según rol:', p.role);
+  console.log(' Redirigiendo según rol:', p.role);
   
+  // CORRECCIÓN: Usar 'role' en lugar de 'rol'
   if (p.role === "admin") {
     go(HOME_ADMIN);
   } else {
@@ -128,7 +110,7 @@ export async function goByRole() {
 
 export async function requireRole(roleNeeded = "cliente") {
   const { data } = await supabase.auth.getSession();
-  if (!data?.session) { 
+  if (!data.session) { 
     go(LOGIN_URL); 
     return; 
   }
@@ -151,15 +133,7 @@ export function setUserNameUI(nombre) {
 
 export async function paintUserChip() {
   const { data } = await supabase.auth.getSession();
-  if (!data?.session) {
-    // Verificar si está en modo invitado
-    if (isGuestMode()) {
-      setUserNameUI("Invitado");
-      return;
-    }
-    setUserNameUI("Cuenta");
-    return;
-  }
+  if (!data?.session) return setUserNameUI("Cuenta");
   
   const display = await getDisplayName();
   setUserNameUI(display || "Cuenta");
@@ -174,7 +148,6 @@ export async function logout(ev) {
     console.error('Error al cerrar sesión:', e);
   }
   
-  // Limpiar TODO incluyendo modo invitado
   try { localStorage.clear(); } catch {}
   try { sessionStorage.clear(); } catch {}
   
@@ -184,41 +157,12 @@ export async function logout(ev) {
 export async function autoWireAuthMenu() {
   const authBtn = document.getElementById("logoutBtn");
   const upd = document.getElementById("updateProfileBtn");
-  const metodosBtn = document.getElementById("metodosBtn");
-  const historialBtn = document.getElementById("historialBtn");
 
   if (upd) {
     upd.addEventListener("click", (ev) => {
       ev?.preventDefault?.();
-      
-      // Si es invitado, pedir login
-      if (isGuestMode()) {
-        alert('Necesitas iniciar sesión para acceder a esta función');
-        window.location.href = LOGIN_URL;
-        return;
-      }
-      
       window.location.href = "misdatos.html";
     });
-  }
-
-  // Deshabilitar funciones que requieren auth para invitados
-  if (isGuestMode()) {
-    if (metodosBtn) {
-      metodosBtn.addEventListener("click", (ev) => {
-        ev?.preventDefault?.();
-        alert('Necesitas iniciar sesión para acceder a esta función');
-        window.location.href = LOGIN_URL;
-      });
-    }
-
-    if (historialBtn) {
-      historialBtn.addEventListener("click", (ev) => {
-        ev?.preventDefault?.();
-        alert('Necesitas iniciar sesión para acceder a esta función');
-        window.location.href = LOGIN_URL;
-      });
-    }
   }
 
   if (authBtn) {
@@ -228,13 +172,6 @@ export async function autoWireAuthMenu() {
     if (hasSession) {
       authBtn.innerHTML = `<i class="bi bi-box-arrow-right"></i> Cerrar sesión`;
       authBtn.onclick = (e) => logout(e);
-    } else if (isGuestMode()) {
-      authBtn.innerHTML = `<i class="bi bi-box-arrow-in-right"></i> Iniciar sesión`;
-      authBtn.onclick = () => {
-        // Limpiar modo invitado al ir a login
-        disableGuestMode();
-        go(LOGIN_URL);
-      };
     } else {
       authBtn.innerHTML = `<i class="bi bi-box-arrow-in-right"></i> Iniciar sesión`;
       authBtn.onclick = () => go(LOGIN_URL);
@@ -267,12 +204,12 @@ async function wireLoginPage() {
     const { data } = await Promise.race([sessionPromise, timeoutPromise]);
     
     if (data?.session) {
-      console.log('✅ Sesión existente detectada, redirigiendo...');
+      console.log(' Sesión existente detectada, redirigiendo...');
       await goByRole();
       return;
     }
   } catch (error) {
-    console.log('⚠️ Error verificando sesión:', error.message);
+    console.log(' Error verificando sesión:', error.message);
   }
 
   // Login
@@ -290,9 +227,6 @@ async function wireLoginPage() {
       showMsg("❌ Credenciales incorrectas.", "danger");
       return;
     }
-    
-    // Limpiar modo invitado al hacer login exitoso
-    disableGuestMode();
     
     showMsg("✅ Bienvenido. Verificando rol…", "success");
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -341,30 +275,6 @@ async function wireLoginPage() {
     
     showMsg("📧 Te enviamos un correo con las instrucciones.", "info");
   });
-
-  // ========= BOTÓN INVITADO =========
-  const guestBtn = document.getElementById("guestBtn");
-  const guestBtnRegister = document.getElementById("guestBtnRegister");
-
-  function continueAsGuest() {
-    console.log('👤 Continuando como invitado...');
-    
-    // Habilitar modo invitado
-    enableGuestMode();
-    
-    // Redirigir a index
-    window.location.href = HOME_CLIENTE;
-  }
-
-  guestBtn?.addEventListener("click", (e) => {
-    e.preventDefault();
-    continueAsGuest();
-  });
-
-  guestBtnRegister?.addEventListener("click", (e) => {
-    e.preventDefault();
-    continueAsGuest();
-  });
 }
 
 /* ========= Auto-init ========= */
@@ -377,7 +287,7 @@ async function wireLoginPage() {
     }
 
     if (isLoginPage) {
-      console.log('🔑 Inicializando página de login...');
+      console.log(' Inicializando página de login...');
       await wireLoginPage();
     }
   } catch (e) {
@@ -396,4 +306,4 @@ export async function requireAuth() {
 
 window.supabase = supabase;
 
-console.log('✅ ScriptLogin.js cargado con soporte de modo invitado');
+console.log(' ScriptLogin.js cargado (versión para tabla profiles)');
