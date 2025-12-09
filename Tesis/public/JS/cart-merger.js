@@ -1,4 +1,4 @@
-// JS/cart-merger.js - VERSIÓN SIN RPC (crea carrito directamente)
+// JS/cart-merger.js - CON DETECCIÓN DE ERRORES Y SOLUCIÓN ALTERNATIVA
 import { supabase } from './ScriptLogin.js';
 
 console.log('🟢 CART-MERGER CARGADO');
@@ -9,35 +9,25 @@ let fusionEnProceso = false;
 function capturarCarrito() {
   try {
     const cartString = localStorage.getItem('productos-en-carrito');
-    
-    if (!cartString || cartString === '[]' || cartString === 'null') {
-      return false;
-    }
+    if (!cartString || cartString === '[]' || cartString === 'null') return false;
     
     const cart = JSON.parse(cartString);
-    
-    if (!Array.isArray(cart) || cart.length === 0) {
-      return false;
-    }
+    if (!Array.isArray(cart) || cart.length === 0) return false;
     
     carritoCapturado = JSON.parse(JSON.stringify(cart));
-    
     console.log(`💾 CARRITO CAPTURADO: ${cart.length} productos`);
-    cart.forEach((p, i) => {
-      console.log(`   ${i + 1}. ${p.titulo} x${p.cantidad}`);
-    });
+    cart.forEach((p, i) => console.log(`   ${i + 1}. ${p.titulo} x${p.cantidad}`));
     
     sessionStorage.setItem('carrito-capturado-backup', JSON.stringify(cart));
     return true;
-    
   } catch (error) {
-    console.error('Error capturando carrito:', error);
+    console.error('Error capturando:', error);
     return false;
   }
 }
 
 // ============================================================================
-// FUSIÓN SIN RPC - CREA CARRITO DIRECTAMENTE
+// FUSIÓN CON DETECCIÓN DE ERRORES
 // ============================================================================
 
 async function fusionarCarritoConSession(session) {
@@ -49,12 +39,11 @@ async function fusionarCarritoConSession(session) {
   fusionEnProceso = true;
   
   try {
-    console.log('');
     console.log('═══════════════════════════════════════════════════');
-    console.log('🔄 FUSIÓN DE CARRITO - MÉTODO DIRECTO');
+    console.log('🔄 FUSIÓN - MÉTODO CON DETECCIÓN DE ERRORES');
     console.log('═══════════════════════════════════════════════════');
     
-    // Recuperar carrito capturado
+    // Recuperar carrito
     if (!carritoCapturado || carritoCapturado.length === 0) {
       const backup = sessionStorage.getItem('carrito-capturado-backup');
       if (backup) {
@@ -72,55 +61,14 @@ async function fusionarCarritoConSession(session) {
     const user = session.user;
     console.log(`📦 Productos a fusionar: ${carritoCapturado.length}`);
     console.log(`✅ Usuario: ${user.email}`);
+    console.log(`✅ User ID: ${user.id}`);
     
     // ============================================
-    // MÉTODO DIRECTO - SIN RPC
+    // INTENTO 1: USAR CartAPI (el más seguro)
     // ============================================
     
-    // Paso 1: Buscar o crear carrito
-    console.log('🔄 Buscando carrito del usuario...');
-    
-    let { data: carrito, error: errorBuscar } = await supabase
-      .from('carritos')
-      .select('id')
-      .eq('usuario_id', user.id)
-      .maybeSingle();
-    
-    if (errorBuscar) {
-      console.error('❌ Error buscando carrito:', errorBuscar);
-      fusionEnProceso = false;
-      return;
-    }
-    
-    // Si no existe, crear uno nuevo
-    if (!carrito) {
-      console.log('📝 Creando nuevo carrito...');
-      
-      const { data: nuevoCarrito, error: errorCrear } = await supabase
-        .from('carritos')
-        .insert({ usuario_id: user.id })
-        .select('id')
-        .single();
-      
-      if (errorCrear) {
-        console.error('❌ Error creando carrito:', errorCrear);
-        fusionEnProceso = false;
-        return;
-      }
-      
-      carrito = nuevoCarrito;
-      console.log(`✅ Carrito creado: ${carrito.id}`);
-    } else {
-      console.log(`✅ Carrito encontrado: ${carrito.id}`);
-    }
-    
-    const carritoId = carrito.id;
-    
-    // Paso 2: Fusionar productos
     console.log('');
-    console.log('─────────────────────────────────────────────────');
-    console.log('📝 FUSIONANDO PRODUCTOS...');
-    console.log('─────────────────────────────────────────────────');
+    console.log('📝 Método 1: Usando CartAPI.addProduct()...');
     
     let exitosos = 0;
     let errores = 0;
@@ -128,75 +76,131 @@ async function fusionarCarritoConSession(session) {
     for (let i = 0; i < carritoCapturado.length; i++) {
       const producto = carritoCapturado[i];
       
-      console.log('');
       console.log(`[${i + 1}/${carritoCapturado.length}] ${producto.titulo}`);
       
       try {
-        // Verificar si ya existe
-        const { data: itemExistente, error: errCheck } = await supabase
-          .from('carrito_items')
-          .select('id, cantidad')
-          .eq('carrito_id', carritoId)
-          .eq('producto_id', producto.id)
-          .maybeSingle();
-        
-        if (errCheck) {
-          console.error(`   ❌ Error verificando:`, errCheck.message);
-          errores++;
-          continue;
-        }
-        
-        if (itemExistente) {
-          // Actualizar
-          const nuevaCantidad = Number(itemExistente.cantidad) + Number(producto.cantidad);
-          console.log(`   📝 Actualizando: ${itemExistente.cantidad} → ${nuevaCantidad}`);
-          
-          const { error: errUpdate } = await supabase
-            .from('carrito_items')
-            .update({ cantidad: nuevaCantidad })
-            .eq('id', itemExistente.id);
-          
-          if (errUpdate) {
-            console.error(`   ❌ Error:`, errUpdate.message);
-            errores++;
-          } else {
-            console.log(`   ✅ Actualizado`);
-            exitosos++;
-          }
-          
-        } else {
-          // Insertar
-          console.log(`   📝 Insertando...`);
-          
-          const { error: errInsert } = await supabase
-            .from('carrito_items')
-            .insert({
-              carrito_id: carritoId,
-              producto_id: producto.id,
-              cantidad: Number(producto.cantidad)
-            });
-          
-          if (errInsert) {
-            console.error(`   ❌ Error:`, errInsert.message);
-            errores++;
-          } else {
-            console.log(`   ✅ Insertado`);
-            exitosos++;
-          }
-        }
+        // Usar CartAPI que ya tiene toda la lógica
+        await window.CartAPI.addById(producto.id, producto.cantidad);
+        console.log(`   ✅ Agregado via CartAPI`);
+        exitosos++;
         
         await new Promise(resolve => setTimeout(resolve, 100));
         
       } catch (error) {
-        console.error(`   ❌ Error:`, error.message);
-        errores++;
+        console.error(`   ❌ Error via CartAPI:`, error.message);
+        
+        // ============================================
+        // INTENTO 2: INSERCIÓN DIRECTA (fallback)
+        // ============================================
+        
+        try {
+          console.log(`   🔄 Intentando inserción directa...`);
+          
+          // Buscar carrito del usuario
+          let { data: carrito, error: errorBuscar } = await supabase
+            .from('carritos')
+            .select('id')
+            .eq('usuario_id', user.id)
+            .maybeSingle();
+          
+          console.log(`   📊 Resultado buscar carrito:`, { carrito, error: errorBuscar?.message });
+          
+          if (errorBuscar) {
+            console.error(`   ❌ Error buscando carrito (RLS?):`, errorBuscar);
+            errores++;
+            continue;
+          }
+          
+          // Si no existe, crear carrito
+          if (!carrito) {
+            console.log(`   📝 Creando carrito nuevo...`);
+            
+            const { data: nuevoCarrito, error: errorCrear } = await supabase
+              .from('carritos')
+              .insert({ usuario_id: user.id })
+              .select('id')
+              .single();
+            
+            console.log(`   📊 Resultado crear carrito:`, { nuevoCarrito, error: errorCrear?.message });
+            
+            if (errorCrear) {
+              console.error(`   ❌ Error creando carrito (RLS?):`, errorCrear);
+              errores++;
+              continue;
+            }
+            
+            carrito = nuevoCarrito;
+          }
+          
+          const carritoId = carrito.id;
+          console.log(`   ✅ Carrito ID: ${carritoId}`);
+          
+          // Verificar si producto ya existe
+          const { data: itemExistente, error: errCheck } = await supabase
+            .from('carrito_items')
+            .select('id, cantidad')
+            .eq('carrito_id', carritoId)
+            .eq('producto_id', producto.id)
+            .maybeSingle();
+          
+          console.log(`   📊 Item existente:`, { existe: !!itemExistente, error: errCheck?.message });
+          
+          if (errCheck) {
+            console.error(`   ❌ Error verificando item (RLS?):`, errCheck);
+            errores++;
+            continue;
+          }
+          
+          if (itemExistente) {
+            // Actualizar
+            const nuevaCantidad = Number(itemExistente.cantidad) + Number(producto.cantidad);
+            console.log(`   📝 Actualizando cantidad: ${itemExistente.cantidad} → ${nuevaCantidad}`);
+            
+            const { error: errUpdate } = await supabase
+              .from('carrito_items')
+              .update({ cantidad: nuevaCantidad })
+              .eq('id', itemExistente.id);
+            
+            if (errUpdate) {
+              console.error(`   ❌ Error actualizando (RLS?):`, errUpdate);
+              errores++;
+            } else {
+              console.log(`   ✅ Actualizado via DB directa`);
+              exitosos++;
+            }
+          } else {
+            // Insertar
+            console.log(`   📝 Insertando item...`);
+            
+            const { error: errInsert } = await supabase
+              .from('carrito_items')
+              .insert({
+                carrito_id: carritoId,
+                producto_id: producto.id,
+                cantidad: Number(producto.cantidad)
+              });
+            
+            if (errInsert) {
+              console.error(`   ❌ Error insertando (RLS?):`, errInsert);
+              console.error(`   Detalles completos:`, JSON.stringify(errInsert, null, 2));
+              errores++;
+            } else {
+              console.log(`   ✅ Insertado via DB directa`);
+              exitosos++;
+            }
+          }
+          
+        } catch (error2) {
+          console.error(`   ❌ Error en fallback:`, error2);
+          errores++;
+        }
       }
     }
     
     // Resultado
     console.log('');
     console.log('═══════════════════════════════════════════════════');
-    console.log('📊 RESULTADO');
+    console.log('📊 RESULTADO FINAL');
     console.log('═══════════════════════════════════════════════════');
     console.log(`   Total:     ${carritoCapturado.length}`);
     console.log(`   ✅ Exitosos: ${exitosos}`);
@@ -204,7 +208,7 @@ async function fusionarCarritoConSession(session) {
     
     if (exitosos > 0) {
       console.log('');
-      console.log('✅ FUSIÓN COMPLETADA');
+      console.log('✅ FUSIÓN COMPLETADA (al menos parcialmente)');
       
       // Limpiar
       localStorage.removeItem('productos-en-carrito');
@@ -217,22 +221,35 @@ async function fusionarCarritoConSession(session) {
         await window.CartAPI.refreshBadge();
       }
       
-      // Recargar si es carrito.html
+      // Recargar
       if (window.location.pathname.includes('carrito.html')) {
-        console.log('🔄 Recargando...');
+        console.log('🔄 Recargando página...');
         setTimeout(() => window.location.reload(), 800);
       }
       
     } else {
-      console.log('⚠️ No se fusionó ningún producto');
+      console.log('');
+      console.log('❌ NO SE PUDO FUSIONAR NINGÚN PRODUCTO');
+      console.log('');
+      console.log('🔧 POSIBLES CAUSAS:');
+      console.log('   1. RLS (Row Level Security) bloqueando acceso');
+      console.log('   2. Tabla "carritos" no existe o tiene otro nombre');
+      console.log('   3. Columna "usuario_id" no existe');
+      console.log('');
+      console.log('💡 SOLUCIÓN:');
+      console.log('   Ve a Supabase > Authentication > Policies');
+      console.log('   Habilita políticas para:');
+      console.log('   - tabla "carritos" (INSERT, SELECT)');
+      console.log('   - tabla "carrito_items" (INSERT, SELECT, UPDATE)');
     }
     
     console.log('═══════════════════════════════════════════════════');
     
   } catch (error) {
     console.error('');
-    console.error('❌ ERROR CRÍTICO:');
+    console.error('❌ ERROR CRÍTICO EN FUSIÓN:');
     console.error(error);
+    console.error('Stack:', error.stack);
   } finally {
     fusionEnProceso = false;
   }
