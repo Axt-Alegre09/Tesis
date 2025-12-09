@@ -26,30 +26,25 @@ async function isUserAuthenticated() {
 function redirectToLogin() {
   console.log('🔐 Preparando redirección a login...');
   
-  // Usar CartMerger para capturar el carrito
-  if (window.CartMerger && typeof window.CartMerger.capturar === 'function') {
-    const capturado = window.CartMerger.capturar();
-    if (capturado) {
-      console.log('✅ Carrito capturado por CartMerger');
+  // Guardar carrito actual en sessionStorage como backup
+  try {
+    const currentCart = localStorage.getItem('productos-en-carrito');
+    if (currentCart) {
+      sessionStorage.setItem('backup-cart-before-login', currentCart);
+      console.log('💾 Carrito respaldado en sessionStorage');
+      
+      const productos = JSON.parse(currentCart);
+      console.log(`📦 ${productos.length} productos respaldados`);
     }
-  } else {
-    console.warn('⚠️ CartMerger no disponible, intentando backup manual...');
-    
-    // Backup manual si CartMerger no está disponible
-    try {
-      const currentCart = localStorage.getItem('productos-en-carrito');
-      if (currentCart) {
-        sessionStorage.setItem('backup-cart-before-login', currentCart);
-        console.log('💾 Backup manual creado');
-      }
-    } catch (error) {
-      console.error('Error en backup manual:', error);
-    }
+  } catch (error) {
+    console.error('Error respaldando carrito:', error);
   }
   
-  // Guardar URL actual
+  // Guardar URL actual para volver después del login
   const currentUrl = window.location.href;
   sessionStorage.setItem('returnUrl', currentUrl);
+  
+  // Guardar flag indicando que viene de intento de compra
   sessionStorage.setItem('fromCheckout', 'true');
   
   console.log('➡️ Redirigiendo a login...');
