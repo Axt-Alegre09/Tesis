@@ -211,7 +211,7 @@ aside{
 }
 
 /* =========================
-   Topbar mejorado CON FIX DE OVERFLOW
+   Topbar mejorado - SIN OVERFLOW HIDDEN
 ========================= */
 .site-topbar.within { 
   margin: 1rem;
@@ -236,7 +236,7 @@ aside{
   background: transparent;
   width: 100%;
   max-width: 100vw;
-  overflow-x: hidden;
+  /* NO overflow-x: hidden - permite que dropdown se muestre */
 }
 
 .topbar-inner{
@@ -248,8 +248,8 @@ aside{
   background: transparent;
   width: 100%;
   max-width: 100vw;
-  overflow-x: hidden;
   box-sizing: border-box;
+  /* NO overflow-x: hidden - permite que dropdown se muestre */
 }
 
 /* Searchbar profesional */
@@ -315,8 +315,13 @@ aside{
   box-shadow: var(--shadow-sm);
 }
 
-/*usermenu*/
-.user-menu { position: relative; }
+/* =========================
+   USER MENU - FIX CRÍTICO PARA DROPDOWN
+========================= */
+.user-menu { 
+  position: relative;
+  z-index: 1000;
+}
 
 .user-chip{
   display: flex; 
@@ -355,19 +360,19 @@ aside{
   transform: rotate(180deg); 
 }
 
+/* DROPDOWN CORREGIDO - Z-INDEX MUY ALTO */
 .user-dropdown {
-    
-  position: absolute !important;
+  position: absolute;
   top: calc(100% + 8px);
   right: 0;
   min-width: 220px;
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: var(--radius-md);
   background: var(--clr-blanco);
-  box-shadow: var(--shadow-xl);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05);
   padding: 8px;
   display: none;
-  z-index: 2000;
+  z-index: 9999;
   animation: slideDown 0.2s ease;
 }
 
@@ -382,7 +387,9 @@ aside{
   }
 }
 
-.user-dropdown.open { display: block; }
+.user-dropdown.open { 
+  display: block; 
+}
 
 .user-dropdown .dropdown-item {
   width: 100%;
@@ -1076,7 +1083,7 @@ main{
     gap: 8px;
     width: 100%;
     max-width: 100vw;
-    overflow-x: hidden;
+    /* NO overflow - permite dropdown */
   }
   
   .searchbar { 
@@ -1095,6 +1102,11 @@ main{
 
   .user-chip {
     flex-shrink: 0;
+  }
+
+  /* USER MENU Z-INDEX MÁS ALTO EN MOBILE */
+  .user-menu {
+    z-index: 1001;
   }
 
   .wrapper.has-topbar aside { 
@@ -1199,7 +1211,7 @@ main{
     gap: 6px;
     width: 100%;
     max-width: 100vw;
-    overflow-x: hidden;
+    /* NO overflow - permite dropdown */
   }
   
   .searchbar { 
