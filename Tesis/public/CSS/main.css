@@ -92,7 +92,7 @@ aside{
   box-shadow: 0 12px 32px rgba(0,0,0,.25);
 }
 
-/* Navegación mejorada y CENTRADA */
+/* Navegación PERFECTAMENTE ALINEADA */
 .menu { 
   display: flex; 
   flex-direction: column; 
@@ -116,6 +116,7 @@ aside{
   transition: var(--transition);
   position: relative;
   text-align: left;
+  justify-content: flex-start;
 }
 
 .boton-menu:hover{
@@ -132,9 +133,18 @@ aside{
 
 .boton-menu i {
   font-size: 1.375rem;
-  width: 24px;
+  width: 28px;
   text-align: center;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.boton-menu span {
+  flex: 1;
+  display: flex;
+  align-items: center;
 }
 
 .boton-carrito { 
@@ -382,7 +392,7 @@ main{
 }
 
 /* =========================
-   Cards ultra profesionales - TÍTULOS Y PRECIOS MÁS GRANDES
+   Cards - TÍTULOS Y PRECIOS MÁS GRANDES, SIN GAP
 ========================= */
 .contenedor-productos{
   display: grid;
@@ -436,7 +446,7 @@ main{
   border-radius: 0 0 var(--radius-lg) var(--radius-lg);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0;
 }
 
 .producto-titulo { 
@@ -448,12 +458,14 @@ main{
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  margin-bottom: 8px;
 }
 
 .producto-precio { 
   color: var(--clr-main-claro); 
   font-size: 1.375rem;
   font-weight: 700;
+  margin-bottom: 8px;
 }
 
 .producto-agregar{
@@ -467,7 +479,7 @@ main{
   font-size: 0.875rem;
   cursor: pointer;
   transition: var(--transition);
-  margin-top: 4px;
+  margin-top: 0;
 }
 
 .producto-agregar:hover{
@@ -517,7 +529,7 @@ main{
   50% { transform: scale(1.25); }
 }
 
-/* ==================== PROMOS MEJORADAS ==================== */
+/* ==================== PROMOS SIN GAP ==================== */
 .promo-badge {
   position: absolute;
   top: 12px;
@@ -549,7 +561,8 @@ main{
 .precios-con-promo {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
+  margin-bottom: 8px;
 }
 
 .precio-original {
@@ -558,6 +571,7 @@ main{
   font-size: 0.875rem;
   opacity: 0.8;
   font-weight: 500;
+  margin: 0;
 }
 
 .precios-con-promo .producto-precio {
@@ -573,6 +587,7 @@ main{
   display: flex;
   align-items: center;
   gap: 4px;
+  margin: 0;
 }
 
 .producto:has(.promo-badge) {
@@ -949,35 +964,20 @@ main{
   vertical-align: middle; 
 }
 
+/* BOTÓN CERRAR OCULTO (se cierra tocando backdrop) */
 .mobile-close{
-  display: none;
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  border: none;
-  background: rgba(255, 255, 255, 0.95);
-  color: var(--clr-main);
-  border-radius: var(--radius-sm);
-  width: 38px; 
-  height: 38px;
-  font-size: 1.125rem;
-  box-shadow: var(--shadow-md);
-  cursor: pointer;
-  transition: var(--transition);
+  display: none !important;
 }
 
-.mobile-close:hover {
-  background: var(--clr-blanco);
-  transform: scale(1.1);
-}
-
+/* BACKDROP MÁS OSCURO */
 .backdrop{
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,.4);
+  background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(2px);
   display: none;
   z-index: 900;
+  cursor: pointer;
 }
 
 .aside-open .backdrop { 
@@ -1056,27 +1056,23 @@ main{
     justify-content: center;
   }
 
+  /* ASIDE MÓVIL - 50% DE PANTALLA */
   aside{
     position: fixed;
-    left: -280px;
+    left: -50vw;
     top: 0;
-    width: 260px;
+    width: 50vw;
+    max-width: 320px;
     height: 100dvh;
     z-index: 1000;
     background: var(--clr-main);
     box-shadow: var(--shadow-xl);
     transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    padding: 20px 20px 32px 20px;
+    padding: 24px 20px 32px 20px;
   }
   
   .aside-open aside { 
     left: 0; 
-  }
-
-  .mobile-close { 
-    display: inline-flex; 
-    align-items: center; 
-    justify-content: center; 
   }
 
   .logo-principal{
@@ -1172,19 +1168,24 @@ main{
   
   .producto-detalles{
     padding: 12px;
-    gap: 6px;
-    border-radius: 0 0 var(--radius-md) var(--radius-md);
+    gap: 0;
   }
 
-  /* TÍTULOS Y PRECIOS MÓVIL */
   .producto-titulo{
     font-size: 1rem;
     line-height: 1.25;
     min-height: 2.5em;
+    margin-bottom: 6px;
   }
   
   .producto-precio { 
     font-size: 1.125rem;
+    margin-bottom: 6px;
+  }
+
+  .precios-con-promo {
+    gap: 2px;
+    margin-bottom: 6px;
   }
 
   .precios-con-promo .producto-precio {
@@ -1195,6 +1196,7 @@ main{
     width: 100%;
     padding: 10px 12px;
     font-size: 0.8125rem;
+    margin-top: 0;
   }
 
   .btn-favorito {
@@ -1212,18 +1214,19 @@ main{
     font-size: 0.75rem;
   }
 
-  /* NAVEGACIÓN MÓVIL */
+  /* NAVEGACIÓN MÓVIL ALINEADA AL INICIO */
   .boton-menu {
     padding: 10px 12px;
     font-size: 1rem;
+    text-align: left;
+    justify-content: flex-start;
   }
 
   .boton-menu i {
     font-size: 1.25rem;
-    width: 22px;
+    width: 24px;
   }
 
-  /* NUMERITO MÓVIL */
   .numerito {
     min-width: 22px;
     height: 22px;
@@ -1231,9 +1234,11 @@ main{
     right: 14px;
   }
 
+  /* ASIDE 50% EN MÓVIL */
   aside { 
-    width: min(88vw, 300px); 
-    left: -100vw; 
+    width: 50vw;
+    max-width: 280px;
+    left: -50vw;
   }
   
   .aside-open aside { 
@@ -1252,15 +1257,22 @@ main{
   
   .producto-titulo { 
     font-size: 0.9375rem;
+    margin-bottom: 6px;
   }
   
   .producto-precio {
     font-size: 1rem;
+    margin-bottom: 6px;
   }
   
   .producto-agregar { 
     padding: 8px 10px; 
     font-size: 0.75rem; 
+  }
+
+  aside {
+    width: 50vw;
+    max-width: 240px;
   }
 }
 

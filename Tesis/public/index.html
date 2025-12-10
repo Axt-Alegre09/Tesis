@@ -345,6 +345,17 @@
       </button>
     </form>
   </div>
+  <script>
+// Cerrar aside al tocar backdrop
+document.addEventListener('DOMContentLoaded', function() {
+  const backdrop = document.querySelector('.backdrop');
+  if (backdrop) {
+    backdrop.addEventListener('click', function() {
+      document.body.classList.remove('aside-open');
+    });
+  }
+});
+</script>
 
   <!-- Scripts -->
   <script type="module" src="JS/main.js"></script>
