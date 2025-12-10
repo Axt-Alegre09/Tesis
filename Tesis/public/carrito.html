@@ -65,7 +65,6 @@
     </main>
   </div>
 
-  <!-- Script de la API del carrito (efecto lateral) -->
   <script type="module">
     import { supabase } from "./JS/ScriptLogin.js";
     import "./JS/cart-api.js";
@@ -98,7 +97,6 @@
       const snap = await window.CartAPI.getSnapshot();
       const items = snap.items || [];
       
-      // Calcular totales
       let totalSinDescuento = 0;
       let totalConDescuento = 0;
       
@@ -115,7 +113,6 @@
 
       totalEl.textContent = fmtGs(snap.total || 0);
 
-      // Mostrar ahorro si hay promos
       if (ahorroTotal > 0) {
         ahorroMontoEl.textContent = fmtGs(ahorroTotal);
         totalAhorroEl.style.display = 'block';
@@ -136,20 +133,17 @@
         const row = document.createElement("div");
         row.className = "carrito-producto";
         
-        // Agregar clase y data attribute si tiene promo
         if (it.tienePromo) {
           row.classList.add("has-promo");
           row.setAttribute("data-descuento", Math.round(it.descuentoPorcentaje));
         }
 
-        // Remoto usa itemId (id de carrito_items). Hacemos fallback por si vino _itemId o id.
         const idAttrKey = snap.mode === "remote" ? "data-itemid" : "data-id";
         const resolvedId = snap.mode === "remote"
           ? (it.itemId ?? it._itemId ?? it.id)
           : it.id;
         const idAttrVal = String(resolvedId);
 
-        // HTML del precio (con o sin promo)
         let precioHTML;
         if (it.tienePromo) {
           precioHTML = `
@@ -194,7 +188,6 @@
       }
     }
 
-    // Delegación de eventos (+/− y eliminar)
     contProds.addEventListener("click", async (e) => {
       const btn = e.target.closest(".qty-btn, .carrito-producto-eliminar");
       if (!btn) return;
@@ -204,7 +197,6 @@
       const idVal = btn.getAttribute(idKey);
 
       if (btn.classList.contains("carrito-producto-eliminar")) {
-        // Animación de salida
         const row = btn.closest(".carrito-producto");
         row.style.animation = "slideOut 0.3s ease";
         await new Promise(r => setTimeout(r, 300));
@@ -216,7 +208,7 @@
       }
 
       if (btn.classList.contains("qty-btn")) {
-        const action = btn.getAttribute("data-action"); // inc/dec
+        const action = btn.getAttribute("data-action");
         const row = btn.closest(".carrito-producto");
         const qEl = row?.querySelector("[data-qty]");
         const qty = Number(qEl?.textContent || "1");
@@ -227,7 +219,6 @@
       }
     });
 
-    // Vaciar carrito con confirmación
     btnVaciar.addEventListener("click", async () => {
       if (!confirm("¿Estás seguro de que quieres vaciar el carrito?")) return;
       
@@ -236,56 +227,82 @@
       await window.CartAPI.refreshBadge?.();
     });
 
-    // ⭐ COMPRAR AHORA: INTERCEPTAR PARA MODO INVITADO
+    // ⭐ COMPRAR AHORA CON LOGS
     btnComprar.addEventListener("click", async () => {
+      console.log("═══════════════════════════════════════");
+      console.log("🛒 BOTÓN COMPRAR AHORA CLICKEADO");
+      console.log("═══════════════════════════════════════");
+      
       const snap = await window.CartAPI.getSnapshot();
       const items = snap.items || [];
+      
+      console.log("📊 Carrito actual:", {
+        modo: snap.mode,
+        items: items.length,
+        total: snap.total,
+        productos: items.map(i => `${i.titulo} (${i.cantidad}x)`)
+      });
       
       if (!items.length) { 
         alert("Tu carrito está vacío."); 
         return; 
       }
 
-      // ⭐ VERIFICAR SI HAY SESIÓN
       const { data: { user } } = await supabase.auth.getUser();
 
+      console.log("👤 Usuario:", user ? "AUTENTICADO (" + user.email + ")" : "INVITADO");
+
       if (!user) {
-        // ❌ INVITADO - Guardar carrito y redirigir a login
-        console.log("🔒 Usuario invitado detectado - Redirigiendo a login");
+        console.log("🔒 FLUJO INVITADO ACTIVADO");
         
-        // Asegurar que el carrito esté guardado en localStorage
+        const carritoParaGuardar = items.map(it => ({
+          id: it.id,
+          titulo: it.titulo,
+          precio: Number(it.precio || 0),
+          cantidad: Number(it.cantidad || 1),
+          tienePromo: it.tienePromo || false,
+          descuentoPorcentaje: Number(it.descuentoPorcentaje || 0),
+          precioOriginal: Number(it.precioOriginal || it.precio || 0)
+        }));
+        
+        localStorage.setItem("productos-en-carrito", JSON.stringify(carritoParaGuardar));
+        console.log("💾 Carrito guardado en localStorage:", carritoParaGuardar.length, "productos");
+        console.log("📋 Productos guardados:");
+        carritoParaGuardar.forEach((p, i) => {
+          console.log(`   ${i+1}. ${p.titulo} - ${p.cantidad}x`);
+        });
+        
         const payload = {
           source: "local",
-          items: items.map(it => ({
-            id: it.id,
-            titulo: it.titulo,
-            precio: Number(it.precio || 0),
-            cantidad: Number(it.cantidad || 1),
-            tienePromo: it.tienePromo || false,
-            descuentoPorcentaje: Number(it.descuentoPorcentaje || 0),
-            precioOriginal: Number(it.precioOriginal || it.precio || 0)
-          })),
+          items: carritoParaGuardar,
           total: Number(snap.total || 0),
           ts: Date.now()
         };
         
-        localStorage.setItem("productos-en-carrito", JSON.stringify(items));
         sessionStorage.setItem("checkout_snapshot", JSON.stringify(payload));
+        console.log("💾 Snapshot guardado en sessionStorage");
         
-        // Mostrar mensaje temporal
+        const verificacion = localStorage.getItem("productos-en-carrito");
+        console.log("✓ Verificación localStorage:", verificacion ? "OK (" + JSON.parse(verificacion).length + " items)" : "FALLO");
+        
         btnComprar.textContent = "Redirigiendo a login...";
         btnComprar.disabled = true;
         
-        // Redirigir a login con parámetro de retorno
+        const loginUrl = new URL("./login.html", window.location.href);
+        loginUrl.searchParams.set("return", "carrito");
+        
+        console.log("🔗 URL de redirección:", loginUrl.toString());
+        console.log("═══════════════════════════════════════");
+        
         setTimeout(() => {
-          window.location.href = "login.html?return=carrito";
+          window.location.href = loginUrl.toString();
         }, 500);
         
         return;
       }
 
-      // ✅ USUARIO LOGUEADO - Continuar normal
       console.log("✅ Usuario autenticado - Procesando checkout");
+      console.log("═══════════════════════════════════════");
 
       const payload = {
         source: "local",
@@ -309,7 +326,6 @@
       window.location.assign(url.toString());
     });
 
-    // Animación de entrada adicional
     document.addEventListener("DOMContentLoaded", () => {
       document.body.style.opacity = "0";
       setTimeout(() => {

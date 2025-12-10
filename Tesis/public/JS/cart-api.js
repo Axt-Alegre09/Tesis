@@ -1,5 +1,5 @@
 // JS/cart-api.js
-// CartAPI CON SOPORTE COMPLETO DE PROMOS + MIGRACIÓN DE CARRITO INVITADO
+// CartAPI CON SOPORTE COMPLETO DE PROMOS + MIGRACIÓN DE CARRITO INVITADO + LOGS
 import { supabase } from "./ScriptLogin.js";
 
 // ---------- Utils ----------
@@ -36,7 +36,7 @@ function _writeLocal(cart) {
   };
   localStorage.setItem("carrito", JSON.stringify(cartData));
   
-  console.log("Carrito guardado:", {
+  console.log("💾 Carrito guardado:", {
     items: cart.length,
     conPromo: cart.filter(p => p.tienePromo).length,
     sinPromo: cart.filter(p => !p.tienePromo).length
@@ -83,7 +83,7 @@ function _addLocal(prod, qty=1) {
     descuentoPorcentaje = Math.round(((precioOriginal - precioFinal) / precioOriginal) * 100);
   }
   
-  console.log("Agregando producto:", {
+  console.log("➕ Agregando producto:", {
     nombre: prod.titulo || prod.nombre,
     tienePromo,
     precioOriginal,
@@ -129,8 +129,9 @@ function _removeLocal(id) {
 }
 
 function _emptyLocal() {
+  console.log("🗑️ Vaciando carrito local");
   _writeLocal([]);
-  localStorage.removeItem("carrito"); // También limpiar el snapshot
+  localStorage.removeItem("carrito");
   return true;
 }
 
@@ -236,23 +237,32 @@ async function _emptyRemote() {
   return true;
 }
 
-// ========== MIGRACIÓN DE CARRITO LOCAL → REMOTO (CON FUSIÓN) ==========
+// ========== MIGRACIÓN DE CARRITO LOCAL → REMOTO (CON FUSIÓN + LOGS) ==========
 async function migrateToRemote() {
-  console.log("🔄 Iniciando migración de carrito invitado → usuario logueado (FUSIÓN)");
+  console.log("═══════════════════════════════════════");
+  console.log("🔄 INICIANDO MIGRACIÓN DE CARRITO");
+  console.log("═══════════════════════════════════════");
   
   const uid = await getUserId();
+  console.log("👤 Usuario ID:", uid || "NO AUTENTICADO");
+  
   if (!uid) {
     console.warn("⚠️ No hay usuario logueado, no se puede migrar");
     return { success: false, message: "Usuario no autenticado" };
   }
 
   const localCart = _readLocal();
+  console.log("📦 Carrito local:", localCart.length, "items");
+  
   if (!localCart || localCart.length === 0) {
     console.log("ℹ️ Carrito local vacío, nada que migrar");
-    return { success: true, itemsMigrados: 0 };
+    return { success: true, itemsMigrados: 0, itemsFusionados: 0 };
   }
 
-  console.log(`📦 Migrando ${localCart.length} productos con FUSIÓN...`);
+  console.log("📋 Items a migrar:");
+  localCart.forEach((item, idx) => {
+    console.log(`   ${idx + 1}. ${item.titulo} - ${item.cantidad}x - ${fmtGs(item.precio)}`);
+  });
   
   let migrados = 0;
   let fusionados = 0;
@@ -260,8 +270,11 @@ async function migrateToRemote() {
 
   for (const item of localCart) {
     try {
+      console.log(`\n🔄 Procesando: ${item.titulo}`);
+      
       // Verificar si el producto ya existe en el carrito remoto
       const carritoId = await _asegurarCarrito();
+      console.log(`   ✓ Carrito ID: ${carritoId}`);
       
       const { data: existente, error: e1 } = await supabase
         .from("carrito_items")
@@ -274,7 +287,14 @@ async function migrateToRemote() {
       
       if (existente) {
         // ⭐ FUSIÓN: Sumar cantidades
-        const cantidadTotal = Number(existente.cantidad || 1) + Number(item.cantidad || 1);
+        const cantidadAnterior = Number(existente.cantidad || 1);
+        const cantidadNueva = Number(item.cantidad || 1);
+        const cantidadTotal = cantidadAnterior + cantidadNueva;
+        
+        console.log(`   🔗 FUSIÓN detectada:`);
+        console.log(`      Cantidad en BD: ${cantidadAnterior}`);
+        console.log(`      Cantidad local: ${cantidadNueva}`);
+        console.log(`      Total: ${cantidadTotal}`);
         
         const { error: e2 } = await supabase
           .from("carrito_items")
@@ -283,28 +303,33 @@ async function migrateToRemote() {
         
         if (e2) throw e2;
         
-        console.log(`   🔗 FUSIONADO: ${item.titulo} (${existente.cantidad} + ${item.cantidad} = ${cantidadTotal})`);
+        console.log(`   ✅ FUSIONADO exitosamente`);
         fusionados++;
       } else {
         // Agregar nuevo
+        console.log(`   ➕ Agregando como nuevo (${item.cantidad}x)`);
         await _addRemote(item.id, item.cantidad);
-        console.log(`   ✓ AGREGADO: ${item.titulo} (${item.cantidad}x)`);
+        console.log(`   ✅ AGREGADO exitosamente`);
       }
       
       migrados++;
     } catch (error) {
-      console.error(`   ✗ Error migrando ${item.titulo}:`, error);
+      console.error(`   ❌ Error con ${item.titulo}:`, error);
       errores++;
     }
   }
 
   // Limpiar carrito local después de migrar
+  console.log("\n🗑️ Limpiando carrito local...");
   _emptyLocal();
   
-  console.log(`✅ Migración completada:`);
-  console.log(`   • ${migrados} productos procesados`);
-  console.log(`   • ${fusionados} fusionados`);
-  console.log(`   • ${errores} errores`);
+  console.log("\n═══════════════════════════════════════");
+  console.log("✅ MIGRACIÓN COMPLETADA:");
+  console.log(`   • Productos procesados: ${migrados}`);
+  console.log(`   • Productos fusionados: ${fusionados}`);
+  console.log(`   • Productos nuevos: ${migrados - fusionados}`);
+  console.log(`   • Errores: ${errores}`);
+  console.log("═══════════════════════════════════════");
   
   return {
     success: true,
@@ -363,11 +388,9 @@ async function addById(productoId, qty=1) {
   return _addLocal(prod, qty);
 }
 
-// FUNCIÓN PRINCIPAL - con soporte completo de promos
 async function addProduct(productObj, qty=1) {
   const uid = await getUserId();
   
-  // Asegurar que el objeto tenga toda la info de promo
   const productoCompleto = {
     ...productObj,
     tienePromo: productObj.tienePromo || false,
@@ -419,7 +442,6 @@ async function refreshBadge() {
   el.textContent = String(totalQty);
 }
 
-// Función de verificación para debugging
 function verificarCarrito() {
   const cart = _readLocal();
   const conPromo = cart.filter(p => p.tienePromo);
@@ -441,21 +463,16 @@ function verificarCarrito() {
 }
 
 window.CartAPI = {
-  // core
   getSnapshot, 
   addById, 
   addProduct, 
   setQty, 
   remove, 
   empty,
-  // helpers UI
   refreshBadge,
-  // debugging
   verificarCarrito,
-  // ⭐ MODO INVITADO
   migrateToRemote
 };
 
-// Auto-verificar al cargar
 console.log("✅ CartAPI cargado con soporte de promociones + modo invitado");
 console.log("Usar CartAPI.verificarCarrito() para ver el estado actual");

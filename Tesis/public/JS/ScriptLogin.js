@@ -1,13 +1,11 @@
-// JS/ScriptLogin.js - VERSIÓN FINAL CORREGIDA PARA TUS TABLAS REALES
+// JS/ScriptLogin.js - CON SOPORTE PARA MODO INVITADO Y MIGRACIÓN + LOGS
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-/* ========= Config ========= */
 export const supabase = createClient(
   "https://jyygevitfnbwrvxrjexp.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5eWdldml0Zm5id3J2eHJqZXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2OTQ2OTYsImV4cCI6MjA3MTI3MDY5Nn0.St0IiSZSeELESshctneazCJHXCDBi9wrZ28UkiEDXYo"
 );
 
-/* ========= Utilidades ========= */
 const LOGIN_URL = "login.html";
 const HOME_CLIENTE = "index.html";
 const HOME_ADMIN = "admin-dashboard.html";
@@ -26,15 +24,11 @@ function showMsg(text, type = "info") {
   box.innerHTML = `<div class="alert alert-${type}" role="alert">${text}</div>`;
 }
 
-/* ========= Sesión ========= */
 export async function getUser() {
   const { data } = await supabase.auth.getUser();
   return data?.user ?? null;
 }
 
-/* ========= Perfiles =========
-   CORRECCIÓN: Usar tabla 'profiles' con campo 'role' y 'id'
-*/
 export async function getProfile() {
   const user = await getUser();
   if (!user) return null;
@@ -69,7 +63,6 @@ export async function getClientePerfil() {
   return data;
 }
 
-/* ========= Nombre visible en el chip ========= */
 async function getDisplayName() {
   const user = await getUser();
   if (!user) return "";
@@ -88,7 +81,6 @@ async function getDisplayName() {
   return "";
 }
 
-/* ========= Navegación por rol ========= */
 export async function goByRole() {
   if (isRedirecting) return;
   
@@ -98,9 +90,8 @@ export async function goByRole() {
     return;
   }
   
-  console.log(' Redirigiendo según rol:', p.role);
+  console.log('🔀 Redirigiendo según rol:', p.role);
   
-  // CORRECCIÓN: Usar 'role' en lugar de 'rol'
   if (p.role === "admin") {
     go(HOME_ADMIN);
   } else {
@@ -125,7 +116,6 @@ export async function requireRole(roleNeeded = "cliente") {
   }
 }
 
-/* ========= Menú de cuenta / Chip ========= */
 export function setUserNameUI(nombre) {
   const el = document.querySelector(".user-name");
   if (el) el.textContent = nombre || "Cuenta";
@@ -181,7 +171,6 @@ export async function autoWireAuthMenu() {
   await paintUserChip();
 }
 
-/* ========= Lógica específica de login.html ========= */
 async function wireLoginPage() {
   const wrapper = document.getElementById("authWrapper");
   const loginForm = document.getElementById("loginForm");
@@ -193,7 +182,6 @@ async function wireLoginPage() {
   registerBtn?.addEventListener("click", () => wrapper?.classList.add("active"));
   loginBtn?.addEventListener("click", () => wrapper?.classList.remove("active"));
 
-  // Verificar sesión con timeout
   try {
     const timeoutPromise = new Promise((_, reject) => 
       setTimeout(() => reject(new Error('Timeout')), 3000)
@@ -204,17 +192,22 @@ async function wireLoginPage() {
     const { data } = await Promise.race([sessionPromise, timeoutPromise]);
     
     if (data?.session) {
-      console.log(' Sesión existente detectada, redirigiendo...');
+      console.log('✓ Sesión existente detectada, redirigiendo...');
       await goByRole();
       return;
     }
   } catch (error) {
-    console.log(' Error verificando sesión:', error.message);
+    console.log('⚠️ Error verificando sesión:', error.message);
   }
 
-  // Login
+  // ⭐ LOGIN CON LOGS
   loginForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
+    
+    console.log("═══════════════════════════════════════");
+    console.log("🔐 INTENTANDO LOGIN");
+    console.log("═══════════════════════════════════════");
+    
     showMsg("Procesando...", "secondary");
 
     const email = (document.getElementById("loginEmail")?.value || "").trim();
@@ -223,17 +216,117 @@ async function wireLoginPage() {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     
     if (error) {
-      console.error(error);
+      console.error("❌ Error de autenticación:", error);
       showMsg("❌ Credenciales incorrectas.", "danger");
       return;
     }
+    
+    console.log("✅ Autenticación exitosa - Email:", email);
+    
+    const params = new URLSearchParams(window.location.search);
+    const returnTo = params.get("return");
+    
+    console.log("📋 Parámetros URL:", {
+      return: returnTo,
+      urlCompleta: window.location.href
+    });
+    
+    if (returnTo === "carrito") {
+      console.log("🛒 FLUJO DE CARRITO INVITADO DETECTADO");
+      showMsg("✅ Bienvenido. Sincronizando tu carrito…", "success");
+      
+      const carritoLocal = localStorage.getItem("productos-en-carrito");
+      console.log("📦 Carrito local encontrado:", carritoLocal ? "SÍ" : "NO");
+      
+      if (carritoLocal) {
+        try {
+          const items = JSON.parse(carritoLocal);
+          console.log("📊 Items a migrar:", items.length);
+          console.log("📋 Productos:");
+          items.forEach((i, idx) => {
+            console.log(`   ${idx+1}. ${i.titulo} - ${i.cantidad}x`);
+          });
+        } catch (e) {
+          console.error("❌ Error parseando carrito:", e);
+        }
+      } else {
+        console.warn("⚠️ No se encontró carrito en localStorage");
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      try {
+        console.log("⏳ Esperando CartAPI...");
+        
+        let intentos = 0;
+        while (!window.CartAPI && intentos < 20) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          intentos++;
+          if (intentos % 5 === 0) {
+            console.log(`   Intento ${intentos}/20...`);
+          }
+        }
+        
+        if (!window.CartAPI) {
+          throw new Error("CartAPI no disponible después de 2 segundos");
+        }
+        
+        console.log("✓ CartAPI disponible");
+        
+        if (typeof window.CartAPI.migrateToRemote !== "function") {
+          throw new Error("CartAPI.migrateToRemote no es una función");
+        }
+        
+        console.log("✓ Función migrateToRemote encontrada");
+        
+        console.log("🔄 EJECUTANDO MIGRACIÓN...");
+        const resultado = await window.CartAPI.migrateToRemote();
+        
+        console.log("📊 Resultado de migración:", resultado);
+        
+        if (resultado.success) {
+          console.log("✅ MIGRACIÓN EXITOSA:");
+          console.log(`   • Productos procesados: ${resultado.itemsMigrados}`);
+          console.log(`   • Productos fusionados: ${resultado.itemsFusionados}`);
+          console.log(`   • Errores: ${resultado.errores}`);
+          
+          showMsg(`✅ Carrito sincronizado (${resultado.itemsMigrados} productos)`, "success");
+        } else {
+          console.warn("⚠️ Migración retornó success=false:", resultado);
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        console.log("🔀 Redirigiendo a carrito...");
+        console.log("═══════════════════════════════════════");
+        
+        window.location.href = "carrito.html";
+        
+      } catch (err) {
+        console.error("═══════════════════════════════════════");
+        console.error("❌ ERROR EN MIGRACIÓN:");
+        console.error("   Mensaje:", err.message);
+        console.error("   Stack:", err.stack);
+        console.error("═══════════════════════════════════════");
+        
+        showMsg("⚠️ Login exitoso. Redirigiendo...", "warning");
+        
+        setTimeout(() => {
+          window.location.href = "carrito.html";
+        }, 1500);
+      }
+      
+      return;
+    }
+    
+    console.log("🏠 Flujo normal - redirigiendo según rol");
+    console.log("═══════════════════════════════════════");
     
     showMsg("✅ Bienvenido. Verificando rol…", "success");
     await new Promise(resolve => setTimeout(resolve, 500));
     await goByRole();
   });
 
-  // Registro
   registerForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
     showMsg("Procesando registro...", "secondary");
@@ -257,7 +350,6 @@ async function wireLoginPage() {
     wrapper?.classList.remove("active");
   });
 
-  // Recuperación
   forgot?.addEventListener("click", async (e) => {
     e.preventDefault();
     const email = prompt("Ingresa tu correo para recuperar la contraseña:");
@@ -277,7 +369,6 @@ async function wireLoginPage() {
   });
 }
 
-/* ========= Auto-init ========= */
 (async function init() {
   try {
     const isLoginPage = document.getElementById("loginForm") || document.getElementById("registerForm");
@@ -287,7 +378,7 @@ async function wireLoginPage() {
     }
 
     if (isLoginPage) {
-      console.log(' Inicializando página de login...');
+      console.log('🔐 Inicializando página de login con soporte de modo invitado...');
       await wireLoginPage();
     }
   } catch (e) {
@@ -306,4 +397,4 @@ export async function requireAuth() {
 
 window.supabase = supabase;
 
-console.log(' ScriptLogin.js cargado (versión para tabla profiles)');
+console.log('✅ ScriptLogin.js cargado con soporte de modo invitado (fusión de carritos)');
