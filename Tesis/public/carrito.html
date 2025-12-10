@@ -67,6 +67,7 @@
 
   <!-- Script de la API del carrito (efecto lateral) -->
   <script type="module">
+    import { supabase } from "./JS/ScriptLogin.js";
     import "./JS/cart-api.js";
 
     const contVacio   = document.getElementById("carrito-vacio");
@@ -235,14 +236,56 @@
       await window.CartAPI.refreshBadge?.();
     });
 
-    // Comprar ahora: guarda SNAPSHOT y navega con ?monto=<total> (flujo local)
+    // ⭐ COMPRAR AHORA: INTERCEPTAR PARA MODO INVITADO
     btnComprar.addEventListener("click", async () => {
       const snap = await window.CartAPI.getSnapshot();
       const items = snap.items || [];
+      
       if (!items.length) { 
         alert("Tu carrito está vacío."); 
         return; 
       }
+
+      // ⭐ VERIFICAR SI HAY SESIÓN
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        // ❌ INVITADO - Guardar carrito y redirigir a login
+        console.log("🔒 Usuario invitado detectado - Redirigiendo a login");
+        
+        // Asegurar que el carrito esté guardado en localStorage
+        const payload = {
+          source: "local",
+          items: items.map(it => ({
+            id: it.id,
+            titulo: it.titulo,
+            precio: Number(it.precio || 0),
+            cantidad: Number(it.cantidad || 1),
+            tienePromo: it.tienePromo || false,
+            descuentoPorcentaje: Number(it.descuentoPorcentaje || 0),
+            precioOriginal: Number(it.precioOriginal || it.precio || 0)
+          })),
+          total: Number(snap.total || 0),
+          ts: Date.now()
+        };
+        
+        localStorage.setItem("productos-en-carrito", JSON.stringify(items));
+        sessionStorage.setItem("checkout_snapshot", JSON.stringify(payload));
+        
+        // Mostrar mensaje temporal
+        btnComprar.textContent = "Redirigiendo a login...";
+        btnComprar.disabled = true;
+        
+        // Redirigir a login con parámetro de retorno
+        setTimeout(() => {
+          window.location.href = "login.html?return=carrito";
+        }, 500);
+        
+        return;
+      }
+
+      // ✅ USUARIO LOGUEADO - Continuar normal
+      console.log("✅ Usuario autenticado - Procesando checkout");
 
       const payload = {
         source: "local",

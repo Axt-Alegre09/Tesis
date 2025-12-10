@@ -1,5 +1,5 @@
 // JS/cart-api.js
-// CartAPI CON SOPORTE COMPLETO DE PROMOS
+// CartAPI CON SOPORTE COMPLETO DE PROMOS + MIGRACIÓN DE CARRITO INVITADO
 import { supabase } from "./ScriptLogin.js";
 
 // ---------- Utils ----------
@@ -114,7 +114,7 @@ function _addLocal(prod, qty=1) {
 function _setQtyLocal(id, qty) {
   qty = Math.max(1, Number(qty));
   const cart = _readLocal();
-  const i = cart.findIndex(p => String(p.id) === String(id));
+  const i = cart.findIndex(p => String(p.id) === id);
   if (i >= 0) {
     cart[i].cantidad = qty;
     _writeLocal(cart);
@@ -236,6 +236,84 @@ async function _emptyRemote() {
   return true;
 }
 
+// ========== MIGRACIÓN DE CARRITO LOCAL → REMOTO (CON FUSIÓN) ==========
+async function migrateToRemote() {
+  console.log("🔄 Iniciando migración de carrito invitado → usuario logueado (FUSIÓN)");
+  
+  const uid = await getUserId();
+  if (!uid) {
+    console.warn("⚠️ No hay usuario logueado, no se puede migrar");
+    return { success: false, message: "Usuario no autenticado" };
+  }
+
+  const localCart = _readLocal();
+  if (!localCart || localCart.length === 0) {
+    console.log("ℹ️ Carrito local vacío, nada que migrar");
+    return { success: true, itemsMigrados: 0 };
+  }
+
+  console.log(`📦 Migrando ${localCart.length} productos con FUSIÓN...`);
+  
+  let migrados = 0;
+  let fusionados = 0;
+  let errores = 0;
+
+  for (const item of localCart) {
+    try {
+      // Verificar si el producto ya existe en el carrito remoto
+      const carritoId = await _asegurarCarrito();
+      
+      const { data: existente, error: e1 } = await supabase
+        .from("carrito_items")
+        .select("id, cantidad")
+        .eq("carrito_id", carritoId)
+        .eq("producto_id", item.id)
+        .maybeSingle();
+      
+      if (e1) throw e1;
+      
+      if (existente) {
+        // ⭐ FUSIÓN: Sumar cantidades
+        const cantidadTotal = Number(existente.cantidad || 1) + Number(item.cantidad || 1);
+        
+        const { error: e2 } = await supabase
+          .from("carrito_items")
+          .update({ cantidad: cantidadTotal })
+          .eq("id", existente.id);
+        
+        if (e2) throw e2;
+        
+        console.log(`   🔗 FUSIONADO: ${item.titulo} (${existente.cantidad} + ${item.cantidad} = ${cantidadTotal})`);
+        fusionados++;
+      } else {
+        // Agregar nuevo
+        await _addRemote(item.id, item.cantidad);
+        console.log(`   ✓ AGREGADO: ${item.titulo} (${item.cantidad}x)`);
+      }
+      
+      migrados++;
+    } catch (error) {
+      console.error(`   ✗ Error migrando ${item.titulo}:`, error);
+      errores++;
+    }
+  }
+
+  // Limpiar carrito local después de migrar
+  _emptyLocal();
+  
+  console.log(`✅ Migración completada:`);
+  console.log(`   • ${migrados} productos procesados`);
+  console.log(`   • ${fusionados} fusionados`);
+  console.log(`   • ${errores} errores`);
+  
+  return {
+    success: true,
+    itemsMigrados: migrados,
+    itemsFusionados: fusionados,
+    errores: errores
+  };
+}
+
 // ---------- API pública ----------
 async function getSnapshot() {
   const uid = await getUserId();
@@ -262,7 +340,7 @@ async function getSnapshot() {
   const cart = _readLocal();
   const total = _totalLocal(cart);
   
-  console.log("Snapshot local:", {
+  console.log("📊 Snapshot local:", {
     items: cart.length,
     conPromo: cart.filter(i => i.tienePromo).length,
     total
@@ -373,9 +451,11 @@ window.CartAPI = {
   // helpers UI
   refreshBadge,
   // debugging
-  verificarCarrito
+  verificarCarrito,
+  // ⭐ MODO INVITADO
+  migrateToRemote
 };
 
 // Auto-verificar al cargar
-console.log("CartAPI cargado con soporte de promociones");
+console.log("✅ CartAPI cargado con soporte de promociones + modo invitado");
 console.log("Usar CartAPI.verificarCarrito() para ver el estado actual");
