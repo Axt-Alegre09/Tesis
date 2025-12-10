@@ -1,4 +1,4 @@
-/* ===== POPUP Recomendaciones Mejorado y Responsive ===== */
+/* ===== POPUP Recomendaciones - REDISEÑO PROFESIONAL Y CLARO ===== */
 #recoModalOverlay[hidden] { 
   display: none; 
 }
@@ -25,7 +25,6 @@
   max-height: min(90vh, 850px);
   background: #fff;
   border-radius: 20px;
-  border: 1px solid rgba(111, 92, 56, 0.15);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   display: grid;
   grid-template-rows: auto 1fr;
@@ -44,29 +43,29 @@
   }
 }
 
-/* Header */
+/* ===== HEADER MEJORADO ===== */
 .reco-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 28px;
-  background: linear-gradient(135deg, #6f5c38 0%, #4f3f24 100%);
+  padding: 18px 24px;
+  background: linear-gradient(135deg, #6f5c38 0%, #5a4a2e 100%);
   color: white;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
 .reco-header h2 {
   margin: 0;
-  font-size: 1.4rem;
+  font-size: 1.3rem;
   font-weight: 700;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .reco-header h2::before {
-  content: '✨';
-  font-size: 1.6rem;
+  content: '';
+  font-size: 1.5rem;
 }
 
 .reco-close {
@@ -76,8 +75,7 @@
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  font-size: 1.4rem;
-  line-height: 1;
+  font-size: 1.3rem;
   cursor: pointer;
   color: white;
   display: grid;
@@ -91,17 +89,18 @@
   transform: rotate(90deg);
 }
 
-/* Grid de productos */
+/* ===== GRID OPTIMIZADO ===== */
 .reco-grid {
-  padding: 28px;
+  padding: 24px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 20px;
   overflow: auto;
   max-height: calc(90vh - 100px);
+  background: #fafafa;
 }
 
-/* Scrollbar personalizado */
+/* Scrollbar elegante */
 .reco-grid::-webkit-scrollbar {
   width: 8px;
 }
@@ -117,108 +116,36 @@
 }
 
 .reco-grid::-webkit-scrollbar-thumb:hover {
-  background: #4f3f24;
+  background: #5a4a2e;
 }
 
-/* Cards */
+/* ===== CARDS REDISEÑADAS - MÁS COMPACTAS Y CLARAS ===== */
 .reco-card {
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  gap: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 16px;
-  padding: 16px;
+  display: flex;
+  flex-direction: column;
   background: #fff;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
+  border-radius: 16px;
   overflow: hidden;
-}
-
-.reco-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(111, 92, 56, 0.05) 0%, transparent 100%);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .reco-card:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+  transform: translateY(-6px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
   border-color: rgba(111, 92, 56, 0.3);
 }
 
-.reco-card:hover::before {
-  opacity: 1;
-}
-
-/* Botón favorito en el card */
-.reco-btn-favorito {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  z-index: 2;
-  appearance: none;
-  border: 0;
-  background: rgba(255, 255, 255, 0.95);
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  transition: all 0.2s ease;
-}
-
-.reco-btn-favorito:hover {
-  transform: scale(1.1);
-  background: white;
-}
-
-.reco-btn-favorito i {
-  font-size: 1.2rem;
-  color: #6f5c38;
-  transition: all 0.2s ease;
-}
-
-.reco-btn-favorito.active i {
-  color: #e74c3c;
-}
-
-.reco-btn-favorito:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Badge de última compra */
-.reco-card[data-ultima="true"]::after {
-  content: '🔥 Repetir';
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
-  color: white;
-  padding: 4px 10px;
-  border-radius: 20px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  z-index: 1;
-  box-shadow: 0 2px 8px rgba(238, 90, 36, 0.4);
-}
-
-/* Imagen */
+/* ===== IMAGEN COMPACTA ===== */
 .reco-imgwrap {
   width: 100%;
-  aspect-ratio: 1/1;
+  height: 180px;
   overflow: hidden;
-  border-radius: 12px;
-  background: #fafafa;
-  display: grid;
-  place-items: center;
+  background: #f5f5f5;
   position: relative;
+  flex-shrink: 0;
 }
 
 .reco-imgwrap img {
@@ -229,85 +156,138 @@
 }
 
 .reco-card:hover .reco-imgwrap img {
-  transform: scale(1.1);
+  transform: scale(1.08);
 }
 
-/* Info del producto */
+/* ===== BADGE REPETIR - VISIBLE Y CLARO ===== */
+.reco-card[data-ultima="true"]::before {
+  content: '🔥 Repetir';
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  z-index: 3;
+  box-shadow: 0 4px 12px rgba(238, 90, 36, 0.4);
+  animation: pulseRepetir 2s ease-in-out infinite;
+}
+
+@keyframes pulseRepetir {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+/* ===== BOTÓN FAVORITO - MEJOR POSICIONADO ===== */
+.reco-btn-favorito {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 3;
+  appearance: none;
+  border: 0;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all 0.2s ease;
+}
+
+.reco-btn-favorito:hover {
+  transform: scale(1.1);
+  background: white;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.reco-btn-favorito i {
+  font-size: 1.2rem;
+  color: #6f5c38;
+  transition: color 0.2s ease;
+}
+
+.reco-btn-favorito.active i {
+  color: #e74c3c;
+}
+
+/* ===== INFO CLARA Y LEGIBLE ===== */
 .reco-info {
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
+  flex: 1;
 }
 
 .reco-title {
   font-size: 1rem;
   font-weight: 700;
-  margin: 0;
   color: #333;
   line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 2.6em;
+  margin: 0;
 }
 
 .reco-price {
-  font-size: 1.1rem;
+  font-size: 1.25rem;
   color: #6f5c38;
   font-weight: 700;
+  margin: 4px 0;
 }
 
 .reco-veces {
-  font-size: 0.8rem;
-  color: #999;
+  font-size: 0.8125rem;
+  color: #666;
   font-style: italic;
+  margin-bottom: 8px;
 }
 
-/* Botón centrado y ancho */
+/* ===== BOTÓN AGREGAR - GRANDE Y VISIBLE ===== */
 .reco-actions {
   display: flex;
-  justify-content: center;
-  margin-top: 8px;
+  padding: 0;
+  margin-top: auto;
 }
 
 .reco-btn-add {
   appearance: none;
   border: 0;
   cursor: pointer;
-  padding: 12px 0;
+  padding: 14px 0;
   width: 100%;
-  border-radius: 12px;
+  border-radius: 0;
   font-weight: 700;
-  font-size: 0.95rem;
-  background: linear-gradient(135deg, #6f5c38 0%, #4f3f24 100%);
+  font-size: 0.9375rem;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, #6f5c38 0%, #5a4a2e 100%);
   color: white;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 12px rgba(111, 92, 56, 0.3);
-  position: relative;
-  overflow: hidden;
-}
-
-.reco-btn-add::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 100%);
-  opacity: 0;
-  transition: opacity 0.3s ease;
+  transition: all 0.3s ease;
+  box-shadow: 0 -2px 8px rgba(0,0,0,0.05);
+  letter-spacing: 0.5px;
 }
 
 .reco-btn-add:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(111, 92, 56, 0.4);
-}
-
-.reco-btn-add:hover::before {
-  opacity: 1;
+  background: linear-gradient(135deg, #5a4a2e 0%, #4a3a1e 100%);
+  box-shadow: 0 -4px 12px rgba(0,0,0,0.1);
 }
 
 .reco-btn-add:active {
-  transform: translateY(0);
+  transform: scale(0.98);
 }
 
 .reco-btn-add.added {
   background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
-  box-shadow: 0 4px 12px rgba(39, 174, 96, 0.3);
 }
 
 .reco-btn-add:disabled {
@@ -315,7 +295,7 @@
   cursor: not-allowed;
 }
 
-/* Estados vacío */
+/* ===== ESTADO VACÍO ===== */
 .reco-empty {
   grid-column: 1 / -1;
   text-align: center;
@@ -330,22 +310,31 @@
   opacity: 0.3;
 }
 
-/* ========== RESPONSIVE ========== */
+.reco-empty p {
+  font-size: 1.125rem;
+  margin: 0;
+}
 
-/* Tablets grandes (hasta 1024px) */
+/* ========== RESPONSIVE OPTIMIZADO ========== */
+
+/* ===== TABLETS (hasta 1024px) ===== */
 @media (max-width: 1024px) {
   .reco-grid {
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
     gap: 18px;
-    padding: 24px;
+    padding: 20px;
   }
   
   .reco-header h2 {
-    font-size: 1.3rem;
+    font-size: 1.2rem;
+  }
+  
+  .reco-imgwrap {
+    height: 160px;
   }
 }
 
-/* Tablets (hasta 768px) */
+/* ===== TABLETS PEQUEÑAS (hasta 768px) ===== */
 @media (max-width: 768px) {
   #recoModalOverlay {
     padding: 12px;
@@ -361,12 +350,12 @@
   }
   
   .reco-header h2 {
-    font-size: 1.2rem;
+    font-size: 1.15rem;
     gap: 8px;
   }
   
   .reco-header h2::before {
-    font-size: 1.4rem;
+    font-size: 1.3rem;
   }
   
   .reco-close {
@@ -376,15 +365,36 @@
   }
   
   .reco-grid {
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: 16px;
-    padding: 20px;
+    padding: 16px;
     max-height: calc(88vh - 80px);
   }
   
-  .reco-card {
-    padding: 12px;
-    gap: 10px;
+  .reco-imgwrap {
+    height: 150px;
+  }
+  
+  .reco-info {
+    padding: 14px;
+    gap: 6px;
+  }
+  
+  .reco-title {
+    font-size: 0.9375rem;
+  }
+  
+  .reco-price {
+    font-size: 1.125rem;
+  }
+  
+  .reco-veces {
+    font-size: 0.75rem;
+  }
+  
+  .reco-btn-add {
+    padding: 12px 0;
+    font-size: 0.875rem;
   }
   
   .reco-btn-favorito {
@@ -398,29 +408,16 @@
     font-size: 1.1rem;
   }
   
-  .reco-card[data-ultima="true"]::after {
+  .reco-card[data-ultima="true"]::before {
     top: 10px;
     left: 10px;
-    padding: 3px 8px;
+    padding: 5px 10px;
     font-size: 0.7rem;
-  }
-  
-  .reco-title {
-    font-size: 0.9rem;
-  }
-  
-  .reco-price {
-    font-size: 1rem;
-  }
-  
-  .reco-btn-add {
-    padding: 10px 0;
-    font-size: 0.9rem;
   }
 }
 
-/* Móviles (hasta 480px) */
-@media (max-width: 480px) {
+/* ===== MÓVILES (hasta 600px) ===== */
+@media (max-width: 600px) {
   #recoModalOverlay {
     padding: 0;
     align-items: flex-end;
@@ -428,6 +425,7 @@
   
   #recoModal {
     width: 100%;
+    max-width: 100%;
     max-height: 92vh;
     border-radius: 20px 20px 0 0;
     animation: slideUpMobile 0.4s cubic-bezier(0.16, 1, 0.3, 1);
@@ -449,7 +447,7 @@
   }
   
   .reco-header h2 {
-    font-size: 1.1rem;
+    font-size: 1.05rem;
     gap: 6px;
   }
   
@@ -463,19 +461,53 @@
     font-size: 1.1rem;
   }
   
+  /* GRID DE 2 COLUMNAS EN MÓVIL */
   .reco-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 12px;
-    padding: 16px;
+    padding: 12px;
     max-height: calc(92vh - 70px);
   }
   
   .reco-card {
-    padding: 10px;
-    gap: 8px;
     border-radius: 12px;
   }
   
+  /* IMAGEN MÁS PEQUEÑA */
+  .reco-imgwrap {
+    height: 130px;
+  }
+  
+  /* INFO COMPACTA */
+  .reco-info {
+    padding: 10px;
+    gap: 4px;
+  }
+  
+  .reco-title {
+    font-size: 0.875rem;
+    line-height: 1.25;
+    min-height: auto;
+    -webkit-line-clamp: 2;
+  }
+  
+  .reco-price {
+    font-size: 1rem;
+    margin: 2px 0;
+  }
+  
+  .reco-veces {
+    font-size: 0.7rem;
+    margin-bottom: 6px;
+  }
+  
+  /* BOTÓN AGREGAR COMPACTO */
+  .reco-btn-add {
+    padding: 10px 0;
+    font-size: 0.8125rem;
+  }
+  
+  /* BOTÓN FAVORITO PEQUEÑO */
   .reco-btn-favorito {
     width: 28px;
     height: 28px;
@@ -487,34 +519,12 @@
     font-size: 1rem;
   }
   
-  .reco-card[data-ultima="true"]::after {
+  /* BADGE REPETIR PEQUEÑO */
+  .reco-card[data-ultima="true"]::before {
     top: 8px;
     left: 8px;
-    padding: 2px 6px;
+    padding: 4px 8px;
     font-size: 0.65rem;
-  }
-  
-  .reco-imgwrap {
-    border-radius: 10px;
-  }
-  
-  .reco-title {
-    font-size: 0.85rem;
-    line-height: 1.2;
-  }
-  
-  .reco-price {
-    font-size: 0.95rem;
-  }
-  
-  .reco-veces {
-    font-size: 0.75rem;
-  }
-  
-  .reco-btn-add {
-    padding: 9px 0;
-    font-size: 0.85rem;
-    border-radius: 10px;
   }
   
   .reco-empty {
@@ -524,35 +534,42 @@
   .reco-empty i {
     font-size: 3rem;
   }
+  
+  .reco-empty p {
+    font-size: 1rem;
+  }
 }
 
-/* Móviles muy pequeños (hasta 360px) */
-@media (max-width: 360px) {
+/* ===== MÓVILES MUY PEQUEÑOS (hasta 380px) ===== */
+@media (max-width: 380px) {
   .reco-grid {
-    grid-template-columns: 1fr;
     gap: 10px;
-    padding: 12px;
+    padding: 10px;
   }
   
-  .reco-header h2 {
-    font-size: 1rem;
+  .reco-imgwrap {
+    height: 120px;
+  }
+  
+  .reco-info {
+    padding: 8px;
   }
   
   .reco-title {
-    font-size: 0.8rem;
+    font-size: 0.8125rem;
   }
   
   .reco-price {
-    font-size: 0.9rem;
+    font-size: 0.9375rem;
   }
   
   .reco-btn-add {
-    padding: 8px 0;
-    font-size: 0.8rem;
+    padding: 9px 0;
+    font-size: 0.75rem;
   }
 }
 
-/* Ajustes para landscape en móviles */
+/* ===== MÓVILES EN LANDSCAPE ===== */
 @media (max-height: 600px) and (orientation: landscape) {
   #recoModal {
     max-height: 95vh;
@@ -560,10 +577,30 @@
   
   .reco-grid {
     max-height: calc(95vh - 70px);
-    padding: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  }
+  
+  .reco-imgwrap {
+    height: 100px;
+  }
+  
+  .reco-info {
+    padding: 8px;
   }
   
   .reco-header {
-    padding: 12px 20px;
+    padding: 10px 16px;
+  }
+}
+
+/* ===== ACCESIBILIDAD ===== */
+@media (prefers-reduced-motion: reduce) {
+  #recoModal,
+  .reco-card,
+  .reco-btn-add,
+  .reco-btn-favorito,
+  .reco-imgwrap img {
+    animation: none !important;
+    transition: none !important;
   }
 }
