@@ -18,6 +18,7 @@
   const SNAP_FACTURA = 'pedido-simulado';
   const SNAP_CHECKOUT_PRIMARY = 'checkout_snapshot';
   const SNAP_CHECKOUT_FALLBACK = 'checkout';
+  
 
   function hasValidPedido(qs = QS) {
     const raw = qs.get('pedido');
