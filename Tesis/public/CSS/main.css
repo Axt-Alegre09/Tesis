@@ -1267,7 +1267,7 @@ main{
     font-size: 1rem;
     line-height: 1.25;
     min-height: 2.5em;
-    margin: 0 0 3px 0;
+    margin: 0 0 0 0;
   }
   
   .producto-precio { 
@@ -1351,7 +1351,7 @@ main{
   
   .producto-titulo { 
     font-size: 0.9375rem;
-    margin: 0 0 3px 0;
+    margin: 0 0 0 0;
   }
   
   .producto-precio {
