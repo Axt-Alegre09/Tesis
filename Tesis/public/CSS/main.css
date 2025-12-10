@@ -1,24 +1,24 @@
 /* =========================
-   Variables Modernas
+   Variables con Paleta Paniquiños
 ========================= */
 :root {
   --clr-primary: #6f5c38;
   --clr-primary-dark: #4f3f24;
-  --clr-primary-light: #a89174;
+  --clr-primary-light: #8a7556;
   --clr-accent: #e8a87c;
   --clr-white: #ffffff;
-  --clr-bg: #fafaf9;
-  --clr-bg-alt: #f5f5f4;
-  --clr-text: #1c1917;
-  --clr-text-light: #78716c;
-  --clr-border: #e7e5e4;
+  --clr-bg: #faf7f2;
+  --clr-bg-alt: #f5f0e8;
+  --clr-text: #3f3422;
+  --clr-text-light: #6f5c38;
+  --clr-border: #e4ddcf;
   --clr-success: #10b981;
   --clr-danger: #ef4444;
-  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  --shadow-xs: 0 1px 2px 0 rgba(111, 92, 56, 0.05);
+  --shadow-sm: 0 1px 3px 0 rgba(111, 92, 56, 0.1), 0 1px 2px -1px rgba(111, 92, 56, 0.1);
+  --shadow-md: 0 4px 6px -1px rgba(111, 92, 56, 0.1), 0 2px 4px -2px rgba(111, 92, 56, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(111, 92, 56, 0.1), 0 4px 6px -4px rgba(111, 92, 56, 0.1);
+  --shadow-xl: 0 20px 25px -5px rgba(111, 92, 56, 0.1), 0 8px 10px -6px rgba(111, 92, 56, 0.1);
   --radius-xs: 6px;
   --radius-sm: 8px;
   --radius-md: 12px;
@@ -80,7 +80,7 @@ body.aside-open {
   background: var(--clr-bg);
 }
 
-/* ===== ASIDE MINIMALISTA Y MODERNO ===== */
+/* ===== ASIDE CON COLORES PANIQUIÑOS ===== */
 aside {
   grid-column: 1 / 2;
   background: var(--clr-white);
@@ -122,7 +122,7 @@ aside {
   transform: scale(1.02);
 }
 
-/* Navegación Moderna */
+/* Navegación con colores Paniquiños */
 nav {
   flex: 1;
   padding: 16px 12px;
@@ -148,7 +148,7 @@ nav::-webkit-scrollbar-thumb {
 .boton-menu {
   background: transparent;
   border: none;
-  color: var(--clr-text-light);
+  color: var(--clr-text);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -164,7 +164,7 @@ nav::-webkit-scrollbar-thumb {
 
 .boton-menu:hover {
   background: var(--clr-bg-alt);
-  color: var(--clr-text);
+  color: var(--clr-primary-dark);
 }
 
 .boton-menu.active {
@@ -212,7 +212,7 @@ nav::-webkit-scrollbar-thumb {
   box-shadow: 0 0 0 2px var(--clr-white);
 }
 
-/* Footer minimalista */
+/* Footer */
 aside footer {
   padding: 16px;
   border-top: 1px solid var(--clr-border);
@@ -222,7 +222,7 @@ aside footer {
   color: var(--clr-text-light);
   font-size: 0.8125rem;
   text-align: center;
-  font-weight: 400;
+  font-weight: 500;
 }
 
 /* Botón cerrar */
@@ -248,7 +248,7 @@ aside footer {
 }
 
 /* =========================
-   Topbar Clean
+   Topbar con colores Paniquiños
 ========================= */
 .site-topbar.within {
   margin: 0;
@@ -291,11 +291,11 @@ aside footer {
   padding: 6px;
   font-size: 1.5rem;
   line-height: 1;
-  color: var(--clr-text);
+  color: var(--clr-primary);
   cursor: pointer;
 }
 
-/* Searchbar limpia */
+/* Searchbar */
 .searchbar {
   flex: 1;
   display: flex;
@@ -310,12 +310,12 @@ aside footer {
 
 .searchbar:focus-within {
   background: var(--clr-white);
-  border-color: var(--clr-text-light);
-  box-shadow: var(--shadow-sm);
+  border-color: var(--clr-primary);
+  box-shadow: 0 0 0 3px rgba(111, 92, 56, 0.1);
 }
 
 .searchbar i {
-  color: var(--clr-text-light);
+  color: var(--clr-primary);
   font-size: 1.125rem;
 }
 
@@ -348,7 +348,7 @@ aside footer {
   background: var(--clr-primary-dark);
 }
 
-/* User menu limpio */
+/* User menu */
 .user-menu {
   position: relative;
 }
@@ -370,16 +370,19 @@ aside footer {
 
 .user-chip:hover {
   background: var(--clr-bg);
+  border-color: var(--clr-primary);
   box-shadow: var(--shadow-xs);
 }
 
 .user-chip i {
   font-size: 1.125rem;
+  color: var(--clr-primary);
 }
 
 .user-chip .chevron {
   font-size: 0.75rem;
   transition: transform 0.2s ease;
+  color: var(--clr-primary);
 }
 
 .user-chip.active .chevron {
@@ -441,11 +444,11 @@ aside footer {
   font-size: 1.125rem;
   width: 18px;
   text-align: center;
-  color: var(--clr-text-light);
+  color: var(--clr-primary);
 }
 
 /* =========================
-   Main Limpio
+   Main
 ========================= */
 main {
   grid-column: 2 / -1;
@@ -456,7 +459,7 @@ main {
 }
 
 .titulo-principal {
-  color: var(--clr-text);
+  color: var(--clr-primary-dark);
   margin-bottom: 32px;
   font-weight: 700;
   font-size: 1.875rem;
@@ -465,7 +468,7 @@ main {
 }
 
 /* =========================
-   Cards Modernas Estilo Airbnb/Instagram
+   Cards con colores Paniquiños
 ========================= */
 .contenedor-productos {
   display: grid;
@@ -487,6 +490,7 @@ main {
 .producto:hover {
   box-shadow: var(--shadow-lg);
   transform: translateY(-2px);
+  border-color: var(--clr-border);
 }
 
 .producto-imagen {
@@ -520,14 +524,14 @@ main {
 }
 
 .producto-precio {
-  color: var(--clr-text);
+  color: var(--clr-primary-dark);
   font-size: 1.0625rem;
   font-weight: 700;
 }
 
 .producto-agregar {
   border: none;
-  background: var(--clr-text);
+  background: var(--clr-primary);
   color: var(--clr-white);
   padding: 12px;
   border-radius: var(--radius-sm);
@@ -540,11 +544,11 @@ main {
 }
 
 .producto-agregar:hover {
-  background: var(--clr-primary);
+  background: var(--clr-primary-dark);
   transform: scale(1.02);
 }
 
-/* Botón favorito minimalista */
+/* Botón favorito */
 .btn-favorito {
   position: absolute;
   top: 12px;
@@ -553,13 +557,13 @@ main {
   height: 36px;
   border-radius: 50%;
   border: none;
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(8px);
   cursor: pointer;
   display: grid;
   place-items: center;
   font-size: 1.25rem;
-  color: var(--clr-text);
+  color: var(--clr-primary);
   transition: all 0.15s ease;
   z-index: 10;
   box-shadow: var(--shadow-sm);
@@ -583,7 +587,7 @@ main {
   50% { transform: scale(1.2); }
 }
 
-/* ==================== PROMOS MODERNAS ==================== */
+/* ==================== PROMOS ==================== */
 .promo-badge {
   position: absolute;
   top: 12px;
@@ -638,7 +642,7 @@ main {
 .alerta-vacia {
   grid-column: 1 / -1;
   background: var(--clr-bg-alt);
-  color: var(--clr-text-light);
+  color: var(--clr-text);
   border: 1px solid var(--clr-border);
   padding: 48px 24px;
   border-radius: var(--radius-lg);
