@@ -315,7 +315,7 @@ aside{
   box-shadow: var(--shadow-sm);
 }
 
-/* User menu mejorado */
+/* ===== USER MENU - VERSIÓN ORIGINAL RESTAURADA ===== */
 .user-menu { 
   position: relative;
   flex-shrink: 0;
@@ -324,34 +324,19 @@ aside{
 .user-chip{
   display: flex; 
   align-items: center; 
-  gap: 8px;
-  border: 1px solid rgba(0, 0, 0, 0.08); 
-  background: var(--clr-blanco);
-  border-radius: var(--radius-xl); 
-  padding: 8px 16px; 
+  gap: .5rem;
+  border: 1px solid #e5e5e5; 
+  background: #fff;
+  border-radius: 999px; 
+  padding: .4rem .75rem; 
   cursor: pointer;
-  transition: var(--transition);
-  font-weight: 500;
-  color: var(--clr-main);
-  box-shadow: var(--shadow-sm);
   flex-shrink: 0;
 }
 
-.user-chip:hover {
-  border-color: var(--clr-main);
-  box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
-}
-
-.user-chip i {
-  color: var(--clr-main);
-  font-size: 1.125rem;
-}
-
 .user-chip .chevron { 
-  font-size: 0.75rem; 
+  font-size: .8rem; 
+  opacity: .7;
   transition: transform 0.2s ease;
-  color: var(--clr-main);
 }
 
 .user-chip.active .chevron,
@@ -1225,7 +1210,7 @@ main{
   }
   
   .user-chip { 
-    padding: 6px 10px;
+    padding: .3rem .5rem;
     flex-shrink: 0;
   }
 
