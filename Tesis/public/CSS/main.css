@@ -21,6 +21,42 @@
   --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* ===== FIX CRÍTICO: PREVENIR ZOOM Y OVERFLOW ===== */
+* { 
+  margin: 0; 
+  padding: 0; 
+  box-sizing: border-box; 
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
+}
+
+html {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body { 
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+  background-color: var(--clr-main); 
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  position: relative;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+h1,h2,h3,h4,h5,h6,p,a,input,textarea,ul { margin: 0; padding: 0; }
+ul { list-style: none; }
+a { text-decoration: none; }
+
+.disabled { display: none !important; }
+body.aside-open { overflow: hidden; }
+
 [data-checkout-msg] {
   display: none !important;
 }
