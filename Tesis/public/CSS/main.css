@@ -322,21 +322,21 @@ aside{
 }
 
 .user-chip{
-  display: flex; 
-  align-items: center; 
+  display: inline-flex;
+  align-items: center;
   gap: .5rem;
-  border: 1px solid #e5e5e5; 
+  padding: .4rem .7rem;
+  border-radius: 999px;
+  border: 1px solid rgba(0,0,0,.08);
   background: #fff;
-  border-radius: 999px; 
-  padding: .4rem .75rem; 
   cursor: pointer;
   flex-shrink: 0;
 }
 
 .user-chip .chevron { 
-  font-size: .8rem; 
+  transition: transform .15s ease;
+  font-size: .8rem;
   opacity: .7;
-  transition: transform 0.2s ease;
 }
 
 .user-chip.active .chevron,
@@ -349,51 +349,38 @@ aside{
   top: calc(100% + 8px);
   right: 0;
   min-width: 220px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: var(--radius-md);
-  background: var(--clr-blanco);
-  box-shadow: var(--shadow-xl);
-  padding: 8px;
+  border: 1px solid rgba(0,0,0,.08);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(0,0,0,.12);
+  padding: 6px;
   display: none;
   z-index: 2000;
-  animation: slideDown 0.2s ease;
 }
 
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
 
-.user-dropdown.open { display: block; }
+.user-dropdown.open { 
+  display: block; 
+}
 
 .user-dropdown .dropdown-item {
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: .5rem;
   background: transparent;
   border: 0;
   font: inherit;
-  padding: 10px 12px;
-  border-radius: var(--radius-sm);
+  padding: .6rem .7rem;
+  border-radius: 10px;
   cursor: pointer;
-  font-weight: 500;
-  color: var(--clr-main);
-  transition: var(--transition);
 }
 
 .user-dropdown .dropdown-item:hover { 
-  background: var(--clr-main-claro);
+  background: #f7f7f7; 
 }
 
 .user-dropdown .dropdown-item i {
-  color: var(--clr-main);
   font-size: 1.125rem;
   width: 20px;
   text-align: center;
