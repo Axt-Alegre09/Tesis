@@ -305,8 +305,14 @@ aside{
   box-shadow: var(--shadow-sm);
 }
 
-/* User menu mejorado */
-.user-menu { position: relative; flex-shrink: 0; }
+/* ============================================================
+   USER MENU - Z-INDEX ARREGLADO
+============================================================ */
+.user-menu { 
+  position: relative; 
+  flex-shrink: 0;
+  z-index: 9999;
+}
 
 .user-chip{
   display: flex; 
@@ -321,6 +327,8 @@ aside{
   font-weight: 500;
   color: var(--clr-main);
   box-shadow: var(--shadow-sm);
+  position: relative;
+  z-index: 9999;
 }
 
 .user-chip:hover {
@@ -353,10 +361,10 @@ aside{
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: var(--radius-md);
   background: var(--clr-blanco);
-  box-shadow: var(--shadow-xl);
+  box-shadow: 0 10px 40px rgba(0,0,0,0.25);
   padding: 8px;
   display: none;
-  z-index: 2000;
+  z-index: 99999 !important;
   animation: slideDown 0.2s ease;
 }
 
@@ -371,7 +379,9 @@ aside{
   }
 }
 
-.user-dropdown.open { display: block; }
+.user-dropdown.open { 
+  display: block !important; 
+}
 
 .user-dropdown .dropdown-item {
   width: 100%;
@@ -1062,7 +1072,7 @@ main{
     overflow-x: hidden !important;
   }
 
-  /* TOPBAR - CONTENER TODO */
+  /* TOPBAR - CONTENER TODO - NO AFECTAR Z-INDEX DEL DROPDOWN */
   .site-topbar,
   .site-topbar.within {
     width: 100% !important;
@@ -1073,7 +1083,7 @@ main{
     top: 0;
     z-index: 800;
     background: var(--clr-main);
-    overflow: hidden !important;
+    overflow: visible !important; /* CAMBIADO: permitir que el dropdown salga */
   }
   
   .topbar-inner {
@@ -1084,7 +1094,7 @@ main{
     display: flex !important;
     align-items: center !important;
     background: var(--clr-main);
-    overflow: hidden !important;
+    overflow: visible !important; /* CAMBIADO: permitir que el dropdown salga */
   }
 
   /* MOBILE TOGGLE */
@@ -1116,19 +1126,30 @@ main{
     display: none !important;
   }
 
-  /* USER CHIP - COMPACTO */
+  /* USER MENU - MANTENER Z-INDEX ALTO EN MÓVIL */
   .user-menu {
     flex-shrink: 0 !important;
+    z-index: 9999 !important;
+    position: relative !important;
   }
 
   .user-chip {
     padding: 10px 12px !important;
     gap: 6px !important;
+    z-index: 9999 !important;
   }
 
   .user-chip .user-name,
   .user-chip .chevron {
     display: none !important;
+  }
+
+  /* DROPDOWN EN MÓVIL - Z-INDEX MÁXIMO */
+  .user-dropdown {
+    z-index: 99999 !important;
+    position: absolute !important;
+    right: 0 !important;
+    min-width: 200px !important;
   }
 
   /* MAIN - CONTENIDO PRINCIPAL */
