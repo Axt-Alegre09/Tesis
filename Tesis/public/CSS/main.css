@@ -20,16 +20,16 @@
   --radius-xl: 24px;
   --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   
-  /* Espaciado móvil dinámico */
-  --mobile-padding: max(8px, 3vw);
-  --mobile-gap: max(8px, 2.5vw);
+  /* Espaciado móvil */
+  --mobile-padding: 12px;
+  --mobile-gap: 12px;
 }
 
 /* ===== FIX CRÍTICO: PREVENIR ZOOM Y OVERFLOW ===== */
-* { 
+*, *::before, *::after { 
   margin: 0; 
   padding: 0; 
-  box-sizing: border-box; 
+  box-sizing: border-box !important; 
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
 }
 
@@ -45,7 +45,6 @@ html {
 
 body { 
   width: 100%;
-  min-width: 280px;
   max-width: 100%;
   overflow-x: hidden;
   background-color: var(--clr-main); 
@@ -1040,262 +1039,304 @@ main{
   }
 }
 
+/* ============================================================
+   MÓVILES - FIX AGRESIVO PARA OVERFLOW
+============================================================ */
 @media (max-width: 900px){
-  .wrapper { 
-    grid-template-columns: 1fr;
-    width: 100%;
-    max-width: 100%;
+  /* RESET TOTAL PARA MÓVILES */
+  html, body {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
-  .site-topbar.within{
-    grid-column: 1 / -1;
-    grid-row: auto;
-    margin: 0;
+  /* WRAPPER - FORZAR CONTENIDO DENTRO */
+  .wrapper { 
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: hidden !important;
+  }
+
+  /* TOPBAR - CONTENER TODO */
+  .site-topbar,
+  .site-topbar.within {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
     position: sticky;
     top: 0;
     z-index: 800;
     background: var(--clr-main);
-    width: 100%;
+    overflow: hidden !important;
   }
   
-  .topbar-inner{
+  .topbar-inner {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: var(--mobile-padding) !important;
+    gap: 10px !important;
+    display: flex !important;
+    align-items: center !important;
     background: var(--clr-main);
-    padding: 10px 16px;
-    gap: 12px;
-    width: 100%;
+    overflow: hidden !important;
   }
-  
+
+  /* MOBILE TOGGLE */
+  .mobile-toggle {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0 !important;
+    padding: 10px 12px;
+  }
+
+  /* SEARCHBAR - DEBE ENCOGERSE */
   .searchbar { 
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
     background: rgba(255, 255, 255, 0.95); 
-    padding: 8px 12px; 
-    gap: 8px; 
-  }
-
-  .wrapper.has-topbar aside { 
-    grid-row: auto; 
+    padding: 10px 14px; 
+    gap: 10px;
+    overflow: hidden !important;
   }
   
-  .wrapper.has-topbar main { 
-    grid-row: auto; 
+  .searchbar input {
+    min-width: 0 !important;
+    width: 100% !important;
   }
 
-  main{
-    grid-column: 1 / -1;
-    grid-row: auto;
-    margin: 16px;
-    padding: 24px;
-    width: calc(100% - 32px);
+  .searchbar-btn {
+    display: none !important;
   }
 
-  .contenedor-productos{
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    gap: 16px;
+  /* USER CHIP - COMPACTO */
+  .user-menu {
+    flex-shrink: 0 !important;
+  }
+
+  .user-chip {
+    padding: 10px 12px !important;
+    gap: 6px !important;
+  }
+
+  .user-chip .user-name,
+  .user-chip .chevron {
+    display: none !important;
+  }
+
+  /* MAIN - CONTENIDO PRINCIPAL */
+  main {
+    width: calc(100% - var(--mobile-padding) * 2) !important;
+    max-width: calc(100% - var(--mobile-padding) * 2) !important;
+    margin: var(--mobile-padding) auto !important;
+    padding: 20px var(--mobile-padding) !important;
+    border-radius: var(--radius-lg);
+    overflow-x: hidden !important;
+  }
+
+  .titulo-principal { 
+    font-size: 1.5rem;
+    margin: 16px 0 20px 0;
+  }
+
+  /* PRODUCTOS GRID - 2 COLUMNAS */
+  .contenedor-productos {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: var(--mobile-gap) !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .producto {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .producto-imagen { 
+    aspect-ratio: 1 / 1; 
+    height: auto;
+    width: 100% !important;
+  }
+
+  .producto-detalles {
+    padding: 12px;
+  }
+
+  .producto-titulo {
+    font-size: 0.9375rem;
+    line-height: 1.3;
+  }
+
+  .producto-precio {
+    font-size: 1.125rem;
+    margin: 4px 0 10px 0;
+  }
+
+  .producto-agregar {
+    padding: 10px 12px;
+    font-size: 0.8125rem;
+  }
+
+  .btn-favorito {
+    width: 34px;
+    height: 34px;
+    top: 10px;
+    right: 10px;
+    font-size: 1.125rem;
+  }
+
+  .promo-badge {
+    top: 10px;
+    left: 10px;
+    padding: 5px 10px;
+    font-size: 0.6875rem;
   }
 
   .checkout-form { 
     grid-template-columns: 1fr; 
   }
 
-  .mobile-toggle{
-    display: inline-flex; 
-    align-items: center; 
-    justify-content: center;
-  }
-
-  /* ASIDE MÓVIL - 50% DE PANTALLA */
-  aside{
+  /* ASIDE MÓVIL */
+  aside {
     position: fixed;
-    left: -50vw;
+    left: -80vw;
     top: 0;
-    width: 50vw;
-    max-width: 320px;
+    width: 75vw;
+    max-width: 300px;
     height: 100dvh;
     z-index: 1000;
     background: var(--clr-main);
     box-shadow: var(--shadow-xl);
     transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     padding: 24px 20px 32px 20px;
+    overflow-y: auto;
   }
   
   .aside-open aside { 
     left: 0; 
   }
 
-  .logo-principal{
-    max-width: 140px;
+  .logo-principal {
+    max-width: 120px;
     margin-left: 0;
-    box-shadow: 0 6px 20px rgba(0,0,0,.2);
   }
 
-  .producto-imagen { 
-    aspect-ratio: 1 / 1; 
-    height: auto; 
+  .boton-menu {
+    margin-right: 0;
   }
 }
 
-/* ===== MÓVILES PEQUEÑOS (hasta 600px) ===== */
-@media (max-width: 600px){
+/* ============================================================
+   MÓVILES PEQUEÑOS (hasta 480px)
+============================================================ */
+@media (max-width: 480px){
   :root { 
-    --card-img-h: 200px; 
+    --mobile-padding: 10px;
+    --mobile-gap: 10px;
   }
   
-  .contenedor-productos { 
-    grid-template-columns: repeat(2, 1fr);
-    gap: var(--mobile-gap);
+  .topbar-inner {
+    padding: 8px 10px !important;
+    gap: 8px !important;
+  }
+  
+  .mobile-toggle {
+    padding: 8px 10px;
+    font-size: 1.125rem;
   }
 
   .searchbar { 
     padding: 8px 12px; 
-    gap: 8px; 
-  }
-  
-  .searchbar-btn { 
-    display: none; 
-  }
-
-  .titulo-principal { 
-    margin: 20px 0; 
-    font-size: 1.5rem;
-  }
-  
-  main { 
-    margin: var(--mobile-padding); 
-    padding: var(--mobile-padding);
-    width: calc(100% - var(--mobile-padding) * 2);
-    border-radius: var(--radius-lg);
-  }
-}
-
-/* ===== MÓVILES MUY PEQUEÑOS (hasta 480px) ===== */
-@media (max-width: 480px){
-  :root { 
-    --card-img-h: 160px;
-    --mobile-padding: 8px;
-    --mobile-gap: 8px;
-  }
-  
-  .topbar-inner{
-    padding: 8px var(--mobile-padding);
     gap: 8px;
-  }
-  
-  .searchbar { 
-    padding: 7px 10px; 
-    gap: 6px;
     border-radius: var(--radius-lg);
   }
   
   .searchbar input { 
     font-size: 14px; 
   }
-  
-  .searchbar-btn { 
-    display: none; 
-  }
 
-  .user-chip .user-name { 
-    display: none; 
-  }
-  
   .user-chip { 
-    padding: 6px 10px; 
+    padding: 8px 10px !important; 
   }
 
   main { 
-    margin: var(--mobile-padding); 
-    padding: 12px var(--mobile-padding);
-    width: calc(100% - var(--mobile-padding) * 2);
+    padding: 16px var(--mobile-padding) !important;
     border-radius: var(--radius-md);
   }
 
   .titulo-principal {
     font-size: 1.375rem;
-    margin: 16px 0;
+    margin: 12px 0 16px 0;
   }
 
-  .contenedor-productos{
-    grid-template-columns: repeat(2, 1fr);
-    gap: var(--mobile-gap);
-    width: 100%;
-  }
-
-  .producto{
+  .producto {
     border-radius: var(--radius-md);
-    width: 100%;
   }
   
-  .producto-imagen{
-    aspect-ratio: 1/1;
-    height: auto;
+  .producto-imagen {
     border-radius: var(--radius-md) var(--radius-md) 0 0;
   }
   
-  .producto-detalles{
+  .producto-detalles {
     padding: 10px;
-    gap: 0;
     border-radius: 0 0 var(--radius-md) var(--radius-md);
   }
 
-  .producto-titulo{
+  .producto-titulo {
     font-size: 0.875rem;
     line-height: 1.25;
-    min-height: auto;
-    margin: 0 0 2px 0;
   }
   
   .producto-precio { 
     font-size: 1rem;
-    margin: 0 0 6px 0;
+    margin: 2px 0 8px 0;
   }
 
   .precios-con-promo {
-    gap: 0;
-    margin: 0 0 6px 0;
+    margin: 0 0 8px 0;
   }
 
   .precios-con-promo .producto-precio {
     font-size: 1.125rem;
-    margin: 0;
   }
 
   .precio-original {
     font-size: 0.75rem;
   }
 
-  .producto-agregar{
-    width: 100%;
+  .producto-agregar {
     padding: 8px 10px;
     font-size: 0.75rem;
-    margin: 0;
     border-radius: var(--radius-lg);
   }
 
   .btn-favorito {
     width: 30px;
     height: 30px;
-    top: 6px;
-    right: 6px;
+    top: 8px;
+    right: 8px;
     font-size: 1rem;
   }
 
   .promo-badge {
-    top: 6px;
-    left: 6px;
+    top: 8px;
+    left: 8px;
     padding: 4px 8px;
-    font-size: 0.6875rem;
-    border-radius: 6px;
+    font-size: 0.625rem;
   }
 
-  .promo-badge i {
-    font-size: 0.75rem;
-  }
-
-  /* NAVEGACIÓN MÓVIL ALINEADA AL INICIO */
   .boton-menu {
     padding: 10px 12px;
     font-size: 0.9375rem;
-    text-align: left;
-    justify-content: flex-start;
   }
 
   .boton-menu i {
@@ -1310,43 +1351,38 @@ main{
     right: 12px;
   }
 
-  /* ASIDE 60% EN MÓVIL PEQUEÑO */
   aside { 
-    width: 60vw;
+    width: 75vw;
     max-width: 260px;
-    left: -60vw;
     padding: 20px 16px 24px 16px;
-  }
-  
-  .aside-open aside { 
-    left: 0; 
   }
 
   .logo-principal {
     max-width: 100px;
   }
-
-  .mobile-toggle {
-    padding: 8px 12px;
-    font-size: 1.125rem;
-  }
 }
 
-/* ===== MÓVILES EXTRA PEQUEÑOS (hasta 360px) ===== */
-@media (max-width: 360px){
+/* ============================================================
+   MÓVILES MUY PEQUEÑOS (hasta 380px)
+============================================================ */
+@media (max-width: 380px){
   :root { 
-    --card-img-h: 130px;
-    --mobile-padding: 6px;
-    --mobile-gap: 6px;
+    --mobile-padding: 8px;
+    --mobile-gap: 8px;
   }
   
   .topbar-inner {
-    padding: 6px;
-    gap: 6px;
+    padding: 6px 8px !important;
+    gap: 6px !important;
+  }
+
+  .mobile-toggle {
+    padding: 7px 9px;
+    font-size: 1rem;
   }
 
   .searchbar {
-    padding: 6px 8px;
+    padding: 7px 10px;
     gap: 6px;
   }
 
@@ -1358,13 +1394,8 @@ main{
     font-size: 1rem;
   }
 
-  .mobile-toggle {
-    padding: 7px 10px;
-    font-size: 1rem;
-  }
-
   .user-chip {
-    padding: 5px 8px;
+    padding: 7px 9px !important;
   }
 
   .user-chip i {
@@ -1372,18 +1403,12 @@ main{
   }
   
   main {
-    margin: var(--mobile-padding);
-    padding: 10px var(--mobile-padding);
-    width: calc(100% - var(--mobile-padding) * 2);
+    padding: 14px var(--mobile-padding) !important;
   }
 
   .titulo-principal {
     font-size: 1.25rem;
-    margin: 12px 0;
-  }
-  
-  .contenedor-productos { 
-    gap: var(--mobile-gap);
+    margin: 10px 0 14px 0;
   }
   
   .producto {
@@ -1401,13 +1426,12 @@ main{
 
   .producto-titulo { 
     font-size: 0.8125rem;
-    margin: 0 0 2px 0;
     line-height: 1.2;
   }
   
   .producto-precio {
     font-size: 0.9375rem;
-    margin: 0 0 5px 0;
+    margin: 2px 0 6px 0;
   }
 
   .precios-con-promo .producto-precio {
@@ -1425,33 +1449,32 @@ main{
   }
 
   .btn-favorito {
-    width: 26px;
-    height: 26px;
-    top: 4px;
-    right: 4px;
-    font-size: 0.875rem;
+    width: 28px;
+    height: 28px;
+    top: 6px;
+    right: 6px;
+    font-size: 0.9375rem;
   }
 
   .promo-badge {
-    top: 4px;
-    left: 4px;
+    top: 6px;
+    left: 6px;
     padding: 3px 6px;
-    font-size: 0.625rem;
+    font-size: 0.5625rem;
   }
 
   .promo-badge i {
-    font-size: 0.625rem;
+    font-size: 0.5625rem;
   }
 
   aside {
-    width: 65vw;
-    max-width: 220px;
-    left: -65vw;
-    padding: 16px 12px 20px 12px;
+    width: 80vw;
+    max-width: 240px;
+    padding: 16px 14px 20px 14px;
   }
 
   .logo-principal {
-    max-width: 80px;
+    max-width: 90px;
   }
 
   .boton-menu {
@@ -1465,24 +1488,18 @@ main{
   }
 }
 
-/* ===== MÓVILES ULTRA PEQUEÑOS (hasta 320px) ===== */
+/* ============================================================
+   MÓVILES ULTRA PEQUEÑOS (hasta 320px)
+============================================================ */
 @media (max-width: 320px){
   :root {
-    --mobile-padding: 4px;
-    --mobile-gap: 4px;
+    --mobile-padding: 6px;
+    --mobile-gap: 6px;
   }
 
   .topbar-inner {
-    padding: 5px 4px;
-    gap: 4px;
-  }
-
-  .searchbar {
-    padding: 5px 7px;
-  }
-
-  .searchbar input {
-    font-size: 12px;
+    padding: 5px 6px !important;
+    gap: 5px !important;
   }
 
   .mobile-toggle {
@@ -1490,22 +1507,25 @@ main{
     font-size: 0.9375rem;
   }
 
+  .searchbar {
+    padding: 6px 8px;
+  }
+
+  .searchbar input {
+    font-size: 12px;
+  }
+
   .user-chip {
-    padding: 4px 6px;
+    padding: 6px 8px !important;
   }
 
   main {
-    margin: var(--mobile-padding);
-    padding: 8px var(--mobile-padding);
+    padding: 12px var(--mobile-padding) !important;
   }
 
   .titulo-principal {
     font-size: 1.125rem;
-    margin: 10px 0;
-  }
-
-  .contenedor-productos {
-    gap: var(--mobile-gap);
+    margin: 8px 0 12px 0;
   }
 
   .producto-detalles {
@@ -1519,7 +1539,7 @@ main{
 
   .producto-precio {
     font-size: 0.875rem;
-    margin: 0 0 4px 0;
+    margin: 2px 0 5px 0;
   }
 
   .producto-agregar {
@@ -1530,18 +1550,21 @@ main{
   .btn-favorito {
     width: 24px;
     height: 24px;
-    font-size: 0.75rem;
+    font-size: 0.8125rem;
+    top: 4px;
+    right: 4px;
   }
 
   .promo-badge {
     padding: 2px 5px;
-    font-size: 0.5625rem;
+    font-size: 0.5rem;
+    top: 4px;
+    left: 4px;
   }
 
   aside {
-    width: 70vw;
-    max-width: 200px;
-    left: -70vw;
+    width: 85vw;
+    max-width: 220px;
   }
 }
 
