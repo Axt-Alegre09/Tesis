@@ -563,7 +563,7 @@ async function processToolCall(toolCall, state) {
     
     case "agendar_catering": {
       try {
-        // Usar datos del estado si no vienen en args
+        // Usar datos del estado si no vienen en args (PRIORIDAD: args > state)
         const cat = state.catering;
         const datos = {
           razonsocial: args.razonsocial || cat.razonsocial,
@@ -579,6 +579,20 @@ async function processToolCall(toolCall, state) {
         
         console.log('[CATERING] Datos finales:', datos);
         
+        // ⚠️ GUARDAR DATOS EN ESTADO antes de intentar (para preservar si falla)
+        state.catering = {
+          activo: true,
+          razonsocial: datos.razonsocial,
+          tipoevento: datos.tipoevento,
+          fecha: datos.fecha,
+          hora: datos.hora,
+          tipocomida: datos.tipocomida,
+          lugar: datos.lugar,
+          invitados: datos.invitados,
+          telefono: datos.telefono,
+          email: datos.email,
+        };
+        
         // Normalizar fecha y hora
         const fechaNormalizada = parseFechaNatural(datos.fecha);
         const horaNormalizada = parseHoraNatural(datos.hora);
@@ -586,11 +600,22 @@ async function processToolCall(toolCall, state) {
         console.log('[CATERING] Normalizado:', { fecha: fechaNormalizada, hora: horaNormalizada });
         
         if (!fechaNormalizada) {
-          return { success: false, message: `No entendí la fecha "${datos.fecha}". ¿Podés decirla como "26 de diciembre" o "26/12/2025"?` };
+          // Limpiar solo la fecha para que el usuario la corrija
+          state.catering.fecha = null;
+          return { 
+            success: false, 
+            message: `No entendí la fecha "${datos.fecha}". ¿Podés decirla como "26 de diciembre" o "26/12/2025"?`,
+            continueConversation: true
+          };
         }
         
         if (!horaNormalizada) {
-          return { success: false, message: `No entendí la hora "${datos.hora}". ¿Podés decirla como "19:00" o "7 de la tarde"?` };
+          state.catering.hora = null;
+          return { 
+            success: false, 
+            message: `No entendí la hora "${datos.hora}". ¿Podés decirla como "19:00" o "7 de la tarde"?`,
+            continueConversation: true
+          };
         }
         
         // Llamar a la función RPC
@@ -610,10 +635,14 @@ async function processToolCall(toolCall, state) {
 
         if (error) {
           console.error('[CATERING] Error:', error);
+          
           if (error.message.includes('Cupo lleno') || error.message.includes('cupo')) {
+            // ⚠️ PRESERVAR todos los datos, solo limpiar la fecha para que elija otra
+            state.catering.fecha = null;
             return { 
               success: false, 
-              message: `❌ ${error.message}\n\n¿Querés probar con otra fecha? Los fines de semana tenemos más disponibilidad.` 
+              message: `❌ ${error.message}\n\n¿Querés probar con otra fecha? Solo decime el nuevo día y agendamos con los mismos datos.`,
+              continueConversation: true
             };
           }
           return { success: false, message: `Error: ${error.message}` };
@@ -621,7 +650,7 @@ async function processToolCall(toolCall, state) {
 
         console.log('[CATERING] Éxito:', data);
 
-        // Limpiar estado de catering
+        // ✅ ÉXITO: Ahora sí limpiar estado de catering
         state.catering = {
           activo: false,
           razonsocial: null, tipoevento: null, fecha: null, hora: null,
