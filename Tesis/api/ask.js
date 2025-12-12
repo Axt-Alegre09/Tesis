@@ -467,39 +467,199 @@ async function ejecutarReserva(state) {
 }
 
 /* ============== PROCESAR CARRITO ============== */
+function normalizarTexto(texto) {
+  return texto.toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // quitar acentos
+    .replace(/[^a-z0-9\s]/g, ' ') // solo letras y números
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function buscarProductoEnMensaje(mensaje, catalogo) {
+  const msgNorm = normalizarTexto(mensaje);
+  const encontrados = [];
+  
+  // Palabras clave para cada tipo de producto
+  const keywords = {
+    'empanada de jamon y queso': ['jamon y queso', 'jamon queso', 'jamón y queso', 'jamón queso', 'jyq'],
+    'empanada de carne': ['de carne', 'empanada carne'],
+    'empanada de huevo': ['de huevo', 'empanada huevo'],
+    'empanada de mandioca': ['de mandioca', 'empanada mandioca'],
+    'empanada saltena': ['saltena', 'salteña'],
+    'torta de chocolate': ['de chocolate', 'torta chocolate'],
+    'torta de frutilla': ['de frutilla', 'torta frutilla'],
+    'torta de dulce de leche': ['dulce de leche', 'torta dulce'],
+    'chipa': ['chipa', 'chipas'],
+    'mbeju': ['mbeju', 'mbejú'],
+    'sopa paraguaya': ['sopa paraguaya', 'sopa'],
+    'coca cola': ['coca', 'coca cola', 'cocacola'],
+    'fanta': ['fanta'],
+    'sprite': ['sprite'],
+    'agua mineral': ['agua'],
+    'jugo': ['jugo'],
+    'cafe': ['cafe', 'café'],
+    'medialunas': ['medialuna', 'medialunas'],
+    'facturas': ['factura', 'facturas'],
+    'pan': ['pan'],
+    'bocaditos': ['bocadito', 'bocaditos'],
+    'sandwich': ['sandwich', 'sandwiches', 'sanguche'],
+    'flan': ['flan'],
+    'helado': ['helado']
+  };
+  
+  for (const prod of catalogo) {
+    const prodNorm = normalizarTexto(prod.nombre);
+    let matched = false;
+    let matchedKeyword = '';
+    
+    // Buscar por nombre exacto normalizado
+    if (msgNorm.includes(prodNorm)) {
+      matched = true;
+      matchedKeyword = prodNorm;
+    }
+    
+    // Buscar por keywords
+    if (!matched) {
+      const kws = keywords[prodNorm] || [];
+      for (const kw of kws) {
+        const kwNorm = normalizarTexto(kw);
+        if (msgNorm.includes(kwNorm)) {
+          matched = true;
+          matchedKeyword = kwNorm;
+          break;
+        }
+      }
+    }
+    
+    // Buscar palabras clave del nombre del producto (última palabra significativa)
+    if (!matched) {
+      const palabrasProd = prodNorm.split(' ').filter(p => p.length > 3 && !['combo', 'de', 'con', 'empanada', 'torta'].includes(p));
+      for (const palabra of palabrasProd) {
+        if (msgNorm.includes(palabra)) {
+          matched = true;
+          matchedKeyword = palabra;
+          break;
+        }
+      }
+    }
+    
+    if (matched) {
+      // Buscar cantidad - múltiples estrategias
+      let qty = 1;
+      
+      // Estrategia 1: número + "de" + keyword
+      if (matchedKeyword) {
+        const keywordFirst = matchedKeyword.split(' ')[0];
+        const patterns = [
+          new RegExp(`(\\d+)\\s*(?:empanadas?\\s+)?(?:de\\s+)?${keywordFirst}`, 'i'),
+          new RegExp(`(\\d+)\\s+${keywordFirst}`, 'i'),
+        ];
+        for (const p of patterns) {
+          const m = mensaje.toLowerCase().match(p);
+          if (m) { qty = parseInt(m[1]) || 1; break; }
+        }
+      }
+      
+      // Estrategia 2: buscar patrón "N de X" donde X es parte del producto
+      if (qty === 1) {
+        const lastMeaningfulWord = prodNorm.split(' ').filter(p => p.length > 3).pop();
+        if (lastMeaningfulWord) {
+          const m = mensaje.toLowerCase().match(new RegExp(`(\\d+)\\s+(?:de\\s+)?${lastMeaningfulWord}`, 'i'));
+          if (m) qty = parseInt(m[1]) || 1;
+        }
+      }
+      
+      // Estrategia 3: buscar posición del keyword y número antes (ignorando palabras como "empanadas de")
+      if (qty === 1 && matchedKeyword) {
+        const idx = msgNorm.indexOf(matchedKeyword);
+        if (idx > 0) {
+          const antes = msgNorm.substring(Math.max(0, idx - 25), idx);
+          // Buscar número, permitiendo palabras intermedias
+          const numMatch = antes.match(/(\d+)\s*(?:empanadas?\s+)?(?:de\s*)?$/);
+          if (numMatch) qty = parseInt(numMatch[1]) || 1;
+        }
+      }
+      
+      // Estrategia 4: buscar "N empanadas de X" globalmente
+      if (qty === 1) {
+        const globalMatch = mensaje.match(/(\d+)\s*empanadas?\s+de\s+/i);
+        if (globalMatch && encontrados.length === 0) {
+          qty = parseInt(globalMatch[1]) || 1;
+        }
+      }
+      
+      encontrados.push({ prod, qty });
+      log('MATCH', `"${matchedKeyword}" → ${prod.nombre} x${qty}`);
+    }
+  }
+  
+  return encontrados;
+}
+
 async function procesarCarrito(mensaje, state) {
   const msgLower = mensaje.toLowerCase();
   
   // Detectar intención de agregar al carrito
-  const triggers = ['quiero', 'dame', 'agregar', 'añadir', 'poneme', 'agrega'];
+  const triggers = ['quiero', 'dame', 'agregar', 'añadir', 'poneme', 'agrega', 'necesito', 'pedido', 'pedir', 'llevar', 'llevo'];
   if (!triggers.some(t => msgLower.includes(t))) {
     return { handled: false };
   }
   
-  // Buscar productos mencionados
   const catalogo = await loadCatalog();
-  const agregados = [];
+  const encontrados = buscarProductoEnMensaje(mensaje, catalogo);
   
-  for (const prod of catalogo) {
-    const nombreLower = prod.nombre.toLowerCase();
-    if (msgLower.includes(nombreLower)) {
-      // Buscar cantidad
-      const regex = new RegExp(`(\\d+)\\s*(?:x\\s*)?${nombreLower}|${nombreLower}\\s*(?:x\\s*)?(\\d+)?`, 'i');
-      const match = mensaje.match(regex);
-      const qty = parseInt(match?.[1] || match?.[2]) || 1;
-      
-      if (!state.cart[prod.id]) state.cart[prod.id] = { ...prod, qty: 0 };
-      state.cart[prod.id].qty += qty;
-      agregados.push(`${qty}× ${prod.nombre}`);
-    }
+  if (encontrados.length === 0) {
+    return { handled: false };
   }
   
-  if (agregados.length > 0) {
-    const total = Object.values(state.cart).reduce((s, i) => s + i.precio * i.qty, 0);
+  const agregados = [];
+  for (const { prod, qty } of encontrados) {
+    if (!state.cart[prod.id]) {
+      state.cart[prod.id] = { ...prod, qty: 0 };
+    }
+    state.cart[prod.id].qty += qty;
+    agregados.push(`${qty}× ${prod.nombre}`);
+    log('CARRITO', `Agregado: ${qty}× ${prod.nombre}`);
+  }
+  
+  const total = Object.values(state.cart).reduce((s, i) => s + i.precio * i.qty, 0);
+  
+  return { 
+    handled: true, 
+    reply: `✅ Agregué al carrito:\n${agregados.join('\n')}\n\n🛒 **Total: ${toPY(total)} Gs**\n\n¿Algo más?`
+  };
+}
+
+/* ============== COMANDOS DE CARRITO ============== */
+function procesarComandosCarrito(mensaje, state) {
+  const msgLower = mensaje.toLowerCase();
+  
+  // Ver carrito
+  if (msgLower.includes('ver carrito') || msgLower.includes('mi carrito') || msgLower.includes('que tengo') || msgLower.includes('qué tengo') || msgLower.includes('mostrar carrito')) {
+    const items = Object.values(state.cart);
+    if (items.length === 0) {
+      return { handled: true, reply: '🛒 Tu carrito está vacío. ¿Qué te gustaría agregar?' };
+    }
+    
+    const lista = items.map(i => `• ${i.qty}× ${i.nombre} - ${toPY(i.precio * i.qty)} Gs`).join('\n');
+    const total = items.reduce((s, i) => s + i.precio * i.qty, 0);
+    
     return { 
       handled: true, 
-      reply: `Agregué ${agregados.join(', ')} al carrito 🛒\n\nTotal: ${toPY(total)} Gs\n\n¿Algo más?`
+      reply: `🛒 **Tu carrito:**\n${lista}\n\n**Total: ${toPY(total)} Gs**\n\n¿Querés agregar algo más o finalizar el pedido?`
     };
+  }
+  
+  // Vaciar carrito
+  if (msgLower.includes('vaciar carrito') || msgLower.includes('limpiar carrito') || msgLower.includes('borrar carrito')) {
+    state.cart = {};
+    return { handled: true, reply: '🗑️ Carrito vaciado. ¿En qué puedo ayudarte?' };
+  }
+  
+  // Quitar producto
+  if (msgLower.includes('quitar') || msgLower.includes('sacar') || msgLower.includes('eliminar')) {
+    // Por ahora respuesta simple
+    return { handled: true, reply: '¿Qué producto querés quitar del carrito?' };
   }
   
   return { handled: false };
@@ -588,13 +748,19 @@ export default async function handler(req, res) {
     if (cateringResult.handled) {
       reply = cateringResult.reply;
     } else {
-      // 2. Procesar carrito
-      const carritoResult = await procesarCarrito(userMsg, state);
-      if (carritoResult.handled) {
-        reply = carritoResult.reply;
+      // 2. Comandos de carrito (ver, vaciar)
+      const comandoCarrito = procesarComandosCarrito(userMsg, state);
+      if (comandoCarrito.handled) {
+        reply = comandoCarrito.reply;
       } else {
-        // 3. Consulta general con GPT
-        reply = await consultarGPT(userMsg, state);
+        // 3. Agregar al carrito
+        const carritoResult = await procesarCarrito(userMsg, state);
+        if (carritoResult.handled) {
+          reply = carritoResult.reply;
+        } else {
+          // 4. Consulta general con GPT
+          reply = await consultarGPT(userMsg, state);
+        }
       }
     }
     
