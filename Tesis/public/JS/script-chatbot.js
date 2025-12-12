@@ -1,293 +1,280 @@
-/**
- * CHATBOT PANIQUIÑOS - Frontend v3.0
- * - Sincronización con CartAPI
- * - Fix teclado móvil (header siempre visible)
- * - Estilo WhatsApp responsive
- */
+// public/JS/script-chatbot.js (cargar con type="module")
+// Versión 2.1 - Sincronización con CartAPI
 
-const API_URL = "/api/ask";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// ===== ELEMENTOS DOM =====
-const chatContainer = document.getElementById("chat-container");
-const chatBody = document.getElementById("chat-body");
-const chatForm = document.getElementById("chat-form");
-const chatInput = document.getElementById("chat-input");
-const chatToggler = document.getElementById("chatToggler");
-const chatCloseBtn = document.getElementById("chatCloseBtn");
-const chatBackdrop = document.getElementById("chatBackdrop");
+document.addEventListener("DOMContentLoaded", async () => {
+  const chatContainer = document.querySelector(".chat-container");
+  const chatBody       = document.getElementById("chat-body");
+  const chatForm       = document.getElementById("chat-form");
+  const chatInput      = document.getElementById("chat-input");
+  const toggler        = document.querySelector(".chatbot-toggler");
 
-// ===== ESTADO =====
-let chatState = {};
-let isOpen = false;
-let isMobile = window.innerWidth <= 480;
-
-// ===== INICIALIZACIÓN =====
-document.addEventListener("DOMContentLoaded", () => {
-  setupEventListeners();
-  setupMobileKeyboardFix();
-  showWelcomeMessage();
-});
-
-function setupEventListeners() {
-  // Toggle chat
-  chatToggler?.addEventListener("click", toggleChat);
-  chatCloseBtn?.addEventListener("click", closeChat);
-  chatBackdrop?.addEventListener("click", closeChat);
-
-  // Enviar mensaje
-  chatForm?.addEventListener("submit", handleSubmit);
-
-  // Textarea auto-resize
-  chatInput?.addEventListener("input", autoResizeInput);
-
-  // Enter para enviar (desktop), Shift+Enter para nueva línea
-  chatInput?.addEventListener("keydown", handleKeydown);
-
-  // Cerrar con Escape
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && isOpen) closeChat();
-  });
-
-  // Detectar cambio de tamaño
-  window.addEventListener("resize", () => {
-    isMobile = window.innerWidth <= 480;
-  });
-}
-
-// ===== FIX TECLADO MÓVIL =====
-function setupMobileKeyboardFix() {
-  if (!("visualViewport" in window)) return;
-
-  const vv = window.visualViewport;
-
-  function adjustForKeyboard() {
-    if (!isOpen || !isMobile) return;
-
-    // Altura visible actual (sin teclado = altura total, con teclado = altura reducida)
-    const viewportHeight = vv.height;
-
-    // Aplicar altura al contenedor
-    chatContainer.style.height = `${viewportHeight}px`;
-
-    // Scroll al final de los mensajes
-    setTimeout(() => scrollToBottom(), 50);
-  }
-
-  vv.addEventListener("resize", adjustForKeyboard);
-  vv.addEventListener("scroll", adjustForKeyboard);
-
-  // También cuando el input recibe focus
-  chatInput?.addEventListener("focus", () => {
-    if (isMobile) {
-      setTimeout(adjustForKeyboard, 100);
-      setTimeout(adjustForKeyboard, 300);
-    }
-  });
-
-  chatInput?.addEventListener("blur", () => {
-    if (isMobile) {
-      // Restaurar altura completa cuando se cierra el teclado
-      setTimeout(() => {
-        chatContainer.style.height = "";
-        chatContainer.style.height = "100dvh";
-      }, 100);
-    }
-  });
-}
-
-// ===== TOGGLE CHAT =====
-function toggleChat() {
-  isOpen ? closeChat() : openChat();
-}
-
-function openChat() {
-  isOpen = true;
-  chatContainer?.classList.add("open");
-  chatToggler?.classList.add("active");
-  chatBackdrop?.classList.add("active");
-
-  // Focus en input después de animación
-  setTimeout(() => {
-    chatInput?.focus();
-    scrollToBottom();
-  }, 350);
-
-  // Bloquear scroll del body en móvil
-  if (isMobile) {
-    document.body.style.overflow = "hidden";
-  }
-}
-
-function closeChat() {
-  isOpen = false;
-  chatContainer?.classList.remove("open");
-  chatToggler?.classList.remove("active");
-  chatBackdrop?.classList.remove("active");
-
-  // Restaurar scroll del body
-  document.body.style.overflow = "";
-
-  // Restaurar altura
-  if (chatContainer) {
-    chatContainer.style.height = "";
-  }
-}
-
-// ===== MENSAJES =====
-function appendMessage(text, sender) {
-  const msgDiv = document.createElement("div");
-  msgDiv.className = `msg ${sender}`;
-
-  const p = document.createElement("p");
-  p.textContent = text;
-
-  msgDiv.appendChild(p);
-  chatBody?.appendChild(msgDiv);
-
-  scrollToBottom();
-}
-
-function showLoader() {
-  const loader = document.createElement("div");
-  loader.className = "msg bot loading";
-  loader.id = "chat-loader";
-  loader.innerHTML = "<p>Escribiendo...</p>";
-  chatBody?.appendChild(loader);
-  scrollToBottom();
-}
-
-function hideLoader() {
-  document.getElementById("chat-loader")?.remove();
-}
-
-function scrollToBottom() {
-  if (chatBody) {
-    chatBody.scrollTop = chatBody.scrollHeight;
-  }
-}
-
-function showWelcomeMessage() {
-  setTimeout(() => {
-    appendMessage(
-      "¡Hola! 👋 Soy el asistente de Paniquiños.\n\n" +
-        "Puedo ayudarte a:\n" +
-        "• Agregar productos al carrito\n" +
-        "• Agendar un catering\n" +
-        "• Responder tus consultas\n\n" +
-        "¿En qué puedo ayudarte?",
-      "bot"
-    );
-  }, 500);
-}
-
-// ===== AUTO-RESIZE TEXTAREA =====
-function autoResizeInput() {
-  if (!chatInput) return;
-  chatInput.style.height = "auto";
-  const newHeight = Math.min(chatInput.scrollHeight, 84);
-  chatInput.style.height = newHeight + "px";
-}
-
-// ===== MANEJO DE TECLAS =====
-function handleKeydown(e) {
-  if (e.key === "Enter") {
-    // En móvil: Enter = nueva línea (como WhatsApp)
-    // En desktop: Enter = enviar, Shift+Enter = nueva línea
-    if (!isMobile && !e.shiftKey) {
-      e.preventDefault();
-      chatForm?.dispatchEvent(new Event("submit", { cancelable: true }));
-    }
-  }
-}
-
-// ===== ENVÍO DE MENSAJE =====
-async function handleSubmit(e) {
-  e.preventDefault();
-
-  const userMsg = chatInput?.value.trim();
-  if (!userMsg) return;
-
-  // Mostrar mensaje del usuario
-  appendMessage(userMsg, "user");
-  if (chatInput) {
-    chatInput.value = "";
-    chatInput.style.height = "auto";
-  }
-
-  showLoader();
-
-  try {
-    const res = await fetch(API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: userMsg, state: chatState }),
-    });
-
-    const data = await res.json();
-    hideLoader();
-
-    // Actualizar estado
-    if (data.state) {
-      chatState = data.state;
-    }
-
-    // Ejecutar acciones del carrito
-    if (data.action) {
-      await runAction(data.action);
-    }
-
-    // Mostrar respuesta
-    if (data.reply) {
-      appendMessage(data.reply, "bot");
-    }
-  } catch (err) {
-    hideLoader();
-    console.error("Error chatbot:", err);
-    appendMessage("Lo siento, hubo un error. Por favor intentá de nuevo.", "bot");
-  }
-}
-
-// ===== EJECUTAR ACCIONES DEL CARRITO =====
-async function runAction(action) {
-  if (!action || !action.type) return;
-
-  switch (action.type) {
-    case "ADD_TO_CART":
-      if (window.CartAPI?.addById) {
-        await window.CartAPI.addById(action.productId, action.qty || 1);
-        await window.CartAPI.refreshBadge?.();
+  // ===== Estado de la conversación =====
+  const STATE_KEY = "paniq.chat.state.v2";
+  
+  const loadState = () => {
+    try {
+      const stored = sessionStorage.getItem(STATE_KEY);
+      if (!stored) return {};
+      const parsed = JSON.parse(stored);
+      // Validar que el estado no sea muy viejo (más de 30 min)
+      const lastUpdate = parsed._lastUpdate || 0;
+      if (Date.now() - lastUpdate > 30 * 60 * 1000) {
+        sessionStorage.removeItem(STATE_KEY);
+        return {};
       }
-      break;
+      return parsed;
+    } catch {
+      return {};
+    }
+  };
+  
+  const saveState = (s) => {
+    try {
+      s._lastUpdate = Date.now();
+      sessionStorage.setItem(STATE_KEY, JSON.stringify(s || {}));
+    } catch (e) {
+      console.warn("No se pudo guardar el estado:", e);
+    }
+  };
 
-    case "MULTIPLE":
-      if (Array.isArray(action.actions)) {
-        for (const subAction of action.actions) {
-          await runAction(subAction);
+  // ===== UI helpers =====
+  const appendMessage = (text, sender = "bot") => {
+    const msg = document.createElement("div");
+    msg.className = `msg ${sender}`;
+    
+    // Convertir markdown básico a HTML
+    const html = text
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/\n/g, '<br>');
+    
+    msg.innerHTML = `<p>${html}</p>`;
+    chatBody.appendChild(msg);
+    chatBody.scrollTop = chatBody.scrollHeight;
+  };
+
+  const showLoader = () => {
+    const existing = document.getElementById("loader");
+    if (existing) return;
+    
+    const loader = document.createElement("div");
+    loader.id = "loader";
+    loader.className = "msg bot loading";
+    loader.innerHTML = "<p>Escribiendo…</p>";
+    chatBody.appendChild(loader);
+    chatBody.scrollTop = chatBody.scrollHeight;
+  };
+  
+  const hideLoader = () => {
+    const loader = document.getElementById("loader");
+    if (loader) loader.remove();
+  };
+
+  const saludo = () => {
+    const h = new Date().getHours();
+    if (h < 12) return "¡Buenos días! 🌅 Soy el asistente de Paniquiños. ¿Qué te gustaría hoy?";
+    if (h < 19) return "¡Hola! 👋 Soy el asistente de Paniquiños. ¿En qué puedo ayudarte?";
+    return "¡Buenas noches! 🌙 Soy el asistente de Paniquiños. ¿Qué se te antoja?";
+  };
+
+  // ===== Toggle panel =====
+  toggler?.addEventListener("click", () => {
+    chatContainer.classList.toggle("open");
+    toggler.classList.toggle("active");
+    if (chatContainer.classList.contains("open")) {
+      setTimeout(() => chatInput.focus(), 150);
+    }
+  });
+
+  // ===== Mensaje inicial =====
+  const state = loadState();
+  if (!state.history || state.history.length === 0) {
+    appendMessage(saludo(), "bot");
+  } else {
+    // Restaurar historial visible (últimos 6 mensajes)
+    const recent = state.history.slice(-6);
+    recent.forEach(msg => {
+      appendMessage(msg.content, msg.role === "user" ? "user" : "bot");
+    });
+  }
+
+  // ===== Ejecutores de acciones de carrito =====
+  async function runAction(action) {
+    if (!action) return null;
+    
+    // Verificar que CartAPI existe
+    if (!window.CartAPI) {
+      console.warn("⚠️ CartAPI no disponible - el carrito no se actualizará");
+      return null;
+    }
+
+    console.log("🛒 Ejecutando action:", action.type, action);
+
+    try {
+      switch (action.type) {
+        case "ADD_TO_CART": {
+          console.log("➕ Agregando al carrito:", action.product?.titulo, "x", action.qty);
+          await window.CartAPI.addProduct(action.product, action.qty || 1);
+          await window.CartAPI.refreshBadge?.();
+          console.log("✅ Producto agregado correctamente");
+          return null;
+        }
+        
+        case "MULTIPLE": {
+          // Procesar múltiples acciones
+          console.log("📦 Procesando", action.actions?.length, "acciones");
+          for (const subAction of (action.actions || [])) {
+            await runAction(subAction);
+          }
+          return null;
+        }
+        
+        case "EMPTY_CART": {
+          console.log("🗑️ Vaciando carrito");
+          await window.CartAPI.empty?.();
+          await window.CartAPI.refreshBadge?.();
+          return null;
+        }
+        
+        case "REMOVE_FROM_CART": {
+          await window.CartAPI.remove?.({ id: action.product?.id });
+          await window.CartAPI.refreshBadge?.();
+          return null;
+        }
+        
+        case "CATERING_AGENDADO": {
+          // Podrías mostrar una notificación especial o confetti 🎉
+          console.log("✅ Catering agendado:", action.data);
+          return null;
+        }
+        
+        default:
+          console.warn("Action no reconocida:", action.type);
+          return null;
+      }
+    } catch (e) {
+      console.error("❌ Cart action error:", e);
+      return "Hubo un problema con el carrito. Intentá de nuevo.";
+    }
+  }
+
+  // ===== Envío de mensaje =====
+  chatForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const text = chatInput.value.trim();
+    if (!text) return;
+
+    // Deshabilitar input mientras procesa
+    chatInput.disabled = true;
+    const submitBtn = chatForm.querySelector('button[type="submit"]');
+    if (submitBtn) submitBtn.disabled = true;
+
+    appendMessage(text, "user");
+    chatInput.value = "";
+    showLoader();
+
+    try {
+      const currentState = loadState();
+
+      const res = await fetch("/api/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [{ role: "user", content: text }],
+          state: currentState,
+        }),
+      });
+
+      const data = await res.json();
+      hideLoader();
+
+      if (!res.ok) {
+        console.error("HTTP", res.status, data);
+        appendMessage("⚠️ Disculpá, hubo un problema. Intentá de nuevo.", "bot");
+        return;
+      }
+
+      // Ejecutar acciones del carrito si existen
+      if (data.action) {
+        console.log("🎯 Acción recibida del backend:", data.action);
+        const feedback = await runAction(data.action);
+        if (feedback) {
+          appendMessage(feedback, "bot");
         }
       }
-      break;
 
-    case "EMPTY_CART":
-      if (window.CartAPI?.empty) {
-        await window.CartAPI.empty();
-        await window.CartAPI.refreshBadge?.();
+      // Mostrar respuesta del bot
+      if (data.reply) {
+        appendMessage(data.reply, "bot");
       }
-      break;
 
-    default:
-      console.warn("Acción desconocida:", action.type);
-  }
-}
+      // Guardar estado actualizado
+      if (data.state) {
+        saveState(data.state);
+      }
 
-// ===== EXPORTAR PARA USO EXTERNO =====
-window.PaniquinosChat = {
-  open: openChat,
-  close: closeChat,
-  toggle: toggleChat,
-  sendMessage: async (msg) => {
-    if (chatInput) {
-      chatInput.value = msg;
-      chatForm?.dispatchEvent(new Event("submit", { cancelable: true }));
+    } catch (err) {
+      console.error("Chat error:", err);
+      hideLoader();
+      appendMessage("⚠️ No pude conectarme. Verificá tu conexión e intentá de nuevo.", "bot");
+    } finally {
+      // Re-habilitar input
+      chatInput.disabled = false;
+      if (submitBtn) submitBtn.disabled = false;
+      chatInput.focus();
     }
-  },
-};
+  });
+
+  // ===== Enter para enviar =====
+  chatInput?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      chatForm.requestSubmit();
+    }
+  });
+
+  // ===== Sugerencias rápidas =====
+  const suggestions = [
+    "¿Qué empanadas tienen?",
+    "Quiero agendar un catering",
+    "Dame 2 empanadas de carne",
+    "¿Cuál es el horario?"
+  ];
+
+  function showSuggestions() {
+    // Evitar mostrar si ya hay sugerencias
+    if (chatBody.querySelector('.suggestions')) return;
+    
+    const suggDiv = document.createElement("div");
+    suggDiv.className = "suggestions";
+    suggDiv.innerHTML = suggestions
+      .map(s => `<button class="suggestion-btn">${s}</button>`)
+      .join("");
+    chatBody.appendChild(suggDiv);
+    chatBody.scrollTop = chatBody.scrollHeight;
+    
+    suggDiv.querySelectorAll(".suggestion-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        chatInput.value = btn.textContent;
+        chatForm.requestSubmit();
+        suggDiv.remove();
+      });
+    });
+  }
+
+  // Mostrar sugerencias al inicio si no hay historial
+  if (!state.history || state.history.length === 0) {
+    setTimeout(showSuggestions, 800);
+  }
+  
+  // ===== Botón para limpiar chat =====
+  // Podrías agregar un botón en el header del chat que llame a esto
+  window.clearChatHistory = () => {
+    sessionStorage.removeItem(STATE_KEY);
+    chatBody.innerHTML = '';
+    appendMessage(saludo(), "bot");
+    setTimeout(showSuggestions, 500);
+  };
+});
