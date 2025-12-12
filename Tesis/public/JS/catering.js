@@ -10,6 +10,7 @@ let currentFilter = 'all';
 let selectedId = null;
 let isEditMode = false;
 
+
 /* ========= Elementos del DOM ========= */
 const elements = {
   // Tabla y contenedores
