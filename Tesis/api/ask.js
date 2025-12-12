@@ -1,5 +1,12 @@
 // /api/ask.js
-// ==================== API CHATBOT CON TRACKING ANALYTICS ====================
+// ==================== API CHATBOT OPTIMIZADA v2.0 ====================
+// Cambios principales:
+// 1. Migración de 'functions' a 'tools' con parallel_tool_calls
+// 2. Nueva función para actualizar datos de catering parciales
+// 3. Mejor manejo del estado conversacional
+// 4. Prompt mejorado para evitar preguntas repetidas
+// =====================================================================
+
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
 
@@ -34,15 +41,19 @@ function parseFechaNatural(texto) {
   // Si ya está en formato YYYY-MM-DD, retornar tal cual
   if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
   
-  // Mapeo de meses en español
   const meses = {
     'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04',
     'mayo': '05', 'junio': '06', 'julio': '07', 'agosto': '08',
     'septiembre': '09', 'setiembre': '09', 'octubre': '10', 'noviembre': '11', 'diciembre': '12'
   };
   
-  // Patrón: "15 de diciembre" o "15 diciembre" o "15/12" o "15-12"
   let dia = null, mes = null, anio = null;
+  
+  // Patrón: dd/mm/yyyy o dd-mm-yyyy
+  const matchFull = str.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](20\d{2})\b/);
+  if (matchFull) {
+    return `${matchFull[3]}-${matchFull[2].padStart(2, '0')}-${matchFull[1].padStart(2, '0')}`;
+  }
   
   // Buscar día (1-31)
   const matchDia = str.match(/\b(\d{1,2})\b/);
@@ -62,30 +73,25 @@ function parseFechaNatural(texto) {
     if (matchMes) mes = matchMes[1].padStart(2, '0');
   }
   
-  // Buscar año explícito (2024, 2025, etc)
+  // Buscar año explícito (2024, 2025, 2026, etc)
   const matchAnio = str.match(/\b(20\d{2})\b/);
   if (matchAnio) {
     anio = matchAnio[1];
   } else {
-    // Si no hay año, determinar si es este año o el siguiente
     const ahora = new Date();
     const anioActual = ahora.getFullYear();
     const mesActual = ahora.getMonth() + 1;
     const diaActual = ahora.getDate();
     
     if (mes && parseInt(mes) < mesActual) {
-      // Si el mes ya pasó, es el año siguiente
       anio = String(anioActual + 1);
     } else if (mes && parseInt(mes) === mesActual && dia && parseInt(dia) < diaActual) {
-      // Si es el mismo mes pero el día ya pasó, es el año siguiente
       anio = String(anioActual + 1);
     } else {
-      // En cualquier otro caso, es este año
       anio = String(anioActual);
     }
   }
   
-  // Validar que tengamos día y mes
   if (!dia || !mes) return null;
   
   return `${anio}-${mes}-${dia}`;
@@ -96,7 +102,7 @@ function parseHoraNatural(texto) {
   
   const str = texto.toLowerCase().trim();
   
-  // Si ya está en formato HH:MM, retornar tal cual
+  // Si ya está en formato HH:MM, retornar normalizado
   if (/^\d{1,2}:\d{2}$/.test(str)) {
     const parts = str.split(':');
     return `${parts[0].padStart(2, '0')}:${parts[1]}`;
@@ -104,15 +110,12 @@ function parseHoraNatural(texto) {
   
   let hora = null;
   
-  // Patrones comunes
-  // "17 horas", "17 hs", "5 de la tarde", "5 de la mañana"
-  
   // Buscar número de hora
   const matchHora = str.match(/\b(\d{1,2})\b/);
   if (matchHora) {
     hora = parseInt(matchHora[1]);
     
-    // Ajustar por AM/PM
+    // Ajustar por AM/PM / tarde / noche
     if (str.includes('tarde') || str.includes('pm')) {
       if (hora < 12) hora += 12;
     } else if (str.includes('mañana') || str.includes('am')) {
@@ -125,7 +128,6 @@ function parseHoraNatural(texto) {
     const matchMinutos = str.match(/(\d{1,2})\s*:\s*(\d{2})/);
     const minutos = matchMinutos ? matchMinutos[2] : '00';
     
-    // Formato con :00 por defecto
     return `${String(hora).padStart(2, '0')}:${minutos}`;
   }
   
@@ -161,16 +163,6 @@ async function loadCatalog() {
 }
 
 /* ============== Funciones de búsqueda de productos ============== */
-async function buscarProductosPorCategoria(categoria) {
-  const items = await loadCatalog();
-  const catNorm = norm(categoria);
-  
-  return items.filter(p => 
-    norm(p.categoria).includes(catNorm) ||
-    norm(p.nombre).includes(catNorm)
-  );
-}
-
 async function buscarProductoPorNombre(nombre) {
   const items = await loadCatalog();
   const nombreNorm = norm(nombre);
@@ -186,182 +178,496 @@ async function buscarProductoPorNombre(nombre) {
     );
   }
   
+  // Búsqueda más flexible (palabras clave)
+  if (!producto) {
+    const palabras = nombreNorm.split(' ').filter(p => p.length > 2);
+    producto = items.find(p => {
+      const pNorm = norm(p.nombre);
+      return palabras.some(palabra => pNorm.includes(palabra));
+    });
+  }
+  
   return producto || null;
 }
 
-/* ============== Sistema de memoria conversacional ============== */
+/* ============== Sistema de estado conversacional ============== */
 function initState(state) {
   return {
     history: state?.history || [],
     cart: state?.cart || {},
-    lastCategory: state?.lastCategory || null,
     sessionId: state?.sessionId || `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-    cateringData: state?.cateringData || {
-      enProgreso: false,
-      razonsocial: null,
-      tipoevento: null,
-      fecha: null,
-      hora: null,
-      tipocomida: null,
-      lugar: null,
-      invitados: null,
-      telefono: null,
-      email: null
+    // Estado de catering con valores explícitos
+    catering: {
+      activo: state?.catering?.activo || false,
+      razonsocial: state?.catering?.razonsocial || null,
+      tipoevento: state?.catering?.tipoevento || null,
+      fecha: state?.catering?.fecha || null,
+      hora: state?.catering?.hora || null,
+      tipocomida: state?.catering?.tipocomida || null,
+      lugar: state?.catering?.lugar || null,
+      invitados: state?.catering?.invitados || null,
+      telefono: state?.catering?.telefono || null,
+      email: state?.catering?.email || null,
     },
   };
 }
 
 function addToHistory(state, role, content) {
   state.history.push({ role, content, timestamp: Date.now() });
-  // Mantener solo últimos 10 mensajes
-  if (state.history.length > 10) {
-    state.history = state.history.slice(-10);
+  // Mantener solo últimos 12 mensajes para mejor contexto
+  if (state.history.length > 12) {
+    state.history = state.history.slice(-12);
   }
 }
 
 /* ============== Construcción del contexto para GPT ============== */
-async function buildContextForGPT(userMsg, state) {
-  // Obtener catálogo completo
+async function buildContextForGPT(state) {
   const catalogo = await loadCatalog();
   
   // Crear resumen del catálogo por categoría
   const categorias = {};
   catalogo.forEach(p => {
     if (!categorias[p.categoria]) categorias[p.categoria] = [];
-    categorias[p.categoria].push({
-      nombre: p.nombre,
-      precio: p.precio
-    });
+    categorias[p.categoria].push({ nombre: p.nombre, precio: p.precio });
   });
   
   const catalogoTexto = Object.entries(categorias)
     .map(([cat, prods]) => {
-      const lista = prods.map(p => 
-        `- ${p.nombre}: ${toPY(p.precio)} Gs`
-      ).join('\n');
+      const lista = prods.map(p => `- ${p.nombre}: ${toPY(p.precio)} Gs`).join('\n');
       return `**${cat}**:\n${lista}`;
     })
     .join('\n\n');
   
-  // Crear contexto del carrito
+  // Carrito
   const carritoItems = Object.values(state.cart);
   const carritoTexto = carritoItems.length > 0
-    ? carritoItems.map(item => 
-        `- ${item.qty}× ${item.nombre} (${toPY(item.precio)} Gs c/u)`
-      ).join('\n')
+    ? carritoItems.map(item => `- ${item.qty}× ${item.nombre} (${toPY(item.precio)} Gs c/u)`).join('\n')
     : 'Carrito vacío';
   
-  const total = carritoItems.reduce((sum, item) => 
-    sum + (item.precio * item.qty), 0
-  );
+  const total = carritoItems.reduce((sum, item) => sum + (item.precio * item.qty), 0);
 
-  // Contexto de catering en progreso
-  const cateringInfo = state.cateringData?.enProgreso ? 
-    `\n\n**CATERING EN PROGRESO:**
-Datos recopilados hasta ahora:
-${state.cateringData.razonsocial ? `- Nombre: ${state.cateringData.razonsocial}` : '- Nombre: FALTA'}
-${state.cateringData.tipoevento ? `- Tipo evento: ${state.cateringData.tipoevento}` : '- Tipo evento: FALTA'}
-${state.cateringData.fecha ? `- Fecha: ${state.cateringData.fecha}` : '- Fecha: FALTA'}
-${state.cateringData.hora ? `- Hora: ${state.cateringData.hora}` : '- Hora: FALTA'}
-${state.cateringData.tipocomida ? `- Menú: ${state.cateringData.tipocomida}` : '- Menú: FALTA'}
-${state.cateringData.lugar ? `- Lugar: ${state.cateringData.lugar}` : '- Lugar: FALTA'}
-${state.cateringData.invitados ? `- Invitados: ${state.cateringData.invitados}` : ''}
-${state.cateringData.telefono ? `- Teléfono: ${state.cateringData.telefono}` : ''}
-${state.cateringData.email ? `- Email: ${state.cateringData.email}` : ''}
-
-SOLO preguntá por los datos que dicen "FALTA". Si ya están completos los obligatorios, agendá automáticamente.`
-    : '';
+  // Estado de catering en progreso
+  const cat = state.catering;
+  let cateringInfo = '';
   
-  return {
-    catalogo: catalogoTexto,
-    carrito: carritoTexto,
-    total: toPY(total),
-    totalNumerico: total,
-    cateringInfo
-  };
+  if (cat.activo) {
+    const campos = [
+      { key: 'razonsocial', label: 'Nombre', valor: cat.razonsocial },
+      { key: 'tipoevento', label: 'Tipo evento', valor: cat.tipoevento },
+      { key: 'fecha', label: 'Fecha', valor: cat.fecha },
+      { key: 'hora', label: 'Hora', valor: cat.hora },
+      { key: 'tipocomida', label: 'Menú', valor: cat.tipocomida },
+      { key: 'lugar', label: 'Lugar', valor: cat.lugar },
+      { key: 'invitados', label: 'Invitados', valor: cat.invitados, opcional: true },
+      { key: 'telefono', label: 'Teléfono', valor: cat.telefono, opcional: true },
+      { key: 'email', label: 'Email', valor: cat.email, opcional: true },
+    ];
+    
+    const obligatorios = campos.filter(c => !c.opcional);
+    const opcionales = campos.filter(c => c.opcional);
+    const faltantes = obligatorios.filter(c => !c.valor);
+    const completados = campos.filter(c => c.valor);
+    
+    cateringInfo = `
+**🎉 CATERING EN PROGRESO - DATOS ACTUALES:**
+${completados.map(c => `✅ ${c.label}: ${c.valor}`).join('\n')}
+${faltantes.length > 0 ? `\n**DATOS QUE FALTAN (obligatorios):**\n${faltantes.map(c => `❌ ${c.label}`).join('\n')}` : ''}
+
+**INSTRUCCIÓN CRÍTICA:** 
+- Los datos marcados con ✅ YA LOS TENÉS, NO los vuelvas a preguntar.
+- Solo preguntá por los datos que faltan (❌).
+- Cuando tengas TODOS los obligatorios (nombre, tipo evento, fecha, hora, menú, lugar), llamá a agendar_catering.
+- Los opcionales (invitados, teléfono, email) solo preguntá UNA VEZ al final si el usuario quiere agregarlos.`;
+  }
+  
+  return { catalogo: catalogoTexto, carrito: carritoTexto, total: toPY(total), totalNumerico: total, cateringInfo };
 }
 
 /* ============== Sistema de prompt para GPT ============== */
-function buildSystemPrompt(context) {
-  return `Sos el asistente virtual de Paniquiños, una panadería y confitería. Tu objetivo es ayudar a los clientes de forma natural, amigable y eficiente.
+function buildSystemPrompt(context, state) {
+  const fechaHoy = new Date().toLocaleDateString('es-PY', { 
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+  });
+  
+  return `Sos el asistente virtual de Paniquiños, una panadería y confitería en Asunción, Paraguay.
+Fecha actual: ${fechaHoy}
 
 **INFORMACIÓN DE LA TIENDA:**
-📍 **Ubicación:** Asunción, Paraguay
-⏰ **Horarios:**
-   - Lunes a Viernes: 8:00 AM a 6:00 PM
-   - Sábados y Domingos: 8:00 AM a 1:00 PM
-🚚 **Delivery:** Disponible en Asunción y Gran Asunción
-📱 **WhatsApp:** +595 992 544 305
+📍 Ubicación: Asunción, Paraguay
+⏰ Horarios: Lun-Vie 8:00-18:00, Sáb-Dom 8:00-13:00
+🚚 Delivery: Asunción y Gran Asunción
+📱 WhatsApp: +595 992 544 305
 
-🎉 **SERVICIO DE CATERING:**
-Paniquiños ofrece servicio de catering para eventos. Podés agendar directamente desde el chat.
-**Datos necesarios para agendar:**
-- Nombre del cliente/empresa (razonsocial)
-- Tipo de evento (cumpleaños, boda, corporativo, etc.)
-- Fecha del evento (acepta formato natural: "15 de diciembre", "15/12", etc.)
-- Hora del evento (acepta formato natural: "17:00", "5 de la tarde", "17 horas")
-- Tipo de comida/menú deseado
-- Lugar del evento (dirección completa)
-- Número de invitados (opcional)
-- Teléfono de contacto (opcional)
-- Email (opcional)
-
-**IMPORTANTE sobre CATERING:**
-- Los productos mencionados para catering NO se agregan al carrito
-- El catering se agenda en la base de datos y luego el cliente coordina detalles y pago por WhatsApp
-- Aceptá fechas en formato paraguayo: "15 de diciembre", "15/12/2024", etc.
-- Aceptá horas en formato paraguayo: "5 de la tarde", "17 horas", "17:00"
-- Si el cliente pide productos para catering (ej: "Quiero Combo 1 para el catering"), anotá eso en "tipocomida" pero NO lo agregues al carrito
-- Solo agregá productos al carrito si el cliente dice explícitamente "agregá al carrito" o "quiero comprar ahora"
-
-Cuando el cliente mencione catering o eventos, recopilá los datos de forma conversacional y natural.
-
-**CATÁLOGO DISPONIBLE:**
+**CATÁLOGO:**
 ${context.catalogo}
 
-**CARRITO ACTUAL DEL CLIENTE:**
+**CARRITO ACTUAL:**
 ${context.carrito}
-**Total actual:** ${context.total} Gs
-${context.cateringInfo || ''}
+**Total:** ${context.total} Gs
+${context.cateringInfo}
 
-**INSTRUCCIONES:**
-1. Cuando te pregunten por productos o categorías, menciona SIEMPRE los nombres exactos y precios del catálogo
-2. Si preguntan "¿Tienen empanadas?" → Lista los tipos de empanadas con sus precios
-3. Si piden agregar algo, identifica el producto EXACTO del catálogo y responde confirmando
-4. **CATERING - Recopilación natural:**
-   - Cuando el usuario mencione catering, preguntá los datos UNO POR UNO
-   - IMPORTANTE: Una vez que el usuario te dé un dato (fecha, hora, etc), YA LO TENÉS. No lo vuelvas a pedir.
-   - Cuando el usuario responda con un dato, ese dato ya está en tu memoria de conversación
-   - Cuando tengas TODOS los datos obligatorios (nombre, tipo evento, fecha, hora, menú, lugar), llamá a la función agendar_catering INMEDIATAMENTE
-   - Los datos opcionales (invitados, teléfono, email) solo preguntá si el usuario quiere agregarlos
-   - Formato de fechas: Aceptá "15 de diciembre", "15/12", etc. (el sistema los convierte automáticamente)
-   - Formato de horas: Aceptá "17:00", "5 de la tarde", "17 horas" (el sistema los convierte automáticamente)
-   - Si mencionan productos para el catering, eso es parte del "menú" (NO va al carrito)
-5. Cuando pregunten por el total, calcula sumando todo el carrito
-6. Si piden quitar algo, confirma qué se quitó y el nuevo total
-7. Si preguntan por horarios, delivery o contacto, usa la información de la tienda
-8. Sé conversacional pero preciso: usa los datos reales
-9. Usa formato claro cuando listes productos:
-    - Nombre: Precio Gs
-10. NUNCA inventes productos, precios o información de la tienda
-11. Mantén respuestas cortas (2-4 líneas) salvo que listen varios productos o estés en medio de agendar catering
+**REGLAS CRÍTICAS:**
 
-**ESTILO:**
-- Amigable y cercano (vos argentino/paraguayo)
-- Natural, como un mozo/a atento
-- Emojis ocasionales (🍰 🥐 😊 🎉)
-- Directo y útil`;
+1. **AGREGAR PRODUCTOS:**
+   - Si el usuario pide VARIOS productos en un mensaje, usá la función agregar_multiples_al_carrito.
+   - Ejemplo: "dame 2 empanadas de carne y 1 flan" → usar agregar_multiples_al_carrito con array de productos.
+   - NUNCA agregues solo 1 si pidieron varios.
+
+2. **CATERING - MEMORIA PERFECTA:**
+   - JAMÁS preguntes por un dato que ya tenés (marcado con ✅ arriba).
+   - Si el usuario dice "ya te di ese dato", revisá el contexto y usá el dato que ya tenés.
+   - Preguntá los datos UNO POR UNO en este orden: nombre → tipo evento → fecha → hora → menú → lugar.
+   - Una vez que tengas los 6 obligatorios, preguntá UNA SOLA VEZ si quiere agregar opcionales (invitados/teléfono/email).
+   - Si dice "no" o similar, agendá inmediatamente.
+
+3. **INTERPRETACIÓN DE FECHAS/HORAS:**
+   - "26 de diciembre del 2025" → fecha: "26 de diciembre del 2025"
+   - "7 de la tarde" o "19 horas" → hora: "19:00"
+   - El sistema convierte automáticamente, solo pasá el texto.
+
+4. **ESTILO:**
+   - Amigable y conciso (2-4 líneas máximo).
+   - Emojis ocasionales (🍰 🥐 😊 🎉).
+   - NUNCA inventes productos ni precios.
+   - Si no encontrás un producto, ofrecé alternativas del catálogo.
+
+5. **NO HAGAS:**
+   - NO repitas preguntas.
+   - NO muestres resúmenes largos a menos que el usuario lo pida.
+   - NO uses datos de conversaciones anteriores (cada sesión es independiente).`;
 }
 
-/* ============== Procesamiento de intención con GPT ============== */
-async function processWithGPT(userMsg, state) {
-  const context = await buildContextForGPT(userMsg, state);
-  const systemPrompt = buildSystemPrompt(context);
+/* ============== Definición de herramientas (tools) ============== */
+const TOOLS = [
+  {
+    type: "function",
+    function: {
+      name: "agregar_al_carrito",
+      description: "Agregar UN producto al carrito. Usar solo cuando el usuario pide 1 solo producto.",
+      parameters: {
+        type: "object",
+        properties: {
+          producto: { type: "string", description: "Nombre exacto del producto del catálogo" },
+          cantidad: { type: "number", description: "Cantidad a agregar (default 1)" }
+        },
+        required: ["producto"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "agregar_multiples_al_carrito",
+      description: "Agregar VARIOS productos al carrito en una sola operación. USAR cuando el usuario pide más de un producto diferente.",
+      parameters: {
+        type: "object",
+        properties: {
+          productos: {
+            type: "array",
+            description: "Lista de productos a agregar",
+            items: {
+              type: "object",
+              properties: {
+                producto: { type: "string", description: "Nombre del producto" },
+                cantidad: { type: "number", description: "Cantidad" }
+              },
+              required: ["producto", "cantidad"]
+            }
+          }
+        },
+        required: ["productos"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "quitar_del_carrito",
+      description: "Quitar productos del carrito",
+      parameters: {
+        type: "object",
+        properties: {
+          producto: { type: "string", description: "Nombre del producto a quitar" },
+          cantidad: { type: "number", description: "Cantidad a quitar" }
+        },
+        required: ["producto"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "actualizar_catering",
+      description: "Actualizar datos parciales del catering en progreso. Usar cada vez que el usuario proporciona un dato nuevo.",
+      parameters: {
+        type: "object",
+        properties: {
+          razonsocial: { type: "string", description: "Nombre del cliente o empresa" },
+          tipoevento: { type: "string", description: "Tipo de evento (cumpleaños, boda, corporativo)" },
+          fecha: { type: "string", description: "Fecha en formato natural (ej: '26 de diciembre del 2025')" },
+          hora: { type: "string", description: "Hora en formato natural (ej: '7 de la tarde', '19:00')" },
+          tipocomida: { type: "string", description: "Menú o tipo de comida" },
+          lugar: { type: "string", description: "Dirección del evento" },
+          invitados: { type: "number", description: "Número de invitados (opcional)" },
+          telefono: { type: "string", description: "Teléfono de contacto (opcional)" },
+          email: { type: "string", description: "Email de contacto (opcional)" }
+        }
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "agendar_catering",
+      description: "Agendar el servicio de catering. SOLO usar cuando se tienen TODOS los datos obligatorios: razonsocial, tipoevento, fecha, hora, tipocomida, lugar.",
+      parameters: {
+        type: "object",
+        properties: {
+          razonsocial: { type: "string" },
+          tipoevento: { type: "string" },
+          fecha: { type: "string" },
+          hora: { type: "string" },
+          tipocomida: { type: "string" },
+          lugar: { type: "string" },
+          invitados: { type: "number" },
+          telefono: { type: "string" },
+          email: { type: "string" }
+        },
+        required: ["razonsocial", "tipoevento", "fecha", "hora", "tipocomida", "lugar"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "iniciar_catering",
+      description: "Iniciar el proceso de agendamiento de catering cuando el usuario menciona que quiere reservar/agendar un servicio para evento.",
+      parameters: {
+        type: "object",
+        properties: {
+          tipoevento: { type: "string", description: "Si el usuario ya mencionó el tipo de evento" }
+        }
+      }
+    }
+  }
+];
+
+/* ============== Procesamiento de tool calls ============== */
+async function processToolCall(toolCall, state) {
+  const name = toolCall.function.name;
+  const args = JSON.parse(toolCall.function.arguments || '{}');
   
-  // Construir historial para GPT
+  console.log(`[TOOL] ${name}:`, args);
+  
+  switch (name) {
+    case "agregar_al_carrito": {
+      const prod = await buscarProductoPorNombre(args.producto);
+      if (prod) {
+        const qty = Math.max(1, parseInt(args.cantidad) || 1);
+        if (!state.cart[prod.id]) {
+          state.cart[prod.id] = { ...prod, qty: 0 };
+        }
+        state.cart[prod.id].qty += qty;
+        return {
+          success: true,
+          message: `Agregué ${qty}× ${prod.nombre} al carrito 🛒`,
+          action: { type: "ADD_TO_CART", product: prod, qty }
+        };
+      }
+      return { success: false, message: `No encontré "${args.producto}" en el catálogo.` };
+    }
+    
+    case "agregar_multiples_al_carrito": {
+      const resultados = [];
+      const acciones = [];
+      
+      for (const item of (args.productos || [])) {
+        const prod = await buscarProductoPorNombre(item.producto);
+        if (prod) {
+          const qty = Math.max(1, parseInt(item.cantidad) || 1);
+          if (!state.cart[prod.id]) {
+            state.cart[prod.id] = { ...prod, qty: 0 };
+          }
+          state.cart[prod.id].qty += qty;
+          resultados.push(`${qty}× ${prod.nombre}`);
+          acciones.push({ type: "ADD_TO_CART", product: prod, qty });
+        } else {
+          resultados.push(`❌ "${item.producto}" no encontrado`);
+        }
+      }
+      
+      return {
+        success: true,
+        message: `Agregué al carrito: ${resultados.join(', ')} 🛒`,
+        actions: acciones
+      };
+    }
+    
+    case "quitar_del_carrito": {
+      const prod = await buscarProductoPorNombre(args.producto);
+      if (prod && state.cart[prod.id]) {
+        const qty = Math.max(1, parseInt(args.cantidad) || 1);
+        state.cart[prod.id].qty -= qty;
+        if (state.cart[prod.id].qty <= 0) {
+          delete state.cart[prod.id];
+        }
+        const items = Object.values(state.cart);
+        const newTotal = items.reduce((sum, item) => sum + (item.precio * item.qty), 0);
+        return {
+          success: true,
+          message: `Quité ${qty}× ${prod.nombre}. Nuevo total: ${toPY(newTotal)} Gs`,
+          action: { type: "REMOVE_FROM_CART", product: prod, qty }
+        };
+      }
+      return { success: false, message: "Ese producto no está en tu carrito." };
+    }
+    
+    case "iniciar_catering": {
+      state.catering.activo = true;
+      if (args.tipoevento) {
+        state.catering.tipoevento = args.tipoevento;
+      }
+      return {
+        success: true,
+        message: "CATERING_INICIADO",
+        continueConversation: true
+      };
+    }
+    
+    case "actualizar_catering": {
+      state.catering.activo = true;
+      
+      // Actualizar solo los campos proporcionados
+      if (args.razonsocial) state.catering.razonsocial = args.razonsocial;
+      if (args.tipoevento) state.catering.tipoevento = args.tipoevento;
+      if (args.fecha) state.catering.fecha = args.fecha;
+      if (args.hora) state.catering.hora = args.hora;
+      if (args.tipocomida) state.catering.tipocomida = args.tipocomida;
+      if (args.lugar) state.catering.lugar = args.lugar;
+      if (args.invitados) state.catering.invitados = args.invitados;
+      if (args.telefono) state.catering.telefono = args.telefono;
+      if (args.email) state.catering.email = args.email;
+      
+      // Verificar qué falta
+      const cat = state.catering;
+      const obligatorios = ['razonsocial', 'tipoevento', 'fecha', 'hora', 'tipocomida', 'lugar'];
+      const faltantes = obligatorios.filter(k => !cat[k]);
+      
+      return {
+        success: true,
+        message: "DATOS_ACTUALIZADOS",
+        faltantes: faltantes,
+        continueConversation: true
+      };
+    }
+    
+    case "agendar_catering": {
+      try {
+        // Usar datos del estado si no vienen en args
+        const cat = state.catering;
+        const datos = {
+          razonsocial: args.razonsocial || cat.razonsocial,
+          tipoevento: args.tipoevento || cat.tipoevento,
+          fecha: args.fecha || cat.fecha,
+          hora: args.hora || cat.hora,
+          tipocomida: args.tipocomida || cat.tipocomida,
+          lugar: args.lugar || cat.lugar,
+          invitados: args.invitados || cat.invitados,
+          telefono: args.telefono || cat.telefono,
+          email: args.email || cat.email,
+        };
+        
+        console.log('[CATERING] Datos finales:', datos);
+        
+        // Normalizar fecha y hora
+        const fechaNormalizada = parseFechaNatural(datos.fecha);
+        const horaNormalizada = parseHoraNatural(datos.hora);
+        
+        console.log('[CATERING] Normalizado:', { fecha: fechaNormalizada, hora: horaNormalizada });
+        
+        if (!fechaNormalizada) {
+          return { success: false, message: `No entendí la fecha "${datos.fecha}". ¿Podés decirla como "26 de diciembre" o "26/12/2025"?` };
+        }
+        
+        if (!horaNormalizada) {
+          return { success: false, message: `No entendí la hora "${datos.hora}". ¿Podés decirla como "19:00" o "7 de la tarde"?` };
+        }
+        
+        // Llamar a la función RPC
+        const { data, error } = await supa.rpc("catering_agendar", {
+          p_razonsocial: datos.razonsocial,
+          p_tipoevento: datos.tipoevento,
+          p_fecha: fechaNormalizada,
+          p_hora: horaNormalizada,
+          p_tipocomida: datos.tipocomida,
+          p_lugar: datos.lugar,
+          p_ruc: 'CHAT-BOT',
+          p_observaciones: null,
+          p_invitados: datos.invitados ? parseInt(datos.invitados) : null,
+          p_telefono: datos.telefono || null,
+          p_email: datos.email || null
+        });
+
+        if (error) {
+          console.error('[CATERING] Error:', error);
+          if (error.message.includes('Cupo lleno') || error.message.includes('cupo')) {
+            return { 
+              success: false, 
+              message: `❌ ${error.message}\n\n¿Querés probar con otra fecha? Los fines de semana tenemos más disponibilidad.` 
+            };
+          }
+          return { success: false, message: `Error: ${error.message}` };
+        }
+
+        console.log('[CATERING] Éxito:', data);
+
+        // Limpiar estado de catering
+        state.catering = {
+          activo: false,
+          razonsocial: null, tipoevento: null, fecha: null, hora: null,
+          tipocomida: null, lugar: null, invitados: null, telefono: null, email: null
+        };
+
+        // Construir resumen
+        let resumen = `🎉 ¡Perfecto! Tu catering está pre-agendado.\n\n📋 **Resumen:**\n- Evento: ${datos.tipoevento}\n- Fecha: ${fechaNormalizada}\n- Hora: ${horaNormalizada}\n- Lugar: ${datos.lugar}\n- Menú: ${datos.tipocomida}`;
+        
+        if (datos.invitados) resumen += `\n- Invitados: ${datos.invitados}`;
+        if (datos.telefono) resumen += `\n- Teléfono: ${datos.telefono}`;
+        if (datos.email) resumen += `\n- Email: ${datos.email}`;
+        
+        resumen += `\n\n📱 **Siguiente paso:**\nContactanos por WhatsApp al **+595 992 544 305** para confirmar disponibilidad y coordinar detalles.\n\n¡Gracias por elegirnos! 😊`;
+
+        return {
+          success: true,
+          message: resumen,
+          action: { type: "CATERING_AGENDADO", data }
+        };
+
+      } catch (err) {
+        console.error("[CATERING] Error catch:", err);
+        return { success: false, message: `Error técnico. Por favor contactanos por WhatsApp: +595 992 544 305` };
+      }
+    }
+    
+    default:
+      return { success: false, message: "Función no reconocida." };
+  }
+}
+
+/* ============== Procesamiento principal con GPT ============== */
+async function processWithGPT(userMsg, state) {
+  const context = await buildContextForGPT(state);
+  const systemPrompt = buildSystemPrompt(context, state);
+  
+  // Construir historial limpio (solo últimos mensajes relevantes)
+  const cleanHistory = state.history.slice(-8).map(h => ({
+    role: h.role,
+    content: h.content
+  }));
+  
   const messages = [
     { role: "system", content: systemPrompt },
-    ...state.history.slice(-6), // Últimos 6 mensajes
+    ...cleanHistory,
     { role: "user", content: userMsg }
   ];
   
@@ -370,252 +676,92 @@ async function processWithGPT(userMsg, state) {
       model: "gpt-4o-mini",
       temperature: 0.7,
       messages,
-      functions: [
-        {
-          name: "agregar_al_carrito",
-          description: "Agregar productos al carrito del cliente",
-          parameters: {
-            type: "object",
-            properties: {
-              producto: { type: "string", description: "Nombre exacto del producto" },
-              cantidad: { type: "number", description: "Cantidad a agregar" }
-            },
-            required: ["producto", "cantidad"]
-          }
-        },
-        {
-          name: "quitar_del_carrito",
-          description: "Quitar productos del carrito",
-          parameters: {
-            type: "object",
-            properties: {
-              producto: { type: "string", description: "Nombre exacto del producto" },
-              cantidad: { type: "number", description: "Cantidad a quitar" }
-            },
-            required: ["producto", "cantidad"]
-          }
-        },
-        {
-          name: "mostrar_total",
-          description: "Mostrar el total del carrito",
-          parameters: { type: "object", properties: {} }
-        },
-        {
-          name: "agendar_catering",
-          description: "Agendar un servicio de catering para eventos. Solo usar cuando se tengan TODOS los datos obligatorios.",
-          parameters: {
-            type: "object",
-            properties: {
-              razonsocial: { 
-                type: "string", 
-                description: "Nombre del cliente o empresa" 
-              },
-              tipoevento: { 
-                type: "string", 
-                description: "Tipo de evento (cumpleaños, boda, corporativo, etc.)" 
-              },
-              fecha: { 
-                type: "string", 
-                description: "Fecha del evento. Puede ser en formato natural como '15 de diciembre' o '15/12/2024'" 
-              },
-              hora: { 
-                type: "string", 
-                description: "Hora del evento. Puede ser en formato natural como '17:00', '5 de la tarde', '17 horas'" 
-              },
-              tipocomida: { 
-                type: "string", 
-                description: "Tipo de comida o menú solicitado" 
-              },
-              lugar: { 
-                type: "string", 
-                description: "Dirección o lugar del evento" 
-              },
-              invitados: { 
-                type: "number", 
-                description: "Número de invitados (opcional)" 
-              },
-              telefono: { 
-                type: "string", 
-                description: "Teléfono de contacto (opcional)" 
-              },
-              email: { 
-                type: "string", 
-                description: "Email de contacto (opcional)" 
-              }
-            },
-            required: ["razonsocial", "tipoevento", "fecha", "hora", "tipocomida", "lugar"]
-          }
-        }
-      ]
+      tools: TOOLS,
+      tool_choice: "auto",
+      parallel_tool_calls: true // Permite múltiples llamadas de herramientas
     });
     
     const choice = completion.choices[0];
+    const message = choice.message;
     
-    // Si GPT decidió usar una función
-    if (choice.finish_reason === "function_call") {
-      const funcCall = choice.message.function_call;
-      const args = JSON.parse(funcCall.arguments);
+    // Si hay tool calls, procesarlos
+    if (message.tool_calls && message.tool_calls.length > 0) {
+      const results = [];
+      let actions = [];
       
-      switch (funcCall.name) {
-        case "agregar_al_carrito": {
-          const prod = await buscarProductoPorNombre(args.producto);
-          if (prod) {
-            const qty = Math.max(1, parseInt(args.cantidad));
-            if (!state.cart[prod.id]) {
-              state.cart[prod.id] = { ...prod, qty: 0 };
-            }
-            state.cart[prod.id].qty += qty;
-            
-            return {
-              reply: `Listo! Agregué ${qty}× ${prod.nombre} al carrito 🛒`,
-              action: { 
-                type: "ADD_TO_CART", 
-                product: prod, 
-                qty 
-              },
-              state
-            };
-          }
-          return { 
-            reply: "No encontré ese producto exacto. ¿Podés ser más específico?",
-            state 
-          };
-        }
+      for (const toolCall of message.tool_calls) {
+        const result = await processToolCall(toolCall, state);
+        results.push(result);
         
-        case "quitar_del_carrito": {
-          const prod = await buscarProductoPorNombre(args.producto);
-          if (prod && state.cart[prod.id]) {
-            const qty = Math.max(1, parseInt(args.cantidad));
-            state.cart[prod.id].qty -= qty;
-            
-            if (state.cart[prod.id].qty <= 0) {
-              delete state.cart[prod.id];
-            }
-            
-            const items = Object.values(state.cart);
-            const newTotal = items.reduce((sum, item) => 
-              sum + (item.precio * item.qty), 0
-            );
-            
-            return {
-              reply: `Listo! Quité ${qty}× ${prod.nombre}. Tu nuevo total es ${toPY(newTotal)} Gs`,
-              action: { 
-                type: "REMOVE_FROM_CART", 
-                product: prod, 
-                qty 
-              },
-              state
-            };
-          }
-          return { 
-            reply: "Ese producto no está en tu carrito.",
-            state 
-          };
-        }
-        
-        case "mostrar_total": {
-          return {
-            reply: `Tu total actual es ${context.total} Gs 💰`,
-            action: { type: "GET_CART_TOTAL" },
-            state
-          };
-        }
-
-        case "agendar_catering": {
-          try {
-            console.log('[CATERING] Args originales:', args);
-            
-            // Normalizar fecha y hora a formato correcto
-            const fechaNormalizada = parseFechaNatural(args.fecha);
-            const horaNormalizada = parseHoraNatural(args.hora);
-            
-            console.log('[CATERING] Fecha normalizada:', args.fecha, '→', fechaNormalizada);
-            console.log('[CATERING] Hora normalizada:', args.hora, '→', horaNormalizada);
-            
-            if (!fechaNormalizada) {
-              return {
-                reply: `No pude entender la fecha "${args.fecha}". ¿Podés decirla de nuevo? Por ejemplo: "15 de diciembre" o "15/12/2024"`,
-                state
-              };
-            }
-            
-            if (!horaNormalizada) {
-              return {
-                reply: `No pude entender la hora "${args.hora}". ¿Podés decirla de nuevo? Por ejemplo: "17:00" o "5 de la tarde"`,
-                state
-              };
-            }
-            
-            // Llamar a la función de Supabase
-            const { data, error } = await supa.rpc("catering_agendar", {
-              p_razonsocial: args.razonsocial,
-              p_tipoevento: args.tipoevento,
-              p_fecha: fechaNormalizada,
-              p_hora: horaNormalizada,
-              p_tipocomida: args.tipocomida,
-              p_lugar: args.lugar,
-              p_ruc: 'CHAT-BOT',
-              p_observaciones: null,
-              p_invitados: args.invitados || null,
-              p_telefono: args.telefono || null,
-              p_email: args.email || null
-            });
-
-            if (error) {
-              console.error('[CATERING] Error de Supabase:', error);
-              
-              if (error.message.includes('Cupo lleno') || error.message.includes('cupo')) {
-                return {
-                  reply: `❌ ${error.message}\n\n¿Querés probar con otra fecha? Los fines de semana tenemos más disponibilidad (hasta 3 servicios).`,
-                  state
-                };
-              }
-              
-              return {
-                reply: `❌ Hubo un problema: ${error.message}\n\n¿Podés verificar los datos e intentar de nuevo?`,
-                state
-              };
-            }
-
-            console.log('[CATERING] Agendado exitosamente:', data);
-
-            // Limpiar estado de catering
-            state.cateringData = {
-              enProgreso: false,
-              razonsocial: null,
-              tipoevento: null,
-              fecha: null,
-              hora: null,
-              tipocomida: null,
-              lugar: null,
-              invitados: null,
-              telefono: null,
-              email: null
-            };
-
-            return {
-              reply: `🎉 ¡Perfecto! Tu catering está pre-agendado.\n\n📋 **Resumen:**\n- Evento: ${args.tipoevento}\n- Fecha: ${fechaNormalizada}\n- Hora: ${horaNormalizada}\n- Lugar: ${args.lugar}\n- Menú: ${args.tipocomida}${args.invitados ? `\n- Invitados: ${args.invitados}` : ''}${args.telefono ? `\n- Contacto: ${args.telefono}` : ''}\n\n📱 **Siguiente paso:**\nContactanos por WhatsApp al **+595 992 544 305** para:\n✓ Confirmar disponibilidad\n✓ Ajustar menú y cantidades\n✓ Coordinar forma de pago (transferencia/efectivo)\n✓ Detalles finales del servicio\n\n¡Gracias por elegirnos! 😊`,
-              action: {
-                type: "CATERING_AGENDADO",
-                data: data
-              },
-              state
-            };
-
-          } catch (err) {
-            console.error("[CATERING] Error catch:", err);
-            return {
-              reply: `⚠️ Error técnico: ${err.message}\n\nPor favor intentá de nuevo o contactanos por WhatsApp: +595 992 544 305`,
-              state
-            };
-          }
-        }
+        if (result.action) actions.push(result.action);
+        if (result.actions) actions.push(...result.actions);
       }
+      
+      // Si alguna herramienta requiere continuar conversación, hacer segunda llamada
+      const needsContinue = results.some(r => r.continueConversation);
+      
+      if (needsContinue) {
+        // Reconstruir contexto con datos actualizados
+        const newContext = await buildContextForGPT(state);
+        const newSystemPrompt = buildSystemPrompt(newContext, state);
+        
+        const followUp = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          temperature: 0.7,
+          messages: [
+            { role: "system", content: newSystemPrompt },
+            ...cleanHistory,
+            { role: "user", content: userMsg },
+            { role: "assistant", content: `[Datos actualizados correctamente]` }
+          ]
+        });
+        
+        return {
+          reply: followUp.choices[0].message.content,
+          action: actions.length === 1 ? actions[0] : (actions.length > 1 ? { type: "MULTIPLE", actions } : null),
+          state
+        };
+      }
+      
+      // Combinar mensajes de resultados
+      const successMessages = results.filter(r => r.success && r.message && !r.message.includes('_'));
+      const errorMessages = results.filter(r => !r.success);
+      
+      let reply = '';
+      if (successMessages.length > 0) {
+        reply = successMessages.map(r => r.message).join('\n\n');
+      }
+      if (errorMessages.length > 0) {
+        reply += (reply ? '\n\n' : '') + errorMessages.map(r => r.message).join('\n');
+      }
+      
+      // Si no hay mensaje significativo, usar la respuesta del asistente
+      if (!reply || reply.includes('DATOS_ACTUALIZADOS') || reply.includes('CATERING_INICIADO')) {
+        // Hacer llamada adicional para obtener respuesta natural
+        const followUp = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          temperature: 0.7,
+          messages: [
+            { role: "system", content: buildSystemPrompt(await buildContextForGPT(state), state) },
+            ...cleanHistory,
+            { role: "user", content: userMsg }
+          ]
+        });
+        reply = followUp.choices[0].message.content;
+      }
+      
+      return {
+        reply,
+        action: actions.length === 1 ? actions[0] : (actions.length > 1 ? { type: "MULTIPLE", actions } : null),
+        state
+      };
     }
     
     // Respuesta normal de texto
-    const reply = choice.message.content.trim() || "¿En qué más te puedo ayudar?";
-    return { reply, state };
+    return {
+      reply: message.content || "¿En qué más puedo ayudarte?",
+      state
+    };
     
   } catch (err) {
     console.error("GPT error:", err);
@@ -626,21 +772,19 @@ async function processWithGPT(userMsg, state) {
   }
 }
 
-/* ============== FUNCIÓN DE TRACKING ============== */
+/* ============== TRACKING ============== */
 async function trackInteraction(userMsg, reply, action, state, startTime) {
   try {
-    // Determinar tipo de interacción
     let tipo = 'consulta';
-    if (action?.type === 'ADD_TO_CART') tipo = 'agregar_carrito';
+    if (action?.type === 'ADD_TO_CART' || action?.type === 'MULTIPLE') tipo = 'agregar_carrito';
     else if (action?.type === 'CATERING_AGENDADO') tipo = 'catering';
     else if (action?.type === 'REMOVE_FROM_CART') tipo = 'quitar_carrito';
     else if (userMsg.match(/hola|buen|hey|buenos dias|buenas tardes/i)) tipo = 'saludo';
     
     const tiempoMs = Date.now() - startTime;
     
-    // Registrar en base de datos usando la función RPC
-    const { error } = await supa.rpc('registrar_interaccion_chatbot', {
-      p_user_id: null, // No hay user_id en el backend
+    await supa.rpc('registrar_interaccion_chatbot', {
+      p_user_id: null,
       p_tipo: tipo,
       p_mensaje: userMsg.substring(0, 500),
       p_respuesta: reply.substring(0, 1000),
@@ -650,28 +794,24 @@ async function trackInteraction(userMsg, reply, action, state, startTime) {
       p_metadata: {
         state_size: JSON.stringify(state).length,
         has_cart: Object.keys(state.cart || {}).length > 0,
-        session_id: state.sessionId || 'anonymous'
+        session_id: state.sessionId || 'anonymous',
+        catering_activo: state.catering?.activo || false
       }
     });
     
-    if (error) {
-      console.error('[TRACKING ERROR]:', error);
-    } else {
-      console.log(`[TRACKING] ${tipo} - ${tiempoMs}ms ✓`);
-    }
+    console.log(`[TRACKING] ${tipo} - ${tiempoMs}ms ✓`);
   } catch (error) {
-    console.error('[TRACKING FATAL]:', error);
-    // No fallar el request por tracking
+    console.error('[TRACKING FAIL]:', error);
   }
 }
 
-/* ============== HANDLER PRINCIPAL CON TRACKING ============== */
+/* ============== HANDLER PRINCIPAL ============== */
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Método no permitido" });
   }
 
-  const startTime = Date.now(); // ⏱️ Iniciar timer para tracking
+  const startTime = Date.now();
 
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
@@ -692,14 +832,9 @@ export default async function handler(req, res) {
       addToHistory(result.state || state, "assistant", result.reply);
     }
     
-    // 🎯 TRACKING DE INTERACCIÓN (no bloquea la respuesta)
-    trackInteraction(
-      userMsgRaw, 
-      result.reply, 
-      result.action, 
-      result.state || state, 
-      startTime
-    ).catch(err => console.error('[TRACKING] Failed silently:', err));
+    // Tracking (no bloquea)
+    trackInteraction(userMsgRaw, result.reply, result.action, result.state || state, startTime)
+      .catch(err => console.error('[TRACKING] Silent fail:', err));
     
     return res.status(200).json({
       reply: result.reply,
@@ -710,7 +845,7 @@ export default async function handler(req, res) {
   } catch (err) {
     console.error("Error /api/ask:", err);
     return res.status(500).json({ 
-      error: "Error interno del servidor",
+      error: "Error interno",
       reply: "Disculpá, hubo un problema técnico. Intentá de nuevo." 
     });
   }

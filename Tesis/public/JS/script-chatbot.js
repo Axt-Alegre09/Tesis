@@ -1,4 +1,6 @@
 // public/JS/script-chatbot.js (cargar con type="module")
+// Versión 2.0 - Soporte para múltiples acciones y mejor manejo de estado
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -9,9 +11,33 @@ document.addEventListener("DOMContentLoaded", async () => {
   const toggler        = document.querySelector(".chatbot-toggler");
 
   // ===== Estado de la conversación =====
-  const STATE_KEY = "paniq.chat.state";
-  const loadState  = () => JSON.parse(sessionStorage.getItem(STATE_KEY) || "{}");
-  const saveState  = (s) => sessionStorage.setItem(STATE_KEY, JSON.stringify(s || {}));
+  const STATE_KEY = "paniq.chat.state.v2";
+  
+  const loadState = () => {
+    try {
+      const stored = sessionStorage.getItem(STATE_KEY);
+      if (!stored) return {};
+      const parsed = JSON.parse(stored);
+      // Validar que el estado no sea muy viejo (más de 30 min)
+      const lastUpdate = parsed._lastUpdate || 0;
+      if (Date.now() - lastUpdate > 30 * 60 * 1000) {
+        sessionStorage.removeItem(STATE_KEY);
+        return {};
+      }
+      return parsed;
+    } catch {
+      return {};
+    }
+  };
+  
+  const saveState = (s) => {
+    try {
+      s._lastUpdate = Date.now();
+      sessionStorage.setItem(STATE_KEY, JSON.stringify(s || {}));
+    } catch (e) {
+      console.warn("No se pudo guardar el estado:", e);
+    }
+  };
 
   // ===== UI helpers =====
   const appendMessage = (text, sender = "bot") => {
@@ -30,6 +56,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   };
 
   const showLoader = () => {
+    const existing = document.getElementById("loader");
+    if (existing) return;
+    
     const loader = document.createElement("div");
     loader.id = "loader";
     loader.className = "msg bot loading";
@@ -38,11 +67,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     chatBody.scrollTop = chatBody.scrollHeight;
   };
   
-  const hideLoader = () => document.getElementById("loader")?.remove();
+  const hideLoader = () => {
+    const loader = document.getElementById("loader");
+    if (loader) loader.remove();
+  };
 
   const saludo = () => {
     const h = new Date().getHours();
-    if (h < 12) return "¡Buenos días! 🌅 Soy el asistente de Paniquiños. ¿Qué te gustaría pedir hoy?";
+    if (h < 12) return "¡Buenos días! 🌅 Soy el asistente de Paniquiños. ¿Qué te gustaría hoy?";
     if (h < 19) return "¡Hola! 👋 Soy el asistente de Paniquiños. ¿En qué puedo ayudarte?";
     return "¡Buenas noches! 🌙 Soy el asistente de Paniquiños. ¿Qué se te antoja?";
   };
@@ -61,8 +93,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (!state.history || state.history.length === 0) {
     appendMessage(saludo(), "bot");
   } else {
-    // Restaurar historial visible (últimos 5 mensajes)
-    const recent = state.history.slice(-5);
+    // Restaurar historial visible (últimos 6 mensajes)
+    const recent = state.history.slice(-6);
     recent.forEach(msg => {
       appendMessage(msg.content, msg.role === "user" ? "user" : "bot");
     });
@@ -77,18 +109,29 @@ document.addEventListener("DOMContentLoaded", async () => {
         case "ADD_TO_CART": {
           await window.CartAPI.addProduct(action.product, action.qty || 1);
           await window.CartAPI.refreshBadge?.();
-          // El feedback lo da el backend directamente
           return null;
         }
+        
+        case "MULTIPLE": {
+          // Procesar múltiples acciones
+          for (const subAction of (action.actions || [])) {
+            await runAction(subAction);
+          }
+          return null;
+        }
+        
         case "REMOVE_FROM_CART": {
           await window.CartAPI.removeProduct?.(action.product, action.qty || 1);
           await window.CartAPI.refreshBadge?.();
           return null;
         }
-        case "GET_CART_TOTAL": {
-          // Ya el backend responde con el total
+        
+        case "CATERING_AGENDADO": {
+          // Podrías mostrar una notificación especial o confetti 🎉
+          console.log("✅ Catering agendado:", action.data);
           return null;
         }
+        
         default:
           return null;
       }
@@ -104,19 +147,24 @@ document.addEventListener("DOMContentLoaded", async () => {
     const text = chatInput.value.trim();
     if (!text) return;
 
+    // Deshabilitar input mientras procesa
+    chatInput.disabled = true;
+    const submitBtn = chatForm.querySelector('button[type="submit"]');
+    if (submitBtn) submitBtn.disabled = true;
+
     appendMessage(text, "user");
     chatInput.value = "";
     showLoader();
 
     try {
-      const state = loadState();
+      const currentState = loadState();
 
       const res = await fetch("/api/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: [{ role: "user", content: text }],
-          state,
+          state: currentState,
         }),
       });
 
@@ -125,11 +173,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       if (!res.ok) {
         console.error("HTTP", res.status, data);
-        appendMessage("⚠️ Disculpá, hubo un problema. Intentá de nuevo por favor.", "bot");
+        appendMessage("⚠️ Disculpá, hubo un problema. Intentá de nuevo.", "bot");
         return;
       }
 
-      // Ejecutar acción de carrito si existe
+      // Ejecutar acciones del carrito si existen
       if (data.action) {
         const feedback = await runAction(data.action);
         if (feedback) {
@@ -151,6 +199,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       console.error("Chat error:", err);
       hideLoader();
       appendMessage("⚠️ No pude conectarme. Verificá tu conexión e intentá de nuevo.", "bot");
+    } finally {
+      // Re-habilitar input
+      chatInput.disabled = false;
+      if (submitBtn) submitBtn.disabled = false;
+      chatInput.focus();
     }
   });
 
@@ -162,22 +215,25 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
-  // ===== Sugerencias rápidas (opcional) =====
+  // ===== Sugerencias rápidas =====
   const suggestions = [
     "¿Qué empanadas tienen?",
-    "Mostrame el total",
-    "¿Tienen tortas?",
-    "Agregame 2 alfajores"
+    "Quiero agendar un catering",
+    "Dame 2 empanadas de carne",
+    "¿Cuál es el horario?"
   ];
 
-  // Podrías agregar botones de sugerencias si querés
   function showSuggestions() {
+    // Evitar mostrar si ya hay sugerencias
+    if (chatBody.querySelector('.suggestions')) return;
+    
     const suggDiv = document.createElement("div");
     suggDiv.className = "suggestions";
     suggDiv.innerHTML = suggestions
       .map(s => `<button class="suggestion-btn">${s}</button>`)
       .join("");
     chatBody.appendChild(suggDiv);
+    chatBody.scrollTop = chatBody.scrollHeight;
     
     suggDiv.querySelectorAll(".suggestion-btn").forEach(btn => {
       btn.addEventListener("click", () => {
@@ -190,6 +246,15 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Mostrar sugerencias al inicio si no hay historial
   if (!state.history || state.history.length === 0) {
-    setTimeout(showSuggestions, 1000);
+    setTimeout(showSuggestions, 800);
   }
+  
+  // ===== Botón para limpiar chat =====
+  // Podrías agregar un botón en el header del chat que llame a esto
+  window.clearChatHistory = () => {
+    sessionStorage.removeItem(STATE_KEY);
+    chatBody.innerHTML = '';
+    appendMessage(saludo(), "bot");
+    setTimeout(showSuggestions, 500);
+  };
 });
