@@ -621,17 +621,12 @@ async function procesarCarrito(mensaje, state) {
     }
     state.cart[prod.id].qty += qty;
     agregados.push(`${qty}× ${prod.nombre}`);
-    log('CARRITO', `Agregado: ${qty}× ${prod.nombre}`);
+    log('CARRITO', `Agregado: ${qty}× ${prod.nombre} (ID: ${prod.id})`);
     
-    // Acción para CartAPI del frontend
+    // Acción para CartAPI del frontend - solo pasar ID
     actions.push({
       type: 'ADD_TO_CART',
-      product: {
-        id: prod.id,
-        titulo: prod.nombre,
-        precio: prod.precio,
-        imagen: prod.imagen || null
-      },
+      productId: prod.id,
       qty: qty
     });
   }
