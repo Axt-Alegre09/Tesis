@@ -11,8 +11,8 @@ const FIELD_IDS = [
   "calle1","calle2","nro"
 ];
 
-const userField  = $("usuario");        // visual
-const passField  = $("password");       // <-- antes "contrasenia"
+const userField  = $("usuario");        // Email de AUTH (login)
+const passField  = $("password");       // Contraseña de AUTH
 const form       = document.getElementById("perfil-form");
 const btnGuardar = document.getElementById("btn-guardar-datos");
 
@@ -65,13 +65,20 @@ async function upsertProfile(uid, values) {
 }
 
 // ----- Auth updates -----
+// ⭐ Solo actualizar email de AUTH si el campo "usuario" cambió
 async function updateAuthEmailIfNeeded(currentEmail, newEmail) {
   const next = (newEmail || "").trim();
-  if (!next || next === currentEmail) return { changed: false };
+  // Si está vacío o es igual al actual (ignorando mayúsculas), no hacer nada
+  if (!next || next.toLowerCase() === currentEmail.toLowerCase()) {
+    return { changed: false };
+  }
+  
+  console.log("📧 Cambiando email de auth:", currentEmail, "→", next);
   const { error } = await supabase.auth.updateUser({ email: next });
   if (error) throw error;
   return { changed: true };
 }
+
 async function updateAuthPasswordIfProvided(pwd) {
   const p = (pwd || "").trim();
   if (!p) return false;
@@ -102,7 +109,7 @@ async function handleRecoveryIfNeeded() {
 // ----- init -----
 async function init() {
   try {
-    await requireAuth();               // ahora existe
+    await requireAuth();
     await handleRecoveryIfNeeded();
 
     const { data: { user } } = await supabase.auth.getUser();
@@ -118,28 +125,31 @@ async function init() {
       hideMsg();
       try {
         const values = readFormValues();
-        if (!values.mail)  throw new Error("Ingresá un mail.");
         if (!values.razon) throw new Error("Ingresá la razón social / nombre.");
 
-        // 1) Upsert de perfil
+        // 1) Upsert de perfil (datos de facturación/envío)
         await upsertProfile(user.id, values);
 
-        // 2) Email y password en Auth
-        const emailChanged = await updateAuthEmailIfNeeded(user.email, values.mail);
+        // 2) ⭐ CORREGIDO: Email de AUTH usa el campo "usuario", NO "mail"
+        //    "mail" es solo para contacto/facturación
+        const nuevoEmailAuth = userField?.value?.trim() || "";
+        const emailChanged = await updateAuthEmailIfNeeded(user.email, nuevoEmailAuth);
+        
+        // 3) Contraseña de AUTH
         const newPwd = passField?.value?.trim() ?? "";
         const passChanged = await updateAuthPasswordIfProvided(newPwd);
 
         if (passField) passField.value = "";
 
         let extra = [];
-        if (emailChanged.changed) extra.push("email");
+        if (emailChanged.changed) extra.push("email de acceso");
         if (passChanged)          extra.push("contraseña");
         const suf = extra.length ? ` (actualizado: ${extra.join(", ")})` : "";
 
-        alert("Datos actualizados correctamente " + suf, "ok");
+        showMsg("✅ Datos actualizados correctamente" + suf, "ok");
       } catch (err) {
         console.error(err);
-        showMsg("No se pudieron guardar los datos. " + (err?.message ?? ""), "error");
+        showMsg("❌ " + (err?.message ?? "No se pudieron guardar los datos."), "error");
       } finally {
         setLoading(false);
       }
