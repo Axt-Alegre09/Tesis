@@ -110,15 +110,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       return null;
     }
 
-    console.log("🛒 Ejecutando action:", action.type, action);
+    console.log("🛒 Ejecutando action:", action.type);
 
     try {
       switch (action.type) {
         case "ADD_TO_CART": {
-          console.log("➕ Agregando al carrito:", action.product?.titulo, "x", action.qty);
-          await window.CartAPI.addProduct(action.product, action.qty || 1);
+          // Usar addById que busca el producto en window.__PRODUCTS__ o BD
+          console.log("➕ Agregando producto ID:", action.productId, "x", action.qty);
+          await window.CartAPI.addById(action.productId, action.qty || 1);
           await window.CartAPI.refreshBadge?.();
-          console.log("✅ Producto agregado correctamente");
           return null;
         }
         
@@ -139,13 +139,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
         
         case "REMOVE_FROM_CART": {
-          await window.CartAPI.remove?.({ id: action.product?.id });
+          await window.CartAPI.remove?.({ id: action.productId });
           await window.CartAPI.refreshBadge?.();
           return null;
         }
         
         case "CATERING_AGENDADO": {
-          // Podrías mostrar una notificación especial o confetti 🎉
           console.log("✅ Catering agendado:", action.data);
           return null;
         }
