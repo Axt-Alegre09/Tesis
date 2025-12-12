@@ -67,39 +67,29 @@ body.aside-open { overflow: hidden; }
 }
 
 /* =========================
-   Layout base - ASIDE FIJO
+   Layout base
 ========================= */
 .wrapper{
   display: grid;
   grid-template-columns: 1fr 4fr;
+  grid-auto-rows: auto;
   background-color: var(--clr-main);
   width: 100%;
   max-width: 100%;
-  height: 100vh;            /* CLAVE: Altura fija */
-  overflow: hidden;         /* CLAVE: No scroll en wrapper */
 }
 
-.wrapper.has-topbar {
-  grid-template-rows: auto 1fr;
-}
-
-/* ===== ASIDE FIJO (NO SCROLLEA) ===== */
+/* ===== ASIDE MEJORADO ===== */
 aside{
   grid-column: 1 / 2;
-  grid-row: 1 / -1;         /* Ocupa todas las filas */
   padding: 2rem;
   padding-right: 0;
   color: var(--clr-blanco);
+  position: sticky;
+  top: 0;
   height: 100vh;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  overflow-y: auto;         /* Scroll interno si contenido es largo */
-  background-color: var(--clr-main);
-}
-
-.wrapper.has-topbar aside {
-  grid-row: 1 / -1;
 }
 
 .aside-header { 
@@ -227,16 +217,17 @@ aside{
 /* =========================
    Topbar mejorado
 ========================= */
-.site-topbar.within { 
-  margin: 1rem; 
-  margin-bottom: 0;
-}
+.site-topbar.within { margin: 1rem; }
 
+.wrapper.has-topbar aside { grid-row: 1 / span 2; }
 .wrapper.has-topbar .site-topbar.within {
   grid-column: 2 / -1;
   grid-row: 1;
   margin: 1rem;
-  margin-bottom: 0;
+}
+.wrapper.has-topbar main {
+  grid-column: 2 / -1;
+  grid-row: 2;
 }
 
 .site-topbar { background: transparent; }
@@ -420,24 +411,18 @@ aside{
 }
 
 /* =========================
-   Main - CON SCROLL PROPIO
+   Main mejorado
 ========================= */
 main{
   grid-column: 2 / -1;
+  grid-row: 1;
   background-color: var(--clr-blanco);
   margin: 1rem;
   border-radius: var(--radius-xl);
   padding: 3rem;
   box-shadow: var(--shadow-lg);
-  overflow-y: auto;         /* CLAVE: Solo main scrollea */
   width: calc(100% - 2rem);
   max-width: 100%;
-}
-
-.wrapper.has-topbar main {
-  grid-column: 2 / -1;
-  grid-row: 2;
-  margin: 0 1rem 1rem 1rem;
 }
 
 .titulo-principal{
@@ -1065,10 +1050,10 @@ main{
 }
 
 /* ============================================================
-   MÓVILES - LAYOUT NORMAL (NO FIJO)
+   MÓVILES - FIX AGRESIVO PARA OVERFLOW
 ============================================================ */
 @media (max-width: 900px){
-  /* RESET PARA MÓVILES - Vuelve a scroll normal */
+  /* RESET TOTAL PARA MÓVILES */
   html, body {
     width: 100% !important;
     max-width: 100% !important;
@@ -1077,23 +1062,19 @@ main{
     padding: 0 !important;
   }
 
-  /* WRAPPER - LAYOUT NORMAL EN MÓVIL */
-  .wrapper,
-  .wrapper.has-topbar { 
+  /* WRAPPER - FORZAR CONTENIDO DENTRO */
+  .wrapper { 
     display: flex !important;
     flex-direction: column !important;
     width: 100% !important;
     max-width: 100% !important;
     min-width: 0 !important;
     overflow-x: hidden !important;
-    height: auto !important;        /* Altura automática en móvil */
-    overflow: visible !important;   /* Scroll normal de página */
   }
 
-  /* TOPBAR STICKY */
+  /* TOPBAR - CONTENER TODO - NO AFECTAR Z-INDEX DEL DROPDOWN */
   .site-topbar,
-  .site-topbar.within,
-  .wrapper.has-topbar .site-topbar.within {
+  .site-topbar.within {
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 !important;
@@ -1102,7 +1083,7 @@ main{
     top: 0;
     z-index: 800;
     background: var(--clr-main);
-    overflow: visible !important;
+    overflow: visible !important; /* CAMBIADO: permitir que el dropdown salga */
   }
   
   .topbar-inner {
@@ -1113,7 +1094,7 @@ main{
     display: flex !important;
     align-items: center !important;
     background: var(--clr-main);
-    overflow: visible !important;
+    overflow: visible !important; /* CAMBIADO: permitir que el dropdown salga */
   }
 
   /* MOBILE TOGGLE */
@@ -1125,7 +1106,7 @@ main{
     padding: 10px 12px;
   }
 
-  /* SEARCHBAR */
+  /* SEARCHBAR - DEBE ENCOGERSE */
   .searchbar { 
     flex: 1 1 auto !important;
     min-width: 0 !important;
@@ -1145,7 +1126,7 @@ main{
     display: none !important;
   }
 
-  /* USER MENU */
+  /* USER MENU - MANTENER Z-INDEX ALTO EN MÓVIL */
   .user-menu {
     flex-shrink: 0 !important;
     z-index: 9999 !important;
@@ -1163,6 +1144,7 @@ main{
     display: none !important;
   }
 
+  /* DROPDOWN EN MÓVIL - Z-INDEX MÁXIMO */
   .user-dropdown {
     z-index: 99999 !important;
     position: absolute !important;
@@ -1170,17 +1152,14 @@ main{
     min-width: 200px !important;
   }
 
-  /* MAIN - SCROLL NORMAL */
-  main,
-  .wrapper.has-topbar main {
+  /* MAIN - CONTENIDO PRINCIPAL */
+  main {
     width: calc(100% - var(--mobile-padding) * 2) !important;
     max-width: calc(100% - var(--mobile-padding) * 2) !important;
     margin: var(--mobile-padding) auto !important;
     padding: 20px var(--mobile-padding) !important;
     border-radius: var(--radius-lg);
     overflow-x: hidden !important;
-    overflow-y: visible !important;  /* Scroll normal */
-    height: auto !important;
   }
 
   .titulo-principal { 
@@ -1247,7 +1226,7 @@ main{
     grid-template-columns: 1fr; 
   }
 
-  /* ASIDE MÓVIL - DRAWER */
+  /* ASIDE MÓVIL */
   aside {
     position: fixed;
     left: -80vw;
@@ -1261,7 +1240,6 @@ main{
     transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     padding: 24px 20px 32px 20px;
     overflow-y: auto;
-    grid-row: auto;
   }
   
   .aside-open aside { 
