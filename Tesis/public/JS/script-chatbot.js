@@ -1,5 +1,5 @@
 // public/JS/script-chatbot.js (cargar con type="module")
-// Versión 2.1 - Sincronización con CartAPI
+// Versión 2.2 - UX Mejorado estilo WhatsApp + Sincronización CartAPI
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -8,7 +8,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   const chatBody       = document.getElementById("chat-body");
   const chatForm       = document.getElementById("chat-form");
   const chatInput      = document.getElementById("chat-input");
-  const toggler        = document.querySelector(".chatbot-toggler");
+  const toggler        = document.getElementById("chatToggler") || document.querySelector(".chatbot-toggler");
+  const closeBtn       = document.getElementById("chatCloseBtn");
+  const backdrop       = document.getElementById("chatBackdrop");
+  
+  // Detectar si es móvil
+  const isMobile = () => window.innerWidth <= 480;
 
   // ===== Estado de la conversación =====
   const STATE_KEY = "paniq.chat.state.v2";
@@ -40,6 +45,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   };
 
   // ===== UI helpers =====
+  const scrollToBottom = () => {
+    if (chatBody) {
+      chatBody.scrollTop = chatBody.scrollHeight;
+    }
+  };
+  
   const appendMessage = (text, sender = "bot") => {
     const msg = document.createElement("div");
     msg.className = `msg ${sender}`;
@@ -52,8 +63,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     
     msg.innerHTML = `<p>${html}</p>`;
     chatBody.appendChild(msg);
-    chatBody.scrollTop = chatBody.scrollHeight;
+    scrollToBottom();
   };
+  
+  // Auto-resize del textarea (máximo 2 líneas)
+  const autoResize = () => {
+    if (!chatInput) return;
+    chatInput.style.height = 'auto';
+    const maxHeight = 84; // ~2 líneas
+    chatInput.style.height = Math.min(chatInput.scrollHeight, maxHeight) + 'px';
+  };
+  
+  chatInput?.addEventListener('input', autoResize);
 
   const showLoader = () => {
     const existing = document.getElementById("loader");
@@ -62,9 +83,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     const loader = document.createElement("div");
     loader.id = "loader";
     loader.className = "msg bot loading";
-    loader.innerHTML = "<p>Escribiendo…</p>";
+    loader.innerHTML = "<p>Escribiendo</p>";
     chatBody.appendChild(loader);
-    chatBody.scrollTop = chatBody.scrollHeight;
+    scrollToBottom();
   };
   
   const hideLoader = () => {
@@ -79,12 +100,40 @@ document.addEventListener("DOMContentLoaded", async () => {
     return "¡Buenas noches! 🌙 Soy el asistente de Paniquiños. ¿Qué se te antoja?";
   };
 
-  // ===== Toggle panel =====
+  // ===== Toggle panel (abrir/cerrar) =====
+  const openChat = () => {
+    chatContainer.classList.add("open");
+    toggler?.classList.add("active");
+    if (!isMobile()) backdrop?.classList.add("active");
+    setTimeout(() => chatInput?.focus(), 150);
+    scrollToBottom();
+  };
+  
+  const closeChat = () => {
+    chatContainer.classList.remove("open");
+    toggler?.classList.remove("active");
+    backdrop?.classList.remove("active");
+  };
+  
+  // Botón flotante
   toggler?.addEventListener("click", () => {
-    chatContainer.classList.toggle("open");
-    toggler.classList.toggle("active");
     if (chatContainer.classList.contains("open")) {
-      setTimeout(() => chatInput.focus(), 150);
+      closeChat();
+    } else {
+      openChat();
+    }
+  });
+  
+  // Botón X en header
+  closeBtn?.addEventListener("click", closeChat);
+  
+  // Click en backdrop (solo desktop)
+  backdrop?.addEventListener("click", closeChat);
+  
+  // Escape para cerrar
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && chatContainer.classList.contains("open")) {
+      closeChat();
     }
   });
 
@@ -172,6 +221,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     appendMessage(text, "user");
     chatInput.value = "";
+    chatInput.style.height = 'auto'; // Resetear altura
     showLoader();
 
     try {
@@ -208,6 +258,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (data.reply) {
         appendMessage(data.reply, "bot");
       }
+      
+      // Asegurar scroll al final
+      scrollToBottom();
 
       // Guardar estado actualizado
       if (data.state) {
@@ -226,11 +279,24 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
-  // ===== Enter para enviar =====
+  // ===== Manejo de teclas en el input =====
   chatInput?.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      chatForm.requestSubmit();
+    if (e.key === "Enter") {
+      if (isMobile()) {
+        // MÓVIL: Enter hace nueva línea (como WhatsApp)
+        // No hacemos nada especial, el textarea acepta Enter
+        return;
+      } else {
+        // DESKTOP: Enter envía, Shift+Enter nueva línea
+        if (e.shiftKey) {
+          // Shift+Enter: permite nueva línea
+          return;
+        } else {
+          // Enter solo: envía mensaje
+          e.preventDefault();
+          chatForm.requestSubmit();
+        }
+      }
     }
   });
 
@@ -252,7 +318,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       .map(s => `<button class="suggestion-btn">${s}</button>`)
       .join("");
     chatBody.appendChild(suggDiv);
-    chatBody.scrollTop = chatBody.scrollHeight;
+    scrollToBottom();
     
     suggDiv.querySelectorAll(".suggestion-btn").forEach(btn => {
       btn.addEventListener("click", () => {
