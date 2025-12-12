@@ -1,11 +1,11 @@
 // /api/ask.js
-// ==================== API CHATBOT v3.0 - CORRECCIONES CRÍTICAS ====================
-// Cambios v3:
-// 1. FORZAR llamada a agendar_catering cuando hay datos completos
-// 2. Limpiar estado completamente al iniciar nuevo catering
-// 3. Verificar cupo ANTES de recopilar todos los datos
-// 4. Prompt más estricto para evitar invención de datos
-// ==================================================================================
+// ==================== CHATBOT PANIQUIÑOS v4.0 ====================
+// Flujo de negocio correcto:
+// 1. Recopilar TODOS los datos del cliente (9 campos)
+// 2. Verificar cupo de fecha
+// 3. Agendar y mostrar resumen completo
+// 4. "Te contactaremos vía WhatsApp para confirmar"
+// ==================================================================
 
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
@@ -32,10 +32,9 @@ const norm = (s = "") =>
     .replace(/\s+/g, " ")
     .trim();
 
-/* ============== Parser de fechas y horas naturales ============== */
+/* ============== Parsers ============== */
 function parseFechaNatural(texto) {
   if (!texto) return null;
-  
   const str = texto.toLowerCase().trim();
   
   if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
@@ -48,7 +47,6 @@ function parseFechaNatural(texto) {
   
   let dia = null, mes = null, anio = null;
   
-  // Patrón: dd/mm/yyyy o dd-mm-yyyy
   const matchFull = str.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](20\d{2})\b/);
   if (matchFull) {
     return `${matchFull[3]}-${matchFull[2].padStart(2, '0')}-${matchFull[1].padStart(2, '0')}`;
@@ -58,10 +56,7 @@ function parseFechaNatural(texto) {
   if (matchDia) dia = matchDia[1].padStart(2, '0');
   
   for (const [nombre, num] of Object.entries(meses)) {
-    if (str.includes(nombre)) {
-      mes = num;
-      break;
-    }
+    if (str.includes(nombre)) { mes = num; break; }
   }
   
   if (!mes) {
@@ -88,13 +83,11 @@ function parseFechaNatural(texto) {
   }
   
   if (!dia || !mes) return null;
-  
   return `${anio}-${mes}-${dia}`;
 }
 
 function parseHoraNatural(texto) {
   if (!texto) return null;
-  
   const str = texto.toLowerCase().trim();
   
   if (/^\d{1,2}:\d{2}$/.test(str)) {
@@ -102,76 +95,60 @@ function parseHoraNatural(texto) {
     return `${parts[0].padStart(2, '0')}:${parts[1]}`;
   }
   
-  let hora = null;
-  
   const matchHora = str.match(/\b(\d{1,2})\b/);
   if (matchHora) {
-    hora = parseInt(matchHora[1]);
+    let hora = parseInt(matchHora[1]);
     
     if (str.includes('tarde') || str.includes('pm')) {
       if (hora < 12) hora += 12;
-    } else if (str.includes('mañana') || str.includes('am')) {
-      if (hora === 12) hora = 0;
     } else if (str.includes('noche')) {
       if (hora < 12) hora += 12;
+    } else if (str.includes('mañana') || str.includes('am')) {
+      if (hora === 12) hora = 0;
     }
     
-    const matchMinutos = str.match(/(\d{1,2})\s*:\s*(\d{2})/);
-    const minutos = matchMinutos ? matchMinutos[2] : '00';
-    
-    return `${String(hora).padStart(2, '0')}:${minutos}`;
+    return `${String(hora).padStart(2, '0')}:00`;
   }
   
   return null;
 }
 
 /* ============== Verificar cupo ============== */
-async function verificarCupoFecha(fecha) {
+async function verificarCupo(fechaTexto) {
+  const fechaNorm = parseFechaNatural(fechaTexto);
+  if (!fechaNorm) return { ok: false, error: `No entendí la fecha "${fechaTexto}". Decila como "26 de diciembre" o "26/12/2025".` };
+  
   try {
-    const fechaNorm = parseFechaNatural(fecha);
-    if (!fechaNorm) return { tiene_cupo: true, mensaje: null };
-    
-    const { data, error } = await supa.rpc('verificar_cupo_catering', {
-      p_fecha: fechaNorm
-    });
+    const { data, error } = await supa.rpc('verificar_cupo_catering', { p_fecha: fechaNorm });
     
     if (error) {
-      console.error('Error verificando cupo:', error);
-      return { tiene_cupo: true, mensaje: null };
+      console.error('Error cupo:', error);
+      return { ok: true, fecha: fechaNorm }; // Si falla, asumir que hay cupo
     }
     
-    return {
-      tiene_cupo: data.tiene_cupo,
-      disponible: data.disponible,
-      limite: data.limite,
-      fecha: fechaNorm,
-      mensaje: !data.tiene_cupo 
-        ? `❌ El ${fechaNorm} ya tiene ${data.limite} servicios agendados (cupo lleno). ¿Querés elegir otra fecha?`
-        : null
-    };
+    if (!data.tiene_cupo) {
+      return { 
+        ok: false, 
+        error: `❌ El ${fechaNorm} ya tiene ${data.limite} servicios agendados (cupo lleno). ¿Qué otra fecha te sirve?`,
+        cupoLleno: true
+      };
+    }
+    
+    return { ok: true, fecha: fechaNorm, disponible: data.disponible };
   } catch (err) {
-    console.error('Error verificando cupo:', err);
-    return { tiene_cupo: true, mensaje: null };
+    console.error('Error cupo:', err);
+    return { ok: true, fecha: fechaNorm };
   }
 }
 
-/* ============== Catálogo (cache) ============== */
+/* ============== Catálogo ============== */
 let _cache = { at: 0, items: [] };
-const CACHE_MS = 1000 * 60 * 3;
 
 async function loadCatalog() {
   const now = Date.now();
-  if (now - _cache.at < CACHE_MS && _cache.items.length) return _cache.items;
+  if (now - _cache.at < 180000 && _cache.items.length) return _cache.items;
 
-  const { data, error } = await supa
-    .from("v_productos_publicos")
-    .select("id, nombre, precio, categoria_nombre");
-  
-  if (error) {
-    console.warn("loadCatalog:", error.message);
-    return _cache.items || [];
-  }
-  
+  const { data } = await supa.from("v_productos_publicos").select("id, nombre, precio, categoria_nombre");
   const items = (data || []).map(p => ({
     id: p.id,
     nombre: String(p.nombre || "").trim(),
@@ -183,44 +160,30 @@ async function loadCatalog() {
   return items;
 }
 
-/* ============== Búsqueda de productos ============== */
-async function buscarProductoPorNombre(nombre) {
+async function buscarProducto(nombre) {
   const items = await loadCatalog();
   const nombreNorm = norm(nombre);
   
-  let producto = items.find(p => norm(p.nombre) === nombreNorm);
-  
-  if (!producto) {
-    producto = items.find(p => 
-      norm(p.nombre).includes(nombreNorm) ||
-      nombreNorm.includes(norm(p.nombre))
-    );
-  }
-  
-  if (!producto) {
-    const palabras = nombreNorm.split(' ').filter(p => p.length > 2);
-    producto = items.find(p => {
-      const pNorm = norm(p.nombre);
-      return palabras.some(palabra => pNorm.includes(palabra));
-    });
-  }
-  
-  return producto || null;
+  return items.find(p => norm(p.nombre) === nombreNorm) ||
+         items.find(p => norm(p.nombre).includes(nombreNorm) || nombreNorm.includes(norm(p.nombre))) ||
+         items.find(p => nombreNorm.split(' ').filter(x => x.length > 2).some(palabra => norm(p.nombre).includes(palabra))) ||
+         null;
 }
 
-/* ============== Estado de sesión LIMPIO ============== */
-function createFreshCateringState() {
+/* ============== Estado ============== */
+function crearCateringLimpio() {
   return {
     activo: false,
-    razonsocial: null,
-    tipoevento: null,
-    fecha: null,
-    hora: null,
-    tipocomida: null,
-    lugar: null,
-    invitados: null,
+    paso: 0, // Para saber en qué paso estamos
+    nombre: null,
     telefono: null,
     email: null,
+    direccion: null,
+    tipoServicio: null,
+    menu: null,
+    invitados: null,
+    fecha: null,
+    hora: null,
   };
 }
 
@@ -228,202 +191,141 @@ function initState(state) {
   return {
     history: state?.history || [],
     cart: state?.cart || {},
-    sessionId: state?.sessionId || `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-    catering: state?.catering?.activo ? state.catering : createFreshCateringState(),
+    sessionId: state?.sessionId || `s_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+    catering: state?.catering?.activo ? state.catering : crearCateringLimpio(),
   };
 }
 
 function addToHistory(state, role, content) {
-  state.history.push({ role, content, timestamp: Date.now() });
-  if (state.history.length > 10) {
-    state.history = state.history.slice(-10);
-  }
+  state.history.push({ role, content, ts: Date.now() });
+  if (state.history.length > 12) state.history = state.history.slice(-12);
 }
 
-/* ============== Contexto para GPT ============== */
-async function buildContextForGPT(state) {
+/* ============== Campos del catering ============== */
+const CAMPOS_CATERING = [
+  { key: 'nombre', pregunta: '¿Cuál es tu nombre completo?', ejemplo: 'Ej: Juan Pérez' },
+  { key: 'telefono', pregunta: '¿Tu número de teléfono?', ejemplo: 'Ej: 0991234567' },
+  { key: 'email', pregunta: '¿Tu correo electrónico?', ejemplo: 'Ej: juan@gmail.com' },
+  { key: 'tipoServicio', pregunta: '¿Qué tipo de evento es?', ejemplo: 'Ej: cumpleaños, boda, corporativo' },
+  { key: 'fecha', pregunta: '¿Qué fecha sería el evento?', ejemplo: 'Ej: 26 de diciembre', verificarCupo: true },
+  { key: 'hora', pregunta: '¿A qué hora?', ejemplo: 'Ej: 19:00 o 7 de la tarde' },
+  { key: 'menu', pregunta: '¿Qué menú o comida te gustaría?', ejemplo: 'Ej: empanadas, bocaditos, torta' },
+  { key: 'invitados', pregunta: '¿Cuántos invitados aproximadamente?', ejemplo: 'Ej: 50 personas' },
+  { key: 'direccion', pregunta: '¿Cuál es la dirección del evento?', ejemplo: 'Ej: Avda. España 1234' },
+];
+
+function getSiguienteCampoFaltante(catering) {
+  for (const campo of CAMPOS_CATERING) {
+    if (!catering[campo.key]) return campo;
+  }
+  return null; // Todos completos
+}
+
+function getDatosCompletos(catering) {
+  return CAMPOS_CATERING.every(c => catering[c.key]);
+}
+
+/* ============== Construir contexto ============== */
+async function buildContext(state) {
   const catalogo = await loadCatalog();
   
   const categorias = {};
   catalogo.forEach(p => {
     if (!categorias[p.categoria]) categorias[p.categoria] = [];
-    categorias[p.categoria].push({ nombre: p.nombre, precio: p.precio });
+    categorias[p.categoria].push(`${p.nombre}: ${toPY(p.precio)} Gs`);
   });
   
   const catalogoTexto = Object.entries(categorias)
-    .map(([cat, prods]) => {
-      const lista = prods.map(p => `- ${p.nombre}: ${toPY(p.precio)} Gs`).join('\n');
-      return `**${cat}**:\n${lista}`;
-    })
+    .map(([cat, prods]) => `**${cat}:**\n${prods.map(p => `- ${p}`).join('\n')}`)
     .join('\n\n');
   
   const carritoItems = Object.values(state.cart);
   const carritoTexto = carritoItems.length > 0
-    ? carritoItems.map(item => `- ${item.qty}× ${item.nombre} (${toPY(item.precio)} Gs c/u)`).join('\n')
-    : 'Carrito vacío';
-  
+    ? carritoItems.map(item => `- ${item.qty}× ${item.nombre}`).join('\n')
+    : 'Vacío';
   const total = carritoItems.reduce((sum, item) => sum + (item.precio * item.qty), 0);
 
-  // Estado de catering
-  const cat = state.catering;
+  // Info de catering
   let cateringInfo = '';
-  
-  if (cat.activo) {
+  if (state.catering.activo) {
+    const cat = state.catering;
     const datosActuales = [];
-    const datosFaltantes = [];
+    const faltante = getSiguienteCampoFaltante(cat);
     
-    if (cat.razonsocial) datosActuales.push(`✅ Nombre: ${cat.razonsocial}`);
-    else datosFaltantes.push('❌ Nombre');
-    
-    if (cat.tipoevento) datosActuales.push(`✅ Tipo evento: ${cat.tipoevento}`);
-    else datosFaltantes.push('❌ Tipo evento');
-    
-    if (cat.fecha) datosActuales.push(`✅ Fecha: ${cat.fecha}`);
-    else datosFaltantes.push('❌ Fecha');
-    
-    if (cat.hora) datosActuales.push(`✅ Hora: ${cat.hora}`);
-    else datosFaltantes.push('❌ Hora');
-    
-    if (cat.tipocomida) datosActuales.push(`✅ Menú: ${cat.tipocomida}`);
-    else datosFaltantes.push('❌ Menú');
-    
-    if (cat.lugar) datosActuales.push(`✅ Lugar: ${cat.lugar}`);
-    else datosFaltantes.push('❌ Lugar');
-    
-    // Opcionales
-    if (cat.invitados) datosActuales.push(`✅ Invitados: ${cat.invitados}`);
-    if (cat.telefono) datosActuales.push(`✅ Teléfono: ${cat.telefono}`);
-    if (cat.email) datosActuales.push(`✅ Email: ${cat.email}`);
-    
-    const obligatoriosCompletos = !datosFaltantes.some(d => 
-      d.includes('Nombre') || d.includes('Tipo evento') || d.includes('Fecha') || 
-      d.includes('Hora') || d.includes('Menú') || d.includes('Lugar')
-    );
+    CAMPOS_CATERING.forEach(campo => {
+      if (cat[campo.key]) {
+        datosActuales.push(`✅ ${campo.key}: ${cat[campo.key]}`);
+      }
+    });
     
     cateringInfo = `
-═══════════════════════════════════════════
-🎉 CATERING EN PROGRESO - DATOS ACTUALES:
-═══════════════════════════════════════════
-${datosActuales.join('\n')}
-${datosFaltantes.length > 0 ? `\n**FALTAN (obligatorios):**\n${datosFaltantes.join('\n')}` : ''}
-═══════════════════════════════════════════
+══════════════════════════════════════
+🎉 RESERVA DE CATERING EN PROGRESO
+══════════════════════════════════════
+${datosActuales.length > 0 ? datosActuales.join('\n') : '(Sin datos aún)'}
 
-${obligatoriosCompletos ? `
-⚠️ ¡¡¡IMPORTANTE!!! TENÉS TODOS LOS DATOS OBLIGATORIOS.
-DEBÉS llamar a la función "agendar_catering" AHORA MISMO.
-NO muestres resúmenes. NO preguntes más. EJECUTÁ la función.
+${faltante ? `
+➡️ SIGUIENTE PREGUNTA: ${faltante.pregunta}
+   ${faltante.ejemplo}
 ` : `
-Preguntá SOLO por el siguiente dato faltante.
-NUNCA inventes datos. Si el usuario ya dijo algo, usá ESE valor exacto.
-`}`;
+✅ ¡TODOS LOS DATOS COMPLETOS!
+⚠️ DEBÉS llamar "ejecutar_reserva" AHORA.
+`}
+══════════════════════════════════════`;
   }
   
-  return { catalogo: catalogoTexto, carrito: carritoTexto, total: toPY(total), totalNumerico: total, cateringInfo };
+  return { catalogo: catalogoTexto, carrito: carritoTexto, total: toPY(total), cateringInfo };
 }
 
-/* ============== Prompt del sistema ============== */
-function buildSystemPrompt(context, state) {
-  const fechaHoy = new Date().toLocaleDateString('es-PY', { 
-    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
-  });
-  
+/* ============== Prompt ============== */
+function buildSystemPrompt(context) {
   return `Sos el asistente de Paniquiños (panadería/confitería en Asunción, Paraguay).
-Fecha actual: ${fechaHoy}
 
-TIENDA:
+INFORMACIÓN:
 - Horarios: Lun-Vie 8:00-18:00, Sáb-Dom 8:00-13:00
-- Delivery: Asunción y alrededores
 - WhatsApp: +595 992 544 305
-- Catering: Límite 2 servicios/día (L-V), 3 servicios/día (S-D)
+- Límite catering: 2/día (L-V), 3/día (S-D)
 
 CATÁLOGO:
 ${context.catalogo}
 
-CARRITO:
-${context.carrito}
-Total: ${context.total} Gs
+CARRITO: ${context.carrito} | Total: ${context.total} Gs
 ${context.cateringInfo}
 
-═══════════════════════════════════════════
-REGLAS ABSOLUTAS (NO IGNORAR):
-═══════════════════════════════════════════
+══════════════════════════════════════
+REGLAS IMPORTANTES:
+══════════════════════════════════════
 
-1. **PRODUCTOS MÚLTIPLES:**
-   - Si piden varios productos → usar "agregar_multiples_al_carrito"
-   - Ejemplo: "2 empanadas y 1 flan" → agregar_multiples_al_carrito
+1. **CARRITO:**
+   - 1 producto → "agregar_carrito"
+   - Varios productos → "agregar_multiples"
 
-2. **CATERING - REGLAS ESTRICTAS:**
-   - NUNCA inventes datos. Si no te dijeron algo, está VACÍO.
-   - USA EXACTAMENTE lo que el usuario dijo, sin modificar.
-   - Preguntá UN dato a la vez en este orden: nombre → tipo evento → fecha → hora → menú → lugar
-   - Cuando tengas los 6 datos obligatorios: LLAMÁ "agendar_catering" INMEDIATAMENTE
-   - NO muestres "resúmenes bonitos". Llamá la función.
-   - Si falla por cupo, preguntá SOLO nueva fecha (mantené resto de datos)
+2. **CATERING:**
+   - Cuando el usuario quiera reservar/agendar → "iniciar_catering"
+   - Luego, por CADA respuesta del usuario → "guardar_dato" con el campo y valor EXACTO
+   - NUNCA inventes datos. Usá EXACTAMENTE lo que dijo el usuario.
+   - Preguntá UN campo a la vez, en orden.
+   - Cuando estén los 9 datos → "ejecutar_reserva"
 
-3. **DATOS OPCIONALES (invitados/teléfono/email):**
-   - Solo preguntá DESPUÉS de tener los 6 obligatorios
-   - Preguntá UNA vez: "¿Querés agregar invitados, teléfono o email?"
-   - Si dice no → agendar inmediatamente
-
-4. **PROHIBIDO:**
-   - Inventar nombres, fechas, horas o cualquier dato
-   - Mostrar datos de conversaciones anteriores
-   - Decir "Diego" si el usuario dijo "Juan"
-   - Decir "Boda" si el usuario dijo "corporativo"
+3. **PROHIBIDO:**
+   - Inventar nombres, fechas, teléfonos o cualquier dato
+   - Decir un nombre diferente al que dijo el usuario
    - Mostrar resúmenes sin ejecutar la función
+   - Saltear campos
 
-5. **ESTILO:**
-   - Respuestas cortas (1-3 líneas)
-   - Emojis ocasionales
-   - Amigable pero eficiente`;
+4. **ESTILO:**
+   - Corto y amigable (1-2 líneas)
+   - Emojis ocasionales 😊
+   - Cuando guardes un dato, preguntá inmediatamente el siguiente`;
 }
 
-/* ============== Definición de herramientas ============== */
+/* ============== Tools ============== */
 const TOOLS = [
   {
     type: "function",
     function: {
-      name: "agregar_al_carrito",
+      name: "agregar_carrito",
       description: "Agregar UN producto al carrito",
-      parameters: {
-        type: "object",
-        properties: {
-          producto: { type: "string", description: "Nombre exacto del producto" },
-          cantidad: { type: "number", description: "Cantidad (default 1)" }
-        },
-        required: ["producto"]
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "agregar_multiples_al_carrito",
-      description: "Agregar VARIOS productos en una operación. USAR cuando piden más de 1 producto diferente.",
-      parameters: {
-        type: "object",
-        properties: {
-          productos: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                producto: { type: "string" },
-                cantidad: { type: "number" }
-              },
-              required: ["producto", "cantidad"]
-            }
-          }
-        },
-        required: ["productos"]
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "quitar_del_carrito",
-      description: "Quitar productos del carrito",
       parameters: {
         type: "object",
         properties: {
@@ -437,30 +339,47 @@ const TOOLS = [
   {
     type: "function",
     function: {
-      name: "iniciar_catering",
-      description: "Iniciar proceso de catering. IMPORTANTE: Limpia cualquier catering anterior.",
+      name: "agregar_multiples",
+      description: "Agregar VARIOS productos al carrito",
       parameters: {
         type: "object",
         properties: {
-          tipoevento: { type: "string", description: "Si ya mencionó el tipo de evento" }
-        }
+          productos: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                producto: { type: "string" },
+                cantidad: { type: "number" }
+              }
+            }
+          }
+        },
+        required: ["productos"]
       }
     }
   },
   {
     type: "function",
     function: {
-      name: "guardar_dato_catering",
-      description: "Guardar UN dato del catering. Llamar cada vez que el usuario proporciona información.",
+      name: "iniciar_catering",
+      description: "Iniciar el proceso de reserva de catering. Limpia datos anteriores.",
+      parameters: { type: "object", properties: {} }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "guardar_dato",
+      description: "Guardar UN dato del catering. Llamar con el campo y valor EXACTO que dijo el usuario.",
       parameters: {
         type: "object",
         properties: {
           campo: { 
             type: "string", 
-            enum: ["razonsocial", "tipoevento", "fecha", "hora", "tipocomida", "lugar", "invitados", "telefono", "email"],
-            description: "Qué campo guardar"
+            enum: ["nombre", "telefono", "email", "tipoServicio", "fecha", "hora", "menu", "invitados", "direccion"]
           },
-          valor: { type: "string", description: "Valor EXACTO que dijo el usuario" }
+          valor: { type: "string", description: "Valor EXACTO que dijo el usuario, sin modificar" }
         },
         required: ["campo", "valor"]
       }
@@ -469,435 +388,269 @@ const TOOLS = [
   {
     type: "function",
     function: {
-      name: "agendar_catering",
-      description: "EJECUTAR cuando se tienen TODOS los datos obligatorios. NO mostrar resumen, ejecutar directamente.",
-      parameters: {
-        type: "object",
-        properties: {
-          confirmar: { type: "boolean", description: "Siempre true para confirmar" }
-        },
-        required: ["confirmar"]
-      }
+      name: "ejecutar_reserva",
+      description: "Ejecutar la reserva de catering. Solo llamar cuando TODOS los 9 campos estén completos.",
+      parameters: { type: "object", properties: {} }
     }
   }
 ];
 
-/* ============== Procesamiento de tool calls ============== */
+/* ============== Procesar tool calls ============== */
 async function processToolCall(toolCall, state) {
   const name = toolCall.function.name;
   const args = JSON.parse(toolCall.function.arguments || '{}');
   
-  console.log(`[TOOL] ${name}:`, JSON.stringify(args));
+  console.log(`[TOOL] ${name}:`, args);
   
   switch (name) {
-    case "agregar_al_carrito": {
-      const prod = await buscarProductoPorNombre(args.producto);
+    case "agregar_carrito": {
+      const prod = await buscarProducto(args.producto);
       if (prod) {
         const qty = Math.max(1, parseInt(args.cantidad) || 1);
-        if (!state.cart[prod.id]) {
-          state.cart[prod.id] = { ...prod, qty: 0 };
-        }
+        if (!state.cart[prod.id]) state.cart[prod.id] = { ...prod, qty: 0 };
         state.cart[prod.id].qty += qty;
-        return {
-          success: true,
-          message: `Agregué ${qty}× ${prod.nombre} al carrito 🛒`,
-          action: { type: "ADD_TO_CART", product: prod, qty }
-        };
+        return { message: `Agregué ${qty}× ${prod.nombre} al carrito 🛒` };
       }
-      return { success: false, message: `No encontré "${args.producto}". ¿Podés ser más específico?` };
+      return { message: `No encontré "${args.producto}". ¿Podés ser más específico?` };
     }
     
-    case "agregar_multiples_al_carrito": {
+    case "agregar_multiples": {
       const resultados = [];
-      const acciones = [];
-      
       for (const item of (args.productos || [])) {
-        const prod = await buscarProductoPorNombre(item.producto);
+        const prod = await buscarProducto(item.producto);
         if (prod) {
           const qty = Math.max(1, parseInt(item.cantidad) || 1);
-          if (!state.cart[prod.id]) {
-            state.cart[prod.id] = { ...prod, qty: 0 };
-          }
+          if (!state.cart[prod.id]) state.cart[prod.id] = { ...prod, qty: 0 };
           state.cart[prod.id].qty += qty;
           resultados.push(`${qty}× ${prod.nombre}`);
-          acciones.push({ type: "ADD_TO_CART", product: prod, qty });
-        } else {
-          resultados.push(`❌ "${item.producto}" no encontrado`);
         }
       }
-      
-      return {
-        success: true,
-        message: `Agregué al carrito: ${resultados.join(', ')} 🛒`,
-        actions: acciones
-      };
-    }
-    
-    case "quitar_del_carrito": {
-      const prod = await buscarProductoPorNombre(args.producto);
-      if (prod && state.cart[prod.id]) {
-        const qty = Math.max(1, parseInt(args.cantidad) || 1);
-        state.cart[prod.id].qty -= qty;
-        if (state.cart[prod.id].qty <= 0) delete state.cart[prod.id];
-        
-        const items = Object.values(state.cart);
-        const newTotal = items.reduce((sum, item) => sum + (item.precio * item.qty), 0);
-        return {
-          success: true,
-          message: `Quité ${qty}× ${prod.nombre}. Nuevo total: ${toPY(newTotal)} Gs`,
-          action: { type: "REMOVE_FROM_CART", product: prod, qty }
-        };
-      }
-      return { success: false, message: "Ese producto no está en tu carrito." };
+      return { message: resultados.length > 0 ? `Agregué al carrito: ${resultados.join(', ')} 🛒` : 'No encontré esos productos.' };
     }
     
     case "iniciar_catering": {
-      // LIMPIAR completamente cualquier catering anterior
-      state.catering = createFreshCateringState();
+      state.catering = crearCateringLimpio();
       state.catering.activo = true;
-      
-      if (args.tipoevento) {
-        state.catering.tipoevento = args.tipoevento;
-      }
-      
-      console.log('[CATERING] Iniciado limpio:', state.catering);
-      return {
-        success: true,
-        message: null, // Sin mensaje, que GPT pregunte el primer dato
-        continueConversation: true
+      const primerCampo = CAMPOS_CATERING[0];
+      return { 
+        message: `¡Perfecto! Vamos a reservar tu servicio de catering. 🎉\n\n${primerCampo.pregunta} ${primerCampo.ejemplo}`,
+        continuar: true
       };
     }
     
-    case "guardar_dato_catering": {
+    case "guardar_dato": {
       if (!state.catering.activo) {
-        state.catering = createFreshCateringState();
+        state.catering = crearCateringLimpio();
         state.catering.activo = true;
       }
       
-      const campo = args.campo;
-      const valor = args.valor;
+      const { campo, valor } = args;
       
-      // Validación especial para fecha - verificar cupo
+      // Validación especial para fecha
       if (campo === 'fecha') {
-        const cupoCheck = await verificarCupoFecha(valor);
-        if (!cupoCheck.tiene_cupo) {
-          return {
-            success: false,
-            message: cupoCheck.mensaje,
-            continueConversation: true
-          };
+        const cupoCheck = await verificarCupo(valor);
+        if (!cupoCheck.ok) {
+          return { message: cupoCheck.error, continuar: true };
         }
+        state.catering.fecha = cupoCheck.fecha; // Guardar fecha normalizada
+      } else {
+        state.catering[campo] = valor;
       }
       
-      // Guardar el valor
-      state.catering[campo] = valor;
+      console.log(`[CATERING] Guardado ${campo}:`, state.catering[campo]);
       
-      console.log(`[CATERING] Guardado ${campo}:`, valor);
-      console.log('[CATERING] Estado actual:', state.catering);
+      // Ver qué sigue
+      const siguiente = getSiguienteCampoFaltante(state.catering);
       
-      // Verificar si ya tenemos todos los obligatorios
-      const cat = state.catering;
-      const obligatoriosCompletos = cat.razonsocial && cat.tipoevento && 
-                                     cat.fecha && cat.hora && 
-                                     cat.tipocomida && cat.lugar;
-      
-      return {
-        success: true,
-        message: null,
-        datosCompletos: obligatoriosCompletos,
-        continueConversation: true
-      };
+      if (siguiente) {
+        return { 
+          message: `Perfecto. ${siguiente.pregunta} ${siguiente.ejemplo}`,
+          continuar: true
+        };
+      } else {
+        // ¡Todos los datos! Ejecutar reserva automáticamente
+        return await ejecutarReserva(state);
+      }
     }
     
-    case "agendar_catering": {
-      const cat = state.catering;
-      
-      console.log('[CATERING] Intentando agendar con:', cat);
-      
-      // Validar que tenemos los datos obligatorios
-      if (!cat.razonsocial || !cat.tipoevento || !cat.fecha || !cat.hora || !cat.tipocomida || !cat.lugar) {
-        const faltantes = [];
-        if (!cat.razonsocial) faltantes.push('nombre');
-        if (!cat.tipoevento) faltantes.push('tipo de evento');
-        if (!cat.fecha) faltantes.push('fecha');
-        if (!cat.hora) faltantes.push('hora');
-        if (!cat.tipocomida) faltantes.push('menú');
-        if (!cat.lugar) faltantes.push('lugar');
-        
-        return {
-          success: false,
-          message: `Faltan datos: ${faltantes.join(', ')}. Por favor proporcioná esa información.`,
-          continueConversation: true
-        };
-      }
-      
-      try {
-        const fechaNormalizada = parseFechaNatural(cat.fecha);
-        const horaNormalizada = parseHoraNatural(cat.hora);
-        
-        console.log('[CATERING] Normalizado:', { fecha: fechaNormalizada, hora: horaNormalizada });
-        
-        if (!fechaNormalizada) {
-          return { 
-            success: false, 
-            message: `No entendí la fecha "${cat.fecha}". Decila como "26 de diciembre" o "26/12/2025".`,
-            continueConversation: true
-          };
-        }
-        
-        if (!horaNormalizada) {
-          return { 
-            success: false, 
-            message: `No entendí la hora "${cat.hora}". Decila como "19:00" o "7 de la tarde".`,
-            continueConversation: true
-          };
-        }
-        
-        // Llamar a Supabase
-        const { data, error } = await supa.rpc("catering_agendar", {
-          p_razonsocial: cat.razonsocial,
-          p_tipoevento: cat.tipoevento,
-          p_fecha: fechaNormalizada,
-          p_hora: horaNormalizada,
-          p_tipocomida: cat.tipocomida,
-          p_lugar: cat.lugar,
-          p_ruc: 'CHAT-BOT',
-          p_observaciones: null,
-          p_invitados: cat.invitados ? parseInt(cat.invitados) : null,
-          p_telefono: cat.telefono || null,
-          p_email: cat.email || null
-        });
-
-        if (error) {
-          console.error('[CATERING] Error Supabase:', error);
-          
-          if (error.message.includes('Cupo lleno') || error.message.includes('cupo')) {
-            // Limpiar SOLO la fecha
-            state.catering.fecha = null;
-            return { 
-              success: false, 
-              message: `❌ Cupo lleno para ${fechaNormalizada}. ¿Qué otra fecha te sirve? (Los demás datos los mantengo)`,
-              continueConversation: true
-            };
-          }
-          return { success: false, message: `Error: ${error.message}` };
-        }
-
-        console.log('[CATERING] ✅ Agendado:', data);
-
-        // Construir resumen
-        let resumen = `🎉 ¡Listo! Tu catering está pre-agendado.\n\n`;
-        resumen += `📋 **Resumen:**\n`;
-        resumen += `- Cliente: ${cat.razonsocial}\n`;
-        resumen += `- Evento: ${cat.tipoevento}\n`;
-        resumen += `- Fecha: ${fechaNormalizada}\n`;
-        resumen += `- Hora: ${horaNormalizada}\n`;
-        resumen += `- Menú: ${cat.tipocomida}\n`;
-        resumen += `- Lugar: ${cat.lugar}`;
-        
-        if (cat.invitados) resumen += `\n- Invitados: ${cat.invitados}`;
-        if (cat.telefono) resumen += `\n- Teléfono: ${cat.telefono}`;
-        if (cat.email) resumen += `\n- Email: ${cat.email}`;
-        
-        resumen += `\n\n📱 Contactanos al **+595 992 544 305** para confirmar. ¡Gracias! 😊`;
-
-        // LIMPIAR estado de catering
-        state.catering = createFreshCateringState();
-
-        return {
-          success: true,
-          message: resumen,
-          action: { type: "CATERING_AGENDADO", data }
-        };
-
-      } catch (err) {
-        console.error("[CATERING] Error:", err);
-        return { success: false, message: `Error técnico. Contactanos por WhatsApp: +595 992 544 305` };
-      }
+    case "ejecutar_reserva": {
+      return await ejecutarReserva(state);
     }
     
     default:
-      return { success: false, message: "Función no reconocida." };
+      return { message: "¿En qué puedo ayudarte?" };
   }
 }
 
-/* ============== Procesamiento principal ============== */
-async function processWithGPT(userMsg, state) {
-  const context = await buildContextForGPT(state);
-  const systemPrompt = buildSystemPrompt(context, state);
+async function ejecutarReserva(state) {
+  const cat = state.catering;
   
-  const cleanHistory = state.history.slice(-6).map(h => ({
-    role: h.role,
-    content: h.content
-  }));
+  // Validar que tenemos todo
+  const faltante = getSiguienteCampoFaltante(cat);
+  if (faltante) {
+    return { 
+      message: `Todavía falta: ${faltante.pregunta}`,
+      continuar: true
+    };
+  }
+  
+  try {
+    const fechaNorm = parseFechaNatural(cat.fecha) || cat.fecha;
+    const horaNorm = parseHoraNatural(cat.hora) || cat.hora;
+    
+    console.log('[RESERVA] Ejecutando:', { ...cat, fechaNorm, horaNorm });
+    
+    const { data, error } = await supa.rpc("catering_agendar", {
+      p_razonsocial: cat.nombre,
+      p_tipoevento: cat.tipoServicio,
+      p_fecha: fechaNorm,
+      p_hora: horaNorm,
+      p_tipocomida: cat.menu,
+      p_lugar: cat.direccion,
+      p_ruc: 'CHAT-BOT',
+      p_observaciones: null,
+      p_invitados: parseInt(cat.invitados) || null,
+      p_telefono: cat.telefono,
+      p_email: cat.email
+    });
+
+    if (error) {
+      console.error('[RESERVA] Error:', error);
+      
+      if (error.message.includes('Cupo lleno')) {
+        state.catering.fecha = null;
+        return { 
+          message: `❌ Cupo lleno para esa fecha. ¿Qué otra fecha te sirve?`,
+          continuar: true
+        };
+      }
+      return { message: `Error: ${error.message}. Intentá de nuevo.` };
+    }
+
+    console.log('[RESERVA] ✅ Éxito:', data);
+
+    // Construir resumen bonito
+    const resumen = `
+🎉 **¡Pre-reserva creada exitosamente!**
+
+📋 **Datos de tu reserva:**
+• **Nombre:** ${cat.nombre}
+• **Teléfono:** ${cat.telefono}
+• **Email:** ${cat.email}
+• **Tipo de evento:** ${cat.tipoServicio}
+• **Fecha:** ${fechaNorm}
+• **Hora:** ${horaNorm}
+• **Menú:** ${cat.menu}
+• **Invitados:** ${cat.invitados}
+• **Dirección:** ${cat.direccion}
+
+📱 **Te contactaremos vía WhatsApp al ${cat.telefono} para confirmar los datos y coordinar el pago.**
+
+¡Gracias por elegir Paniquiños! 😊
+    `.trim();
+
+    // Limpiar estado
+    state.catering = crearCateringLimpio();
+
+    return { message: resumen, reservaExitosa: true };
+
+  } catch (err) {
+    console.error('[RESERVA] Error:', err);
+    return { message: `Error técnico. Contactanos al +595 992 544 305` };
+  }
+}
+
+/* ============== Proceso principal ============== */
+async function processWithGPT(userMsg, state) {
+  const context = await buildContext(state);
+  const systemPrompt = buildSystemPrompt(context);
   
   const messages = [
     { role: "system", content: systemPrompt },
-    ...cleanHistory,
+    ...state.history.slice(-8).map(h => ({ role: h.role, content: h.content })),
     { role: "user", content: userMsg }
   ];
   
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      temperature: 0.5, // Más determinístico
+      temperature: 0.3, // Más determinístico
       messages,
       tools: TOOLS,
       tool_choice: "auto",
       parallel_tool_calls: true
     });
     
-    const choice = completion.choices[0];
-    const message = choice.message;
+    const message = completion.choices[0].message;
     
-    // Si hay tool calls, procesarlos
-    if (message.tool_calls && message.tool_calls.length > 0) {
-      const results = [];
-      let actions = [];
-      let needsContinue = false;
+    if (message.tool_calls?.length > 0) {
+      let respuestaFinal = '';
       
       for (const toolCall of message.tool_calls) {
         const result = await processToolCall(toolCall, state);
-        results.push(result);
-        
-        if (result.action) actions.push(result.action);
-        if (result.actions) actions.push(...result.actions);
-        if (result.continueConversation) needsContinue = true;
-      }
-      
-      // Construir respuesta
-      const messagesWithResults = results
-        .filter(r => r.message)
-        .map(r => r.message);
-      
-      if (messagesWithResults.length > 0) {
-        return {
-          reply: messagesWithResults.join('\n\n'),
-          action: actions.length === 1 ? actions[0] : (actions.length > 1 ? { type: "MULTIPLE", actions } : null),
-          state
-        };
-      }
-      
-      // Si necesita continuar conversación (ej: después de guardar dato)
-      if (needsContinue) {
-        const newContext = await buildContextForGPT(state);
-        const newSystemPrompt = buildSystemPrompt(newContext, state);
-        
-        const followUp = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
-          temperature: 0.5,
-          messages: [
-            { role: "system", content: newSystemPrompt },
-            ...cleanHistory,
-            { role: "user", content: userMsg }
-          ],
-          tools: TOOLS,
-          tool_choice: "auto"
-        });
-        
-        const followUpMsg = followUp.choices[0].message;
-        
-        // Si el follow-up también tiene tool calls, procesarlos
-        if (followUpMsg.tool_calls && followUpMsg.tool_calls.length > 0) {
-          for (const toolCall of followUpMsg.tool_calls) {
-            const result = await processToolCall(toolCall, state);
-            if (result.message) {
-              return {
-                reply: result.message,
-                action: result.action,
-                state
-              };
-            }
-          }
+        if (result.message) {
+          respuestaFinal = result.message; // Usar la última respuesta
         }
-        
-        return {
-          reply: followUpMsg.content || "¿En qué más puedo ayudarte?",
-          action: actions.length > 0 ? (actions.length === 1 ? actions[0] : { type: "MULTIPLE", actions }) : null,
-          state
-        };
       }
+      
+      return { reply: respuestaFinal || message.content || "¿En qué más puedo ayudarte?", state };
     }
     
-    return {
-      reply: message.content || "¿En qué más puedo ayudarte?",
-      state
-    };
+    return { reply: message.content || "¿En qué más puedo ayudarte?", state };
     
   } catch (err) {
     console.error("GPT error:", err);
-    return { 
-      reply: "Disculpá, tuve un problema. ¿Podés repetir?",
-      state 
-    };
+    return { reply: "Disculpá, tuve un problema. ¿Podés repetir?", state };
   }
 }
 
-/* ============== TRACKING ============== */
-async function trackInteraction(userMsg, reply, action, state, startTime) {
+/* ============== Tracking ============== */
+async function track(userMsg, reply, state, startTime) {
   try {
     let tipo = 'consulta';
-    if (action?.type === 'ADD_TO_CART' || action?.type === 'MULTIPLE') tipo = 'agregar_carrito';
-    else if (action?.type === 'CATERING_AGENDADO') tipo = 'catering';
-    else if (action?.type === 'REMOVE_FROM_CART') tipo = 'quitar_carrito';
-    else if (userMsg.match(/hola|buen|hey|buenos dias|buenas tardes/i)) tipo = 'saludo';
+    if (userMsg.match(/hola|buen|hey/i)) tipo = 'saludo';
+    if (reply.includes('Pre-reserva creada')) tipo = 'catering';
+    if (reply.includes('carrito')) tipo = 'agregar_carrito';
     
     await supa.rpc('registrar_interaccion_chatbot', {
       p_user_id: null,
       p_tipo: tipo,
       p_mensaje: userMsg.substring(0, 500),
       p_respuesta: reply.substring(0, 1000),
-      p_accion: action?.type || null,
+      p_accion: tipo,
       p_exitoso: true,
       p_tiempo_ms: Date.now() - startTime,
-      p_metadata: {
-        state_size: JSON.stringify(state).length,
-        has_cart: Object.keys(state.cart || {}).length > 0,
-        session_id: state.sessionId,
-        catering_activo: state.catering?.activo || false
-      }
+      p_metadata: { session_id: state.sessionId, catering_activo: state.catering?.activo }
     });
-  } catch (error) {
-    console.error('[TRACKING]:', error);
-  }
+  } catch (e) { console.error('[TRACK]:', e); }
 }
 
-/* ============== HANDLER ============== */
+/* ============== Handler ============== */
 export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Método no permitido" });
-  }
+  if (req.method !== "POST") return res.status(405).json({ error: "Método no permitido" });
 
   const startTime = Date.now();
 
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
-    const userMsgRaw = body?.messages?.[0]?.content ?? "";
-    const userState = body?.state || {};
+    const userMsg = body?.messages?.[0]?.content ?? "";
     
-    const state = initState(userState);
-    addToHistory(state, "user", userMsgRaw);
+    const state = initState(body?.state || {});
+    addToHistory(state, "user", userMsg);
     
-    const result = await processWithGPT(userMsgRaw, state);
+    const result = await processWithGPT(userMsg, state);
     
-    if (result.reply) {
-      addToHistory(result.state || state, "assistant", result.reply);
-    }
+    addToHistory(result.state, "assistant", result.reply);
     
-    trackInteraction(userMsgRaw, result.reply, result.action, result.state || state, startTime)
-      .catch(err => console.error('[TRACKING]:', err));
+    track(userMsg, result.reply, result.state, startTime).catch(() => {});
     
     return res.status(200).json({
       reply: result.reply,
-      action: result.action,
-      state: result.state || state
+      state: result.state
     });
     
   } catch (err) {
-    console.error("Error /api/ask:", err);
-    return res.status(500).json({ 
-      error: "Error interno",
-      reply: "Disculpá, hubo un problema. Intentá de nuevo." 
-    });
+    console.error("Error:", err);
+    return res.status(500).json({ reply: "Error técnico. Intentá de nuevo." });
   }
 }
