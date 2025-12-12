@@ -613,6 +613,8 @@ async function procesarCarrito(mensaje, state) {
   }
   
   const agregados = [];
+  const actions = []; // Acciones para el frontend
+  
   for (const { prod, qty } of encontrados) {
     if (!state.cart[prod.id]) {
       state.cart[prod.id] = { ...prod, qty: 0 };
@@ -620,13 +622,31 @@ async function procesarCarrito(mensaje, state) {
     state.cart[prod.id].qty += qty;
     agregados.push(`${qty}× ${prod.nombre}`);
     log('CARRITO', `Agregado: ${qty}× ${prod.nombre}`);
+    
+    // Acción para CartAPI del frontend
+    actions.push({
+      type: 'ADD_TO_CART',
+      product: {
+        id: prod.id,
+        titulo: prod.nombre,
+        precio: prod.precio,
+        imagen: prod.imagen || null
+      },
+      qty: qty
+    });
   }
   
   const total = Object.values(state.cart).reduce((s, i) => s + i.precio * i.qty, 0);
   
+  // Si hay múltiples productos, envolver en MULTIPLE
+  const action = actions.length === 1 
+    ? actions[0] 
+    : { type: 'MULTIPLE', actions };
+  
   return { 
     handled: true, 
-    reply: `✅ Agregué al carrito:\n${agregados.join('\n')}\n\n🛒 **Total: ${toPY(total)} Gs**\n\n¿Algo más?`
+    reply: `✅ Agregué al carrito:\n${agregados.join('\n')}\n\n🛒 **Total: ${toPY(total)} Gs**\n\n¿Algo más?`,
+    action
   };
 }
 
@@ -653,7 +673,11 @@ function procesarComandosCarrito(mensaje, state) {
   // Vaciar carrito
   if (msgLower.includes('vaciar carrito') || msgLower.includes('limpiar carrito') || msgLower.includes('borrar carrito')) {
     state.cart = {};
-    return { handled: true, reply: '🗑️ Carrito vaciado. ¿En qué puedo ayudarte?' };
+    return { 
+      handled: true, 
+      reply: '🗑️ Carrito vaciado. ¿En qué puedo ayudarte?',
+      action: { type: 'EMPTY_CART' }
+    };
   }
   
   // Quitar producto
@@ -742,21 +766,25 @@ export default async function handler(req, res) {
     log('STATE', 'Catering activo:', state.catering.activo);
     
     let reply = '';
+    let action = null; // Acción para el frontend (CartAPI)
     
     // 1. Procesar catering (prioridad alta)
     const cateringResult = await procesarCatering(userMsg, state);
     if (cateringResult.handled) {
       reply = cateringResult.reply;
+      action = cateringResult.action || null;
     } else {
       // 2. Comandos de carrito (ver, vaciar)
       const comandoCarrito = procesarComandosCarrito(userMsg, state);
       if (comandoCarrito.handled) {
         reply = comandoCarrito.reply;
+        action = comandoCarrito.action || null;
       } else {
         // 3. Agregar al carrito
         const carritoResult = await procesarCarrito(userMsg, state);
         if (carritoResult.handled) {
           reply = carritoResult.reply;
+          action = carritoResult.action || null;
         } else {
           // 4. Consulta general con GPT
           reply = await consultarGPT(userMsg, state);
@@ -770,23 +798,25 @@ export default async function handler(req, res) {
     if (state.history.length > 12) state.history = state.history.slice(-12);
     
     log('REPLY', reply.substring(0, 100) + '...');
+    log('ACTION', action ? JSON.stringify(action).substring(0, 100) : 'ninguna');
     log('TIME', `${Date.now() - startTime}ms`);
     
     // Tracking
     try {
       await supa.rpc('registrar_interaccion_chatbot', {
         p_user_id: null,
-        p_tipo: state.catering.activo ? 'catering' : (reply.includes('carrito') ? 'agregar_carrito' : 'consulta'),
+        p_tipo: state.catering.activo ? 'catering' : (action ? 'agregar_carrito' : 'consulta'),
         p_mensaje: userMsg.substring(0, 500),
         p_respuesta: reply.substring(0, 1000),
-        p_accion: null,
+        p_accion: action ? JSON.stringify(action) : null,
         p_exitoso: true,
         p_tiempo_ms: Date.now() - startTime,
         p_metadata: { session: state.sessionId, catering_activo: state.catering.activo }
       });
     } catch (e) {}
     
-    return res.status(200).json({ reply, state });
+    // Devolver action para que el frontend ejecute CartAPI
+    return res.status(200).json({ reply, state, action });
     
   } catch (e) {
     log('ERROR', e.message);

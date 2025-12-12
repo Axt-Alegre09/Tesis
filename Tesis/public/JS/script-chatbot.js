@@ -1,5 +1,5 @@
 // public/JS/script-chatbot.js (cargar con type="module")
-// Versión 2.0 - Soporte para múltiples acciones y mejor manejo de estado
+// Versión 2.1 - Sincronización con CartAPI
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -102,26 +102,44 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ===== Ejecutores de acciones de carrito =====
   async function runAction(action) {
-    if (!action || !window.CartAPI) return null;
+    if (!action) return null;
+    
+    // Verificar que CartAPI existe
+    if (!window.CartAPI) {
+      console.warn("⚠️ CartAPI no disponible - el carrito no se actualizará");
+      return null;
+    }
+
+    console.log("🛒 Ejecutando action:", action.type, action);
 
     try {
       switch (action.type) {
         case "ADD_TO_CART": {
+          console.log("➕ Agregando al carrito:", action.product?.titulo, "x", action.qty);
           await window.CartAPI.addProduct(action.product, action.qty || 1);
           await window.CartAPI.refreshBadge?.();
+          console.log("✅ Producto agregado correctamente");
           return null;
         }
         
         case "MULTIPLE": {
           // Procesar múltiples acciones
+          console.log("📦 Procesando", action.actions?.length, "acciones");
           for (const subAction of (action.actions || [])) {
             await runAction(subAction);
           }
           return null;
         }
         
+        case "EMPTY_CART": {
+          console.log("🗑️ Vaciando carrito");
+          await window.CartAPI.empty?.();
+          await window.CartAPI.refreshBadge?.();
+          return null;
+        }
+        
         case "REMOVE_FROM_CART": {
-          await window.CartAPI.removeProduct?.(action.product, action.qty || 1);
+          await window.CartAPI.remove?.({ id: action.product?.id });
           await window.CartAPI.refreshBadge?.();
           return null;
         }
@@ -133,10 +151,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
         
         default:
+          console.warn("Action no reconocida:", action.type);
           return null;
       }
     } catch (e) {
-      console.error("Cart action error:", e);
+      console.error("❌ Cart action error:", e);
       return "Hubo un problema con el carrito. Intentá de nuevo.";
     }
   }
@@ -179,6 +198,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       // Ejecutar acciones del carrito si existen
       if (data.action) {
+        console.log("🎯 Acción recibida del backend:", data.action);
         const feedback = await runAction(data.action);
         if (feedback) {
           appendMessage(feedback, "bot");
