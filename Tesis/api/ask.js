@@ -1,10 +1,9 @@
 // /api/ask.js
-// ==================== CHATBOT PANIQUIÑOS v4.0 ====================
-// Flujo de negocio correcto:
-// 1. Recopilar TODOS los datos del cliente (9 campos)
-// 2. Verificar cupo de fecha
-// 3. Agendar y mostrar resumen completo
-// 4. "Te contactaremos vía WhatsApp para confirmar"
+// ==================== CHATBOT PANIQUIÑOS v6.0 ====================
+// CAMBIO DE ARQUITECTURA:
+// - Backend detecta datos automáticamente (no depende de GPT)
+// - GPT solo genera respuestas naturales
+// - Estado más robusto con logging
 // ==================================================================
 
 import OpenAI from "openai";
@@ -24,16 +23,10 @@ const toPY = (v) => {
   return n.toLocaleString("es-PY");
 };
 
-const norm = (s = "") =>
-  String(s)
-    .toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^\p{L}\p{N}\s]/gu, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+const log = (tag, ...args) => console.log(`[${tag}]`, ...args);
 
 /* ============== Parsers ============== */
-function parseFechaNatural(texto) {
+function parseFecha(texto) {
   if (!texto) return null;
   const str = texto.toLowerCase().trim();
   
@@ -45,13 +38,10 @@ function parseFechaNatural(texto) {
     'septiembre': '09', 'setiembre': '09', 'octubre': '10', 'noviembre': '11', 'diciembre': '12'
   };
   
-  let dia = null, mes = null, anio = null;
+  const matchFull = str.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](20\d{2})/);
+  if (matchFull) return `${matchFull[3]}-${matchFull[2].padStart(2, '0')}-${matchFull[1].padStart(2, '0')}`;
   
-  const matchFull = str.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](20\d{2})\b/);
-  if (matchFull) {
-    return `${matchFull[3]}-${matchFull[2].padStart(2, '0')}-${matchFull[1].padStart(2, '0')}`;
-  }
-  
+  let dia = null, mes = null;
   const matchDia = str.match(/\b(\d{1,2})\b/);
   if (matchDia) dia = matchDia[1].padStart(2, '0');
   
@@ -59,452 +49,375 @@ function parseFechaNatural(texto) {
     if (str.includes(nombre)) { mes = num; break; }
   }
   
-  if (!mes) {
-    const matchMes = str.match(/\b\d{1,2}[\/\-](\d{1,2})\b/);
-    if (matchMes) mes = matchMes[1].padStart(2, '0');
+  if (dia && mes) {
+    const anio = new Date().getFullYear();
+    return `${anio}-${mes}-${dia}`;
   }
-  
-  const matchAnio = str.match(/\b(20\d{2})\b/);
-  if (matchAnio) {
-    anio = matchAnio[1];
-  } else {
-    const ahora = new Date();
-    const anioActual = ahora.getFullYear();
-    const mesActual = ahora.getMonth() + 1;
-    const diaActual = ahora.getDate();
-    
-    if (mes && parseInt(mes) < mesActual) {
-      anio = String(anioActual + 1);
-    } else if (mes && parseInt(mes) === mesActual && dia && parseInt(dia) < diaActual) {
-      anio = String(anioActual + 1);
-    } else {
-      anio = String(anioActual);
-    }
-  }
-  
-  if (!dia || !mes) return null;
-  return `${anio}-${mes}-${dia}`;
+  return null;
 }
 
-function parseHoraNatural(texto) {
+function parseHora(texto) {
   if (!texto) return null;
   const str = texto.toLowerCase().trim();
   
   if (/^\d{1,2}:\d{2}$/.test(str)) {
-    const parts = str.split(':');
-    return `${parts[0].padStart(2, '0')}:${parts[1]}`;
+    const [h, m] = str.split(':');
+    return `${h.padStart(2, '0')}:${m}`;
   }
   
-  const matchHora = str.match(/\b(\d{1,2})\b/);
-  if (matchHora) {
-    let hora = parseInt(matchHora[1]);
-    
-    if (str.includes('tarde') || str.includes('pm')) {
+  const match = str.match(/(\d{1,2})/);
+  if (match) {
+    let hora = parseInt(match[1]);
+    if (str.includes('tarde') || str.includes('pm') || str.includes('noche')) {
       if (hora < 12) hora += 12;
-    } else if (str.includes('noche')) {
-      if (hora < 12) hora += 12;
-    } else if (str.includes('mañana') || str.includes('am')) {
-      if (hora === 12) hora = 0;
     }
-    
     return `${String(hora).padStart(2, '0')}:00`;
   }
-  
   return null;
-}
-
-/* ============== Verificar cupo ============== */
-async function verificarCupo(fechaTexto) {
-  const fechaNorm = parseFechaNatural(fechaTexto);
-  if (!fechaNorm) return { ok: false, error: `No entendí la fecha "${fechaTexto}". Decila como "26 de diciembre" o "26/12/2025".` };
-  
-  try {
-    const { data, error } = await supa.rpc('verificar_cupo_catering', { p_fecha: fechaNorm });
-    
-    if (error) {
-      console.error('Error cupo:', error);
-      return { ok: true, fecha: fechaNorm }; // Si falla, asumir que hay cupo
-    }
-    
-    if (!data.tiene_cupo) {
-      return { 
-        ok: false, 
-        error: `❌ El ${fechaNorm} ya tiene ${data.limite} servicios agendados (cupo lleno). ¿Qué otra fecha te sirve?`,
-        cupoLleno: true
-      };
-    }
-    
-    return { ok: true, fecha: fechaNorm, disponible: data.disponible };
-  } catch (err) {
-    console.error('Error cupo:', err);
-    return { ok: true, fecha: fechaNorm };
-  }
 }
 
 /* ============== Catálogo ============== */
 let _cache = { at: 0, items: [] };
 
 async function loadCatalog() {
-  const now = Date.now();
-  if (now - _cache.at < 180000 && _cache.items.length) return _cache.items;
-
+  if (Date.now() - _cache.at < 180000 && _cache.items.length) return _cache.items;
   const { data } = await supa.from("v_productos_publicos").select("id, nombre, precio, categoria_nombre");
-  const items = (data || []).map(p => ({
-    id: p.id,
-    nombre: String(p.nombre || "").trim(),
-    precio: Number(p.precio || 0),
-    categoria: String(p.categoria_nombre || "").trim(),
-  }));
-  
-  _cache = { at: now, items };
-  return items;
+  _cache = { at: Date.now(), items: (data || []).map(p => ({ id: p.id, nombre: p.nombre?.trim(), precio: Number(p.precio), categoria: p.categoria_nombre?.trim() })) };
+  return _cache.items;
 }
 
 async function buscarProducto(nombre) {
   const items = await loadCatalog();
-  const nombreNorm = norm(nombre);
-  
-  return items.find(p => norm(p.nombre) === nombreNorm) ||
-         items.find(p => norm(p.nombre).includes(nombreNorm) || nombreNorm.includes(norm(p.nombre))) ||
-         items.find(p => nombreNorm.split(' ').filter(x => x.length > 2).some(palabra => norm(p.nombre).includes(palabra))) ||
-         null;
+  const n = nombre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return items.find(p => p.nombre.toLowerCase().includes(n) || n.includes(p.nombre.toLowerCase()));
+}
+
+/* ============== Verificar cupo ============== */
+async function verificarCupo(fecha) {
+  try {
+    const { data, error } = await supa.rpc('verificar_cupo_catering', { p_fecha: fecha });
+    if (error) return { ok: true };
+    return data.tiene_cupo ? { ok: true, disponible: data.disponible } : { ok: false, limite: data.limite };
+  } catch (e) {
+    return { ok: true };
+  }
 }
 
 /* ============== Estado ============== */
-function crearCateringLimpio() {
-  return {
-    activo: false,
-    paso: 0, // Para saber en qué paso estamos
-    nombre: null,
-    telefono: null,
-    email: null,
-    direccion: null,
-    tipoServicio: null,
-    menu: null,
-    invitados: null,
-    fecha: null,
-    hora: null,
-  };
+const CAMPOS = ['nombre', 'telefono', 'email', 'tipoServicio', 'fecha', 'hora', 'menu', 'invitados', 'direccion'];
+
+const ETIQUETAS = {
+  nombre: 'Nombre',
+  telefono: 'Teléfono', 
+  email: 'Email',
+  tipoServicio: 'Tipo de evento',
+  fecha: 'Fecha',
+  hora: 'Hora',
+  menu: 'Menú',
+  invitados: 'Invitados',
+  direccion: 'Dirección'
+};
+
+const PREGUNTAS = {
+  nombre: '¿Cuál es tu nombre completo?',
+  telefono: '¿Tu número de teléfono?',
+  email: '¿Tu correo electrónico?',
+  tipoServicio: '¿Qué tipo de evento es? (cumpleaños, boda, corporativo, etc.)',
+  fecha: '¿Qué fecha sería el evento?',
+  hora: '¿A qué hora?',
+  menu: '¿Qué menú o comida te gustaría?',
+  invitados: '¿Cuántos invitados aproximadamente?',
+  direccion: '¿Cuál es la dirección del evento?'
+};
+
+function crearCateringVacio() {
+  return { activo: false, nombre: null, telefono: null, email: null, tipoServicio: null, fecha: null, hora: null, menu: null, invitados: null, direccion: null };
 }
+
+function getFaltantes(cat) { return CAMPOS.filter(c => !cat[c]); }
+function getCompletos(cat) { return CAMPOS.filter(c => cat[c]); }
+function todosCompletos(cat) { return CAMPOS.every(c => cat[c]); }
 
 function initState(state) {
   return {
-    history: state?.history || [],
+    history: Array.isArray(state?.history) ? state.history : [],
     cart: state?.cart || {},
-    sessionId: state?.sessionId || `s_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
-    catering: state?.catering?.activo ? state.catering : crearCateringLimpio(),
+    sessionId: state?.sessionId || `s_${Date.now()}`,
+    catering: { ...crearCateringVacio(), ...(state?.catering || {}) }
   };
 }
 
-function addToHistory(state, role, content) {
-  state.history.push({ role, content, ts: Date.now() });
-  if (state.history.length > 12) state.history = state.history.slice(-12);
-}
+/* ============== DETECCIÓN AUTOMÁTICA DE DATOS ============== */
+function detectarDatos(mensaje, campoEsperado, datosActuales) {
+  const msg = mensaje.trim();
+  const msgLower = msg.toLowerCase();
+  const datos = {};
 
-/* ============== Campos del catering ============== */
-const CAMPOS_CATERING = [
-  { key: 'nombre', pregunta: '¿Cuál es tu nombre completo?', ejemplo: 'Ej: Juan Pérez' },
-  { key: 'telefono', pregunta: '¿Tu número de teléfono?', ejemplo: 'Ej: 0991234567' },
-  { key: 'email', pregunta: '¿Tu correo electrónico?', ejemplo: 'Ej: juan@gmail.com' },
-  { key: 'tipoServicio', pregunta: '¿Qué tipo de evento es?', ejemplo: 'Ej: cumpleaños, boda, corporativo' },
-  { key: 'fecha', pregunta: '¿Qué fecha sería el evento?', ejemplo: 'Ej: 26 de diciembre', verificarCupo: true },
-  { key: 'hora', pregunta: '¿A qué hora?', ejemplo: 'Ej: 19:00 o 7 de la tarde' },
-  { key: 'menu', pregunta: '¿Qué menú o comida te gustaría?', ejemplo: 'Ej: empanadas, bocaditos, torta' },
-  { key: 'invitados', pregunta: '¿Cuántos invitados aproximadamente?', ejemplo: 'Ej: 50 personas' },
-  { key: 'direccion', pregunta: '¿Cuál es la dirección del evento?', ejemplo: 'Ej: Avda. España 1234' },
-];
-
-function getSiguienteCampoFaltante(catering) {
-  for (const campo of CAMPOS_CATERING) {
-    if (!catering[campo.key]) return campo;
-  }
-  return null; // Todos completos
-}
-
-function getDatosCompletos(catering) {
-  return CAMPOS_CATERING.every(c => catering[c.key]);
-}
-
-/* ============== Construir contexto ============== */
-async function buildContext(state) {
-  const catalogo = await loadCatalog();
+  // === DETECCIÓN GLOBAL (siempre buscar estos) ===
   
-  const categorias = {};
-  catalogo.forEach(p => {
-    if (!categorias[p.categoria]) categorias[p.categoria] = [];
-    categorias[p.categoria].push(`${p.nombre}: ${toPY(p.precio)} Gs`);
-  });
-  
-  const catalogoTexto = Object.entries(categorias)
-    .map(([cat, prods]) => `**${cat}:**\n${prods.map(p => `- ${p}`).join('\n')}`)
-    .join('\n\n');
-  
-  const carritoItems = Object.values(state.cart);
-  const carritoTexto = carritoItems.length > 0
-    ? carritoItems.map(item => `- ${item.qty}× ${item.nombre}`).join('\n')
-    : 'Vacío';
-  const total = carritoItems.reduce((sum, item) => sum + (item.precio * item.qty), 0);
-
-  // Info de catering
-  let cateringInfo = '';
-  if (state.catering.activo) {
-    const cat = state.catering;
-    const datosActuales = [];
-    const faltante = getSiguienteCampoFaltante(cat);
-    
-    CAMPOS_CATERING.forEach(campo => {
-      if (cat[campo.key]) {
-        datosActuales.push(`✅ ${campo.key}: ${cat[campo.key]}`);
-      }
-    });
-    
-    cateringInfo = `
-══════════════════════════════════════
-🎉 RESERVA DE CATERING EN PROGRESO
-══════════════════════════════════════
-${datosActuales.length > 0 ? datosActuales.join('\n') : '(Sin datos aún)'}
-
-${faltante ? `
-➡️ SIGUIENTE PREGUNTA: ${faltante.pregunta}
-   ${faltante.ejemplo}
-` : `
-✅ ¡TODOS LOS DATOS COMPLETOS!
-⚠️ DEBÉS llamar "ejecutar_reserva" AHORA.
-`}
-══════════════════════════════════════`;
+  // Email (muy específico, fácil de detectar)
+  if (!datosActuales.email) {
+    const emailMatch = msg.match(/[\w.\-]+@[\w.\-]+\.\w+/);
+    if (emailMatch) datos.email = emailMatch[0];
   }
   
-  return { catalogo: catalogoTexto, carrito: carritoTexto, total: toPY(total), cateringInfo };
-}
-
-/* ============== Prompt ============== */
-function buildSystemPrompt(context) {
-  return `Sos el asistente de Paniquiños (panadería/confitería en Asunción, Paraguay).
-
-INFORMACIÓN:
-- Horarios: Lun-Vie 8:00-18:00, Sáb-Dom 8:00-13:00
-- WhatsApp: +595 992 544 305
-- Límite catering: 2/día (L-V), 3/día (S-D)
-
-CATÁLOGO:
-${context.catalogo}
-
-CARRITO: ${context.carrito} | Total: ${context.total} Gs
-${context.cateringInfo}
-
-══════════════════════════════════════
-REGLAS IMPORTANTES:
-══════════════════════════════════════
-
-1. **CARRITO:**
-   - 1 producto → "agregar_carrito"
-   - Varios productos → "agregar_multiples"
-
-2. **CATERING:**
-   - Cuando el usuario quiera reservar/agendar → "iniciar_catering"
-   - Luego, por CADA respuesta del usuario → "guardar_dato" con el campo y valor EXACTO
-   - NUNCA inventes datos. Usá EXACTAMENTE lo que dijo el usuario.
-   - Preguntá UN campo a la vez, en orden.
-   - Cuando estén los 9 datos → "ejecutar_reserva"
-
-3. **PROHIBIDO:**
-   - Inventar nombres, fechas, teléfonos o cualquier dato
-   - Decir un nombre diferente al que dijo el usuario
-   - Mostrar resúmenes sin ejecutar la función
-   - Saltear campos
-
-4. **ESTILO:**
-   - Corto y amigable (1-2 líneas)
-   - Emojis ocasionales 😊
-   - Cuando guardes un dato, preguntá inmediatamente el siguiente`;
-}
-
-/* ============== Tools ============== */
-const TOOLS = [
-  {
-    type: "function",
-    function: {
-      name: "agregar_carrito",
-      description: "Agregar UN producto al carrito",
-      parameters: {
-        type: "object",
-        properties: {
-          producto: { type: "string" },
-          cantidad: { type: "number" }
-        },
-        required: ["producto"]
+  // Teléfono (número de 9-10 dígitos empezando con 0)
+  if (!datosActuales.telefono) {
+    const telMatch = msg.match(/0\d{2,3}[\s\-]?\d{3}[\s\-]?\d{3,4}/);
+    if (telMatch) {
+      datos.telefono = telMatch[0].replace(/[\s\-]/g, '');
+    } else {
+      const telSimple = msg.match(/09\d{8}/);
+      if (telSimple) datos.telefono = telSimple[0];
+    }
+  }
+  
+  // Fecha (menciona mes o tiene formato de fecha)
+  if (!datosActuales.fecha) {
+    const fecha = parseFecha(msg);
+    if (fecha) datos.fecha = fecha;
+  }
+  
+  // Hora (menciona horas, :, tarde, noche)
+  if (!datosActuales.hora && /\d+\s*(horas?|hs|:|\s*(de la )?(tarde|noche|mañana))/.test(msgLower)) {
+    const hora = parseHora(msg);
+    if (hora) datos.hora = hora;
+  }
+  
+  // Tipo de servicio
+  if (!datosActuales.tipoServicio) {
+    const tipos = {
+      'cumpleaños': ['cumpleaños', 'cumple'],
+      'boda': ['boda', 'casamiento', 'matrimonio'],
+      'corporativo': ['corporativo', 'empresa', 'empresarial', 'oficina'],
+      'bautismo': ['bautismo', 'bautizo'],
+      'comunión': ['comunión', 'comunion', 'primera comunión'],
+      'quinceañera': ['quinceañera', 'quince', '15 años'],
+      'graduación': ['graduación', 'graduacion', 'egreso'],
+      'aniversario': ['aniversario'],
+      'reunión': ['reunión', 'reunion', 'junta'],
+      'fiesta': ['fiesta']
+    };
+    for (const [tipo, keywords] of Object.entries(tipos)) {
+      if (keywords.some(k => msgLower.includes(k))) {
+        datos.tipoServicio = tipo;
+        break;
       }
     }
-  },
-  {
-    type: "function",
-    function: {
-      name: "agregar_multiples",
-      description: "Agregar VARIOS productos al carrito",
-      parameters: {
-        type: "object",
-        properties: {
-          productos: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                producto: { type: "string" },
-                cantidad: { type: "number" }
-              }
-            }
+  }
+  
+  // Invitados (número seguido de "personas", "invitados", o solo número si esperamos este campo)
+  if (!datosActuales.invitados) {
+    const invMatch = msg.match(/(\d+)\s*(personas?|invitados?|gente)?/i);
+    if (invMatch && parseInt(invMatch[1]) >= 5 && parseInt(invMatch[1]) <= 1000) {
+      // Solo si parece cantidad razonable de invitados
+      if (invMatch[2] || campoEsperado === 'invitados') {
+        datos.invitados = invMatch[1];
+      }
+    }
+  }
+
+  // === DETECCIÓN POR CAMPO ESPERADO ===
+  if (campoEsperado && !datos[campoEsperado]) {
+    switch (campoEsperado) {
+      case 'nombre':
+        // Acepta el mensaje completo como nombre si no tiene @ ni números largos
+        if (!msg.includes('@') && !/\d{5,}/.test(msg) && msg.length >= 2 && msg.length <= 100) {
+          // Limpiar comas y otros datos que ya detectamos
+          let nombre = msg;
+          if (datos.telefono) nombre = nombre.replace(datos.telefono, '');
+          if (datos.email) nombre = nombre.replace(datos.email, '');
+          nombre = nombre.replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
+          // Tomar las primeras palabras que parezcan nombre
+          const palabras = nombre.split(' ').filter(p => p.length >= 2 && !/\d/.test(p));
+          if (palabras.length >= 1) {
+            datos.nombre = palabras.slice(0, 4).join(' '); // Max 4 palabras
           }
-        },
-        required: ["productos"]
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "iniciar_catering",
-      description: "Iniciar el proceso de reserva de catering. Limpia datos anteriores.",
-      parameters: { type: "object", properties: {} }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "guardar_dato",
-      description: "Guardar UN dato del catering. Llamar con el campo y valor EXACTO que dijo el usuario.",
-      parameters: {
-        type: "object",
-        properties: {
-          campo: { 
-            type: "string", 
-            enum: ["nombre", "telefono", "email", "tipoServicio", "fecha", "hora", "menu", "invitados", "direccion"]
-          },
-          valor: { type: "string", description: "Valor EXACTO que dijo el usuario, sin modificar" }
-        },
-        required: ["campo", "valor"]
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "ejecutar_reserva",
-      description: "Ejecutar la reserva de catering. Solo llamar cuando TODOS los 9 campos estén completos.",
-      parameters: { type: "object", properties: {} }
+        }
+        break;
+        
+      case 'telefono':
+        // Si solo hay números en el mensaje
+        const soloNum = msg.replace(/[\s\-\(\)]/g, '');
+        if (/^\d{8,12}$/.test(soloNum)) {
+          datos.telefono = soloNum;
+        }
+        break;
+        
+      case 'email':
+        // Ya detectado arriba
+        break;
+        
+      case 'tipoServicio':
+        // Si no matcheó arriba, aceptar texto corto
+        if (!datos.tipoServicio && msg.length <= 50 && !msg.includes('@') && !/\d{5,}/.test(msg)) {
+          datos.tipoServicio = msg;
+        }
+        break;
+        
+      case 'menu':
+        // Aceptar el texto como menú
+        if (msg.length >= 2 && msg.length <= 500) {
+          // Limpiar otros datos detectados
+          let menu = msg;
+          if (datos.fecha) menu = menu.replace(/\d{1,2}\s+de\s+\w+/gi, '').replace(/\d{4}-\d{2}-\d{2}/g, '');
+          menu = menu.replace(/,\s*$/, '').trim();
+          if (menu.length >= 2) datos.menu = menu;
+        }
+        break;
+        
+      case 'invitados':
+        const numMatch = msg.match(/\d+/);
+        if (numMatch) datos.invitados = numMatch[0];
+        break;
+        
+      case 'direccion':
+        // Aceptar el texto como dirección
+        if (msg.length >= 3 && msg.length <= 300) {
+          datos.direccion = msg;
+        }
+        break;
     }
   }
-];
 
-/* ============== Procesar tool calls ============== */
-async function processToolCall(toolCall, state) {
-  const name = toolCall.function.name;
-  const args = JSON.parse(toolCall.function.arguments || '{}');
+  return datos;
+}
+
+/* ============== PROCESAR CATERING ============== */
+async function procesarCatering(mensaje, state) {
+  const cat = state.catering;
+  const msgLower = mensaje.toLowerCase();
   
-  console.log(`[TOOL] ${name}:`, args);
+  // Si no está activo, verificar si quiere iniciar
+  if (!cat.activo) {
+    const triggers = ['catering', 'reservar', 'reserva', 'agendar', 'evento', 'servicio de comida'];
+    if (triggers.some(t => msgLower.includes(t))) {
+      state.catering = { ...crearCateringVacio(), activo: true };
+      return { handled: true, reply: `¡Perfecto! Vamos a reservar tu servicio de catering 🎉\n\n${PREGUNTAS.nombre}` };
+    }
+    return { handled: false };
+  }
+
+  // === COMANDOS ESPECIALES ===
   
-  switch (name) {
-    case "agregar_carrito": {
-      const prod = await buscarProducto(args.producto);
-      if (prod) {
-        const qty = Math.max(1, parseInt(args.cantidad) || 1);
-        if (!state.cart[prod.id]) state.cart[prod.id] = { ...prod, qty: 0 };
-        state.cart[prod.id].qty += qty;
-        return { message: `Agregué ${qty}× ${prod.nombre} al carrito 🛒` };
-      }
-      return { message: `No encontré "${args.producto}". ¿Podés ser más específico?` };
-    }
+  // "Qué datos tenés?"
+  if (msgLower.includes('que datos') || msgLower.includes('qué datos') || msgLower.includes('que tenes') || msgLower.includes('qué tenés')) {
+    const completos = getCompletos(cat);
+    const faltantes = getFaltantes(cat);
     
-    case "agregar_multiples": {
-      const resultados = [];
-      for (const item of (args.productos || [])) {
-        const prod = await buscarProducto(item.producto);
-        if (prod) {
-          const qty = Math.max(1, parseInt(item.cantidad) || 1);
-          if (!state.cart[prod.id]) state.cart[prod.id] = { ...prod, qty: 0 };
-          state.cart[prod.id].qty += qty;
-          resultados.push(`${qty}× ${prod.nombre}`);
-        }
-      }
-      return { message: resultados.length > 0 ? `Agregué al carrito: ${resultados.join(', ')} 🛒` : 'No encontré esos productos.' };
+    let respuesta = '📋 **Datos que tengo:**\n';
+    if (completos.length > 0) {
+      respuesta += completos.map(c => `✅ ${ETIQUETAS[c]}: ${cat[c]}`).join('\n');
+    } else {
+      respuesta += '(ninguno aún)';
     }
-    
-    case "iniciar_catering": {
-      state.catering = crearCateringLimpio();
-      state.catering.activo = true;
-      const primerCampo = CAMPOS_CATERING[0];
-      return { 
-        message: `¡Perfecto! Vamos a reservar tu servicio de catering. 🎉\n\n${primerCampo.pregunta} ${primerCampo.ejemplo}`,
-        continuar: true
-      };
+    respuesta += '\n\n';
+    if (faltantes.length > 0) {
+      respuesta += `❌ **Faltan:** ${faltantes.map(c => ETIQUETAS[c]).join(', ')}\n\n`;
+      respuesta += PREGUNTAS[faltantes[0]];
     }
-    
-    case "guardar_dato": {
-      if (!state.catering.activo) {
-        state.catering = crearCateringLimpio();
-        state.catering.activo = true;
+    return { handled: true, reply: respuesta };
+  }
+  
+  // "Ya te di eso" / "ya me pediste eso"
+  if (msgLower.includes('ya te di') || msgLower.includes('ya me pediste') || msgLower.includes('ya te dije')) {
+    const faltantes = getFaltantes(cat);
+    if (faltantes.length > 0) {
+      return { handled: true, reply: `Disculpá, parece que no guardé bien. ${PREGUNTAS[faltantes[0]]}` };
+    }
+  }
+  
+  // "Cancelar"
+  if (msgLower.includes('cancelar') || msgLower.includes('no quiero') || msgLower.includes('dejá')) {
+    state.catering = crearCateringVacio();
+    return { handled: true, reply: '✅ Reserva cancelada. ¿Te puedo ayudar con algo más?' };
+  }
+  
+  // Pregunta de disponibilidad: "27 de diciembre tenés disponible?"
+  if ((msgLower.includes('disponible') || msgLower.includes('hay cupo') || msgLower.includes('tenes disponible') || msgLower.includes('tenés disponible')) && !cat.fecha) {
+    const fecha = parseFecha(mensaje);
+    if (fecha) {
+      const cupo = await verificarCupo(fecha);
+      if (cupo.ok) {
+        cat.fecha = fecha;
+        log('GUARDADO', `fecha = "${fecha}" (pregunta de disponibilidad)`);
+        const faltantes = getFaltantes(cat);
+        const siguiente = faltantes[0];
+        return { handled: true, reply: `¡Sí, el ${fecha} está disponible! 😊 ${PREGUNTAS[siguiente]}` };
+      } else {
+        return { handled: true, reply: `❌ El ${fecha} ya tiene ${cupo.limite} servicios agendados (cupo lleno). ¿Qué otra fecha te sirve?` };
       }
-      
-      const { campo, valor } = args;
-      
+    }
+  }
+
+  // Catering activo - detectar datos
+  const faltantes = getFaltantes(cat);
+  const campoActual = faltantes[0];
+  
+  log('CATERING', `Campo esperado: ${campoActual}, Faltantes: ${faltantes.join(', ')}`);
+  log('CATERING', `Estado actual:`, JSON.stringify(cat));
+  
+  const datosDetectados = detectarDatos(mensaje, campoActual, cat);
+  log('DETECTADO', JSON.stringify(datosDetectados));
+  
+  // Guardar datos detectados
+  let cupoError = null;
+  for (const [campo, valor] of Object.entries(datosDetectados)) {
+    if (!cat[campo] && valor) {
       // Validación especial para fecha
       if (campo === 'fecha') {
-        const cupoCheck = await verificarCupo(valor);
-        if (!cupoCheck.ok) {
-          return { message: cupoCheck.error, continuar: true };
+        const cupo = await verificarCupo(valor);
+        if (!cupo.ok) {
+          cupoError = `❌ El ${valor} ya tiene ${cupo.limite} servicios agendados (cupo lleno). ¿Qué otra fecha te sirve?`;
+          continue;
         }
-        state.catering.fecha = cupoCheck.fecha; // Guardar fecha normalizada
-      } else {
-        state.catering[campo] = valor;
       }
-      
-      console.log(`[CATERING] Guardado ${campo}:`, state.catering[campo]);
-      
-      // Ver qué sigue
-      const siguiente = getSiguienteCampoFaltante(state.catering);
-      
-      if (siguiente) {
-        return { 
-          message: `Perfecto. ${siguiente.pregunta} ${siguiente.ejemplo}`,
-          continuar: true
-        };
-      } else {
-        // ¡Todos los datos! Ejecutar reserva automáticamente
-        return await ejecutarReserva(state);
-      }
+      cat[campo] = valor;
+      log('GUARDADO', `${campo} = "${valor}"`);
     }
-    
-    case "ejecutar_reserva": {
-      return await ejecutarReserva(state);
-    }
-    
-    default:
-      return { message: "¿En qué puedo ayudarte?" };
   }
+  
+  // Si hubo error de cupo, retornarlo
+  if (cupoError) {
+    return { handled: true, reply: cupoError };
+  }
+  
+  // Verificar si completamos todo
+  if (todosCompletos(cat)) {
+    log('CATERING', '✅ Todos los campos completos, ejecutando reserva...');
+    return await ejecutarReserva(state);
+  }
+  
+  // Si no detectamos nada para el campo actual, dar pista
+  const nuevosFaltantes = getFaltantes(cat);
+  const siguienteCampo = nuevosFaltantes[0];
+  
+  if (Object.keys(datosDetectados).length === 0) {
+    // No entendió el dato
+    return { 
+      handled: true, 
+      reply: `No entendí bien. ${PREGUNTAS[siguienteCampo]} 😊` 
+    };
+  }
+  
+  // Preguntar siguiente
+  return { 
+    handled: true, 
+    reply: `Perfecto. ${PREGUNTAS[siguienteCampo]}` 
+  };
 }
 
 async function ejecutarReserva(state) {
   const cat = state.catering;
   
-  // Validar que tenemos todo
-  const faltante = getSiguienteCampoFaltante(cat);
-  if (faltante) {
-    return { 
-      message: `Todavía falta: ${faltante.pregunta}`,
-      continuar: true
-    };
-  }
-  
   try {
-    const fechaNorm = parseFechaNatural(cat.fecha) || cat.fecha;
-    const horaNorm = parseHoraNatural(cat.hora) || cat.hora;
-    
-    console.log('[RESERVA] Ejecutando:', { ...cat, fechaNorm, horaNorm });
+    log('RESERVA', 'Ejecutando con:', JSON.stringify(cat));
     
     const { data, error } = await supa.rpc("catering_agendar", {
       p_razonsocial: cat.nombre,
       p_tipoevento: cat.tipoServicio,
-      p_fecha: fechaNorm,
-      p_hora: horaNorm,
+      p_fecha: cat.fecha,
+      p_hora: cat.hora,
       p_tipocomida: cat.menu,
       p_lugar: cat.direccion,
       p_ruc: 'CHAT-BOT',
@@ -515,142 +428,202 @@ async function ejecutarReserva(state) {
     });
 
     if (error) {
-      console.error('[RESERVA] Error:', error);
-      
-      if (error.message.includes('Cupo lleno')) {
-        state.catering.fecha = null;
-        return { 
-          message: `❌ Cupo lleno para esa fecha. ¿Qué otra fecha te sirve?`,
-          continuar: true
-        };
+      log('RESERVA', 'Error:', error.message);
+      if (error.message.includes('Cupo')) {
+        cat.fecha = null;
+        return { handled: true, reply: `❌ Cupo lleno para esa fecha. ¿Qué otra fecha te sirve?` };
       }
-      return { message: `Error: ${error.message}. Intentá de nuevo.` };
+      return { handled: true, reply: `Error: ${error.message}` };
     }
 
-    console.log('[RESERVA] ✅ Éxito:', data);
+    log('RESERVA', '✅ Creada:', data?.id);
 
-    // Construir resumen bonito
-    const resumen = `
-🎉 **¡Pre-reserva creada exitosamente!**
+    const resumen = `🎉 **¡Pre-reserva creada exitosamente!**
 
 📋 **Datos de tu reserva:**
 • **Nombre:** ${cat.nombre}
 • **Teléfono:** ${cat.telefono}
 • **Email:** ${cat.email}
 • **Tipo de evento:** ${cat.tipoServicio}
-• **Fecha:** ${fechaNorm}
-• **Hora:** ${horaNorm}
+• **Fecha:** ${cat.fecha}
+• **Hora:** ${cat.hora}
 • **Menú:** ${cat.menu}
 • **Invitados:** ${cat.invitados}
 • **Dirección:** ${cat.direccion}
 
-📱 **Te contactaremos vía WhatsApp al ${cat.telefono} para confirmar los datos y coordinar el pago.**
+📱 Te contactaremos vía WhatsApp al ${cat.telefono} para confirmar los datos y coordinar el pago.
 
-¡Gracias por elegir Paniquiños! 😊
-    `.trim();
+¡Gracias por elegir Paniquiños! 😊`;
 
     // Limpiar estado
-    state.catering = crearCateringLimpio();
+    state.catering = crearCateringVacio();
+    
+    return { handled: true, reply: resumen };
 
-    return { message: resumen, reservaExitosa: true };
-
-  } catch (err) {
-    console.error('[RESERVA] Error:', err);
-    return { message: `Error técnico. Contactanos al +595 992 544 305` };
+  } catch (e) {
+    log('RESERVA', 'Exception:', e.message);
+    return { handled: true, reply: 'Error técnico. Contactanos al +595 992 544 305' };
   }
 }
 
-/* ============== Proceso principal ============== */
-async function processWithGPT(userMsg, state) {
-  const context = await buildContext(state);
-  const systemPrompt = buildSystemPrompt(context);
+/* ============== PROCESAR CARRITO ============== */
+async function procesarCarrito(mensaje, state) {
+  const msgLower = mensaje.toLowerCase();
   
+  // Detectar intención de agregar al carrito
+  const triggers = ['quiero', 'dame', 'agregar', 'añadir', 'poneme', 'agrega'];
+  if (!triggers.some(t => msgLower.includes(t))) {
+    return { handled: false };
+  }
+  
+  // Buscar productos mencionados
+  const catalogo = await loadCatalog();
+  const agregados = [];
+  
+  for (const prod of catalogo) {
+    const nombreLower = prod.nombre.toLowerCase();
+    if (msgLower.includes(nombreLower)) {
+      // Buscar cantidad
+      const regex = new RegExp(`(\\d+)\\s*(?:x\\s*)?${nombreLower}|${nombreLower}\\s*(?:x\\s*)?(\\d+)?`, 'i');
+      const match = mensaje.match(regex);
+      const qty = parseInt(match?.[1] || match?.[2]) || 1;
+      
+      if (!state.cart[prod.id]) state.cart[prod.id] = { ...prod, qty: 0 };
+      state.cart[prod.id].qty += qty;
+      agregados.push(`${qty}× ${prod.nombre}`);
+    }
+  }
+  
+  if (agregados.length > 0) {
+    const total = Object.values(state.cart).reduce((s, i) => s + i.precio * i.qty, 0);
+    return { 
+      handled: true, 
+      reply: `Agregué ${agregados.join(', ')} al carrito 🛒\n\nTotal: ${toPY(total)} Gs\n\n¿Algo más?`
+    };
+  }
+  
+  return { handled: false };
+}
+
+/* ============== GPT PARA CONSULTAS GENERALES ============== */
+async function consultarGPT(mensaje, state) {
+  const catalogo = await loadCatalog();
+  
+  const catTexto = Object.entries(
+    catalogo.reduce((acc, p) => { 
+      if (!acc[p.categoria]) acc[p.categoria] = []; 
+      acc[p.categoria].push(`${p.nombre}: ${toPY(p.precio)} Gs`); 
+      return acc; 
+    }, {})
+  ).map(([cat, prods]) => `**${cat}:**\n${prods.join(', ')}`).join('\n\n');
+  
+  const carritoItems = Object.values(state.cart);
+  const carritoTexto = carritoItems.length ? carritoItems.map(i => `${i.qty}× ${i.nombre}`).join(', ') : 'vacío';
+  const total = carritoItems.reduce((s, i) => s + i.precio * i.qty, 0);
+
+  const systemPrompt = `Sos el asistente de Paniquiños (panadería/confitería en Asunción, Paraguay).
+
+CATÁLOGO:
+${catTexto}
+
+CARRITO ACTUAL: ${carritoTexto} (Total: ${toPY(total)} Gs)
+
+SERVICIOS:
+- Venta de productos (empanadas, tortas, bocaditos, etc.)
+- Servicio de catering para eventos
+
+INSTRUCCIONES:
+- Respuestas cortas y amigables (1-3 líneas)
+- Si preguntan por catering/eventos/reservas → decí "¿Querés que te ayude a agendar un servicio de catering?"
+- Si quieren agregar productos → confirmar y preguntar si algo más
+- Usá emojis ocasionalmente 😊`;
+
   const messages = [
     { role: "system", content: systemPrompt },
-    ...state.history.slice(-8).map(h => ({ role: h.role, content: h.content })),
-    { role: "user", content: userMsg }
+    ...state.history.slice(-6),
+    { role: "user", content: mensaje }
   ];
-  
+
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      temperature: 0.3, // Más determinístico
-      messages,
-      tools: TOOLS,
-      tool_choice: "auto",
-      parallel_tool_calls: true
+      temperature: 0.7,
+      max_tokens: 200,
+      messages
     });
     
-    const message = completion.choices[0].message;
-    
-    if (message.tool_calls?.length > 0) {
-      let respuestaFinal = '';
-      
-      for (const toolCall of message.tool_calls) {
-        const result = await processToolCall(toolCall, state);
-        if (result.message) {
-          respuestaFinal = result.message; // Usar la última respuesta
-        }
-      }
-      
-      return { reply: respuestaFinal || message.content || "¿En qué más puedo ayudarte?", state };
-    }
-    
-    return { reply: message.content || "¿En qué más puedo ayudarte?", state };
-    
-  } catch (err) {
-    console.error("GPT error:", err);
-    return { reply: "Disculpá, tuve un problema. ¿Podés repetir?", state };
+    return completion.choices[0].message.content || "¿En qué puedo ayudarte?";
+  } catch (e) {
+    log('GPT', 'Error:', e.message);
+    return "¿En qué puedo ayudarte? 😊";
   }
 }
 
-/* ============== Tracking ============== */
-async function track(userMsg, reply, state, startTime) {
-  try {
-    let tipo = 'consulta';
-    if (userMsg.match(/hola|buen|hey/i)) tipo = 'saludo';
-    if (reply.includes('Pre-reserva creada')) tipo = 'catering';
-    if (reply.includes('carrito')) tipo = 'agregar_carrito';
-    
-    await supa.rpc('registrar_interaccion_chatbot', {
-      p_user_id: null,
-      p_tipo: tipo,
-      p_mensaje: userMsg.substring(0, 500),
-      p_respuesta: reply.substring(0, 1000),
-      p_accion: tipo,
-      p_exitoso: true,
-      p_tiempo_ms: Date.now() - startTime,
-      p_metadata: { session_id: state.sessionId, catering_activo: state.catering?.activo }
-    });
-  } catch (e) { console.error('[TRACK]:', e); }
-}
-
-/* ============== Handler ============== */
+/* ============== HANDLER PRINCIPAL ============== */
 export default async function handler(req, res) {
-  if (req.method !== "POST") return res.status(405).json({ error: "Método no permitido" });
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Método no permitido" });
+  }
 
   const startTime = Date.now();
 
   try {
-    const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
-    const userMsg = body?.messages?.[0]?.content ?? "";
+    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body || {};
+    const userMsg = body?.messages?.[0]?.content?.trim() ?? "";
     
-    const state = initState(body?.state || {});
-    addToHistory(state, "user", userMsg);
+    if (!userMsg) {
+      return res.status(400).json({ error: "Mensaje vacío" });
+    }
+
+    const state = initState(body?.state);
     
-    const result = await processWithGPT(userMsg, state);
+    log('========', 'NUEVA CONSULTA', '========');
+    log('USER', userMsg);
+    log('STATE', 'Catering activo:', state.catering.activo);
     
-    addToHistory(result.state, "assistant", result.reply);
+    let reply = '';
     
-    track(userMsg, result.reply, result.state, startTime).catch(() => {});
+    // 1. Procesar catering (prioridad alta)
+    const cateringResult = await procesarCatering(userMsg, state);
+    if (cateringResult.handled) {
+      reply = cateringResult.reply;
+    } else {
+      // 2. Procesar carrito
+      const carritoResult = await procesarCarrito(userMsg, state);
+      if (carritoResult.handled) {
+        reply = carritoResult.reply;
+      } else {
+        // 3. Consulta general con GPT
+        reply = await consultarGPT(userMsg, state);
+      }
+    }
     
-    return res.status(200).json({
-      reply: result.reply,
-      state: result.state
-    });
+    // Guardar historial
+    state.history.push({ role: "user", content: userMsg });
+    state.history.push({ role: "assistant", content: reply });
+    if (state.history.length > 12) state.history = state.history.slice(-12);
     
-  } catch (err) {
-    console.error("Error:", err);
-    return res.status(500).json({ reply: "Error técnico. Intentá de nuevo." });
+    log('REPLY', reply.substring(0, 100) + '...');
+    log('TIME', `${Date.now() - startTime}ms`);
+    
+    // Tracking
+    try {
+      await supa.rpc('registrar_interaccion_chatbot', {
+        p_user_id: null,
+        p_tipo: state.catering.activo ? 'catering' : (reply.includes('carrito') ? 'agregar_carrito' : 'consulta'),
+        p_mensaje: userMsg.substring(0, 500),
+        p_respuesta: reply.substring(0, 1000),
+        p_accion: null,
+        p_exitoso: true,
+        p_tiempo_ms: Date.now() - startTime,
+        p_metadata: { session: state.sessionId, catering_activo: state.catering.activo }
+      });
+    } catch (e) {}
+    
+    return res.status(200).json({ reply, state });
+    
+  } catch (e) {
+    log('ERROR', e.message);
+    return res.status(500).json({ reply: "Error técnico. Intentá de nuevo.", state: {} });
   }
 }
