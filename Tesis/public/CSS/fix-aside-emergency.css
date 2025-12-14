@@ -1,0 +1,57 @@
+/* ========================================
+   FIX ASIDE FIJO - SOLO DESKTOP
+   No toca nada del responsive móvil
+======================================== */
+
+/* SOLO EN DESKTOP (mayor a 900px) */
+@media (min-width: 901px) {
+  
+  /* WRAPPER - SIN SCROLL, altura fija */
+  .wrapper,
+  .wrapper.has-topbar {
+    display: grid !important;
+    grid-template-columns: 1fr 4fr !important;
+    height: 100vh !important;
+    overflow: hidden !important;
+    max-height: 100vh !important;
+  }
+
+  /* ASIDE - Sticky dentro del wrapper */
+  aside,
+  aside#mobileAside,
+  #mobileAside {
+    position: sticky !important;
+    top: 0 !important;
+    height: 100vh !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    grid-column: 1 / 2 !important;
+    grid-row: 1 / span 2 !important;
+  }
+
+  /* MAIN - ÚNICO ELEMENTO CON SCROLL */
+  main {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    max-height: 100vh !important;
+    height: 100vh !important;
+  }
+
+  /* TOPBAR */
+  .site-topbar.within {
+    grid-column: 2 / -1 !important;
+    grid-row: 1 !important;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 100 !important;
+  }
+
+  .wrapper.has-topbar main {
+    grid-column: 2 / -1 !important;
+    grid-row: 2 !important;
+    height: auto !important;
+    max-height: calc(100vh - 80px) !important;
+  }
+}
+
+/* MÓVIL se queda igual que antes, sin cambios */

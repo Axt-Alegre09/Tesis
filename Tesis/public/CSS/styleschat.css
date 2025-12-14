@@ -684,6 +684,3 @@
 .chat-container.loading #chat-form {
   opacity: 0.6;
 }
-aside{
-  position: fixed;
-}
