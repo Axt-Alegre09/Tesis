@@ -1,0 +1,355 @@
+/* ==================== PARCHE FINAL - MODALES Y MODO OSCURO ==================== */
+/* Agregar AL FINAL de admin-dashboard-fixes.css o crear archivo separado */
+
+/* ========== FIX: MODALES EN MODO OSCURO ========== */
+
+/* Modal overlay - fondo */
+[data-theme="dark"] .modal-overlay {
+  background: rgba(0, 0, 0, 0.75);
+}
+
+/* Modal content - fondo y colores */
+[data-theme="dark"] .modal-content {
+  background: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Modal header */
+[data-theme="dark"] .modal-header {
+  border-bottom-color: var(--border) !important;
+}
+
+[data-theme="dark"] .modal-header h2,
+[data-theme="dark"] #modalProductoTitle {
+  color: var(--text-primary) !important;
+}
+
+/* Botón cerrar modal */
+[data-theme="dark"] #closeModalProducto,
+[data-theme="dark"] .modal-close {
+  color: var(--text-secondary) !important;
+  background: transparent !important;
+}
+
+[data-theme="dark"] #closeModalProducto:hover,
+[data-theme="dark"] .modal-close:hover {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Labels en modales */
+[data-theme="dark"] .modal-content label,
+[data-theme="dark"] #formProducto label {
+  color: var(--text-secondary) !important;
+}
+
+/* Inputs, selects, textareas en modales */
+[data-theme="dark"] .modal-content input,
+[data-theme="dark"] .modal-content select,
+[data-theme="dark"] .modal-content textarea,
+[data-theme="dark"] #formProducto input,
+[data-theme="dark"] #formProducto select,
+[data-theme="dark"] #formProducto textarea {
+  background: var(--bg-secondary) !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .modal-content input:focus,
+[data-theme="dark"] .modal-content select:focus,
+[data-theme="dark"] .modal-content textarea:focus,
+[data-theme="dark"] #formProducto input:focus,
+[data-theme="dark"] #formProducto select:focus,
+[data-theme="dark"] #formProducto textarea:focus {
+  background: var(--bg-card) !important;
+  border-color: var(--primary) !important;
+}
+
+/* Placeholder en modo oscuro */
+[data-theme="dark"] .modal-content input::placeholder,
+[data-theme="dark"] .modal-content textarea::placeholder,
+[data-theme="dark"] #formProducto input::placeholder,
+[data-theme="dark"] #formProducto textarea::placeholder {
+  color: var(--text-muted) !important;
+  opacity: 0.6;
+}
+
+/* Select background fix */
+[data-theme="dark"] .modal-content select,
+[data-theme="dark"] #formProducto select {
+  background-color: var(--bg-secondary) !important;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23cbd5e1' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 16px 12px;
+  padding-right: 2.5rem;
+}
+
+/* Upload area en modo oscuro */
+[data-theme="dark"] #uploadArea {
+  border-color: var(--border) !important;
+  background: var(--bg-secondary) !important;
+}
+
+[data-theme="dark"] #uploadArea:hover {
+  background: var(--bg-main) !important;
+  border-color: var(--primary) !important;
+}
+
+[data-theme="dark"] #uploadArea p {
+  color: var(--text-secondary) !important;
+}
+
+[data-theme="dark"] #uploadArea i {
+  color: var(--text-muted) !important;
+}
+
+/* Checkbox en modo oscuro */
+[data-theme="dark"] .modal-content input[type="checkbox"] {
+  background: var(--bg-secondary) !important;
+  border-color: var(--border) !important;
+}
+
+[data-theme="dark"] .modal-content input[type="checkbox"]:checked {
+  background: var(--primary) !important;
+  border-color: var(--primary) !important;
+}
+
+/* Botones del modal */
+[data-theme="dark"] #btnCancelarProducto,
+[data-theme="dark"] .btn-secondary {
+  background: var(--bg-secondary) !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] #btnCancelarProducto:hover,
+[data-theme="dark"] .btn-secondary:hover {
+  background: var(--bg-main) !important;
+}
+
+/* Botón primario mantiene su color */
+[data-theme="dark"] .modal-content button[type="submit"],
+[data-theme="dark"] .btn-primary {
+  background: linear-gradient(135deg, var(--primary), var(--primary-light)) !important;
+  color: white !important;
+}
+
+/* ========== FIX: IFRAMES EN MODO OSCURO ========== */
+
+/* Los iframes heredan el tema */
+[data-theme="dark"] iframe {
+  filter: none;
+  background: var(--bg-card);
+}
+
+/* ========== FIX: TÍTULOS DUPLICADOS - OCULTAR COMPLETAMENTE ========== */
+
+/* Ocultar "Gestión de Promociones" dentro del iframe */
+.content-area iframe {
+  width: 100%;
+  height: 80vh;
+  border: none;
+  border-radius: 0;
+}
+
+/* Si las vistas tienen títulos h2 duplicados, ocultarlos */
+.content-area > div > div:first-child > h2:first-of-type,
+.content-area > div > h2:first-of-type:not(.page-title):not(.chart-title):not(.titulo-principal) {
+  display: none !important;
+}
+
+/* ========== FIX: MODALES DE PROMOCIONES ========== */
+
+/* Modales específicos de promociones en modo oscuro */
+[data-theme="dark"] .modal-overlay .modal-content {
+  background: var(--bg-card) !important;
+}
+
+[data-theme="dark"] .modal-overlay .modal-content h2,
+[data-theme="dark"] .modal-overlay .modal-content h3 {
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .modal-overlay .modal-content p,
+[data-theme="dark"] .modal-overlay .modal-content span,
+[data-theme="dark"] .modal-overlay .modal-content label {
+  color: var(--text-secondary) !important;
+}
+
+/* Lista de productos en modal de asignación */
+[data-theme="dark"] .modal-content .product-item,
+[data-theme="dark"] .modal-content .checkbox-item {
+  background: var(--bg-secondary) !important;
+  border-color: var(--border) !important;
+}
+
+/* ========== FIX: RESPONSIVE DE MODALES ========== */
+
+@media (max-width: 768px) {
+  .modal-content {
+    width: calc(100% - 24px) !important;
+    max-width: none !important;
+    margin: 12px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .modal-content {
+    width: calc(100% - 16px) !important;
+    padding: 20px 16px !important;
+  }
+  
+  .modal-header {
+    padding: 1rem !important;
+  }
+  
+  #formProducto,
+  .modal-content form {
+    padding: 1rem !important;
+  }
+  
+  /* Grid de inputs en móvil */
+  .modal-content [style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ========== FIX: TEXTO DE LABELS Y SPAN ========== */
+
+/* Asegurar que el asterisco rojo sea visible */
+[data-theme="dark"] .modal-content span[style*="color: var(--danger)"],
+[data-theme="dark"] label span {
+  color: var(--danger) !important;
+}
+
+/* ========== FIX: CONTRASTE DE BOTONES ========== */
+
+/* Botón guardar - asegurar contraste */
+[data-theme="dark"] .modal-content button[type="submit"] i,
+[data-theme="dark"] .btn-primary i {
+  color: white !important;
+}
+
+/* ========== FIX: SCROLLBAR EN MODALES ========== */
+
+[data-theme="dark"] .modal-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+[data-theme="dark"] .modal-content::-webkit-scrollbar-track {
+  background: var(--bg-main);
+}
+
+[data-theme="dark"] .modal-content::-webkit-scrollbar-thumb {
+  background: var(--primary);
+  border-radius: 4px;
+}
+
+/* ========== FIX: IMAGEN PREVIEW EN MODAL ========== */
+
+[data-theme="dark"] #previewArea img {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+/* ========== FIX: MODO CLARO - ASEGURAR QUE SE VEA BIEN ========== */
+
+/* En modo claro, asegurar que los modales usen blanco */
+[data-theme="light"] .modal-content,
+.modal-content {
+  background: white !important;
+}
+
+[data-theme="light"] .modal-content input,
+[data-theme="light"] .modal-content select,
+[data-theme="light"] .modal-content textarea {
+  background: white !important;
+  border-color: #e5e5e5 !important;
+  color: #111827 !important;
+}
+
+[data-theme="light"] .modal-content label {
+  color: #6b7280 !important;
+}
+
+/* ========== FIX: NÚMERO DE PRODUCTOS EN MODAL ========== */
+
+[data-theme="dark"] .modal-content small,
+[data-theme="dark"] .modal-content .text-muted {
+  color: var(--text-muted) !important;
+}
+
+/* ========== FIX: SEARCH INPUT EN MODALES ========== */
+
+[data-theme="dark"] .modal-content input[type="search"],
+[data-theme="dark"] .modal-content input[placeholder*="Buscar"] {
+  background: var(--bg-secondary) !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+}
+
+/* ========== FIX: BOTÓN CERRAR (X) ========== */
+
+[data-theme="dark"] .modal-close,
+[data-theme="dark"] #closeModalProducto {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition);
+}
+
+/* ========== FIX CRÍTICO: INPUTS NUMBER SIN FLECHAS EN MODO OSCURO ========== */
+
+[data-theme="dark"] input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+[data-theme="dark"] input[type="number"]::-webkit-outer-spin-button,
+[data-theme="dark"] input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* ========== FIX: DATE INPUTS EN MODO OSCURO ========== */
+
+[data-theme="dark"] input[type="date"],
+[data-theme="dark"] input[type="time"],
+[data-theme="dark"] input[type="datetime-local"] {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border) !important;
+  color-scheme: dark;
+}
+
+/* ========== FIX: TEXTO DE AYUDA EN MODO OSCURO ========== */
+
+[data-theme="dark"] .modal-content ul li,
+[data-theme="dark"] .modal-content ol li {
+  color: var(--text-secondary) !important;
+}
+
+/* ========== RESPONSIVE FINAL - ASEGURAR MODALES EN MÓVIL ========== */
+
+@media (max-width: 393px) {
+  .modal-content {
+    width: calc(100% - 12px) !important;
+    max-height: 96vh !important;
+  }
+  
+  .modal-header h2 {
+    font-size: 1.25rem !important;
+    padding-right: 30px;
+  }
+  
+  #closeModalProducto,
+  .modal-close {
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 1.25rem !important;
+  }
+}

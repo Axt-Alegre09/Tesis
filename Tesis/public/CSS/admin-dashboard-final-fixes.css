@@ -1,0 +1,511 @@
+/* ==================== CORRECCIONES FINALES - SIDEBAR Y MODO OSCURO ==================== */
+/* Este archivo REEMPLAZA o se agrega DESPUÉS de todos los demás CSS */
+
+/* ========== FIX CRÍTICO: SIDEBAR EN MÓVIL - SOLO MITAD DE PANTALLA ========== */
+
+@media (max-width: 768px) {
+  .sidebar {
+    width: 70vw; /* 70% del ancho en móvil, no 100% */
+    max-width: 280px; /* Máximo 280px */
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .sidebar.mobile-open {
+    transform: translateX(0);
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.3);
+  }
+  
+  /* Overlay oscuro cuando el sidebar está abierto */
+  .sidebar::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s, visibility 0.3s;
+    z-index: -1;
+    pointer-events: none;
+  }
+  
+  .sidebar.mobile-open::before {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .sidebar {
+    width: 75vw; /* 75% en pantallas muy pequeñas */
+    max-width: 260px;
+  }
+}
+
+@media (max-width: 393px) {
+  .sidebar {
+    width: 80vw; /* 80% en pantallas ultra pequeñas */
+    max-width: 280px;
+  }
+}
+
+/* ========== FIX: SIDEBAR TOGGLE EN DESKTOP ========== */
+
+@media (min-width: 769px) {
+  /* Sidebar normal */
+  .sidebar {
+    width: var(--sidebar-width, 260px);
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: translateX(0) !important;
+  }
+  
+  /* Sidebar colapsado */
+  .sidebar.collapsed {
+    width: var(--sidebar-collapsed, 80px);
+  }
+  
+  /* Ocultar texto en sidebar colapsado */
+  .sidebar.collapsed .nav-text,
+  .sidebar.collapsed .user-info,
+  .sidebar.collapsed .btn-logout span {
+    opacity: 0;
+    width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  
+  /* Main content ajustado */
+  .main-content {
+    margin-left: var(--sidebar-width, 260px);
+    width: calc(100% - var(--sidebar-width, 260px));
+    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .sidebar.collapsed ~ .main-content {
+    margin-left: var(--sidebar-collapsed, 80px);
+    width: calc(100% - var(--sidebar-collapsed, 80px));
+  }
+}
+
+/* ========== FIX: MODO OSCURO EN TODAS LAS VISTAS ========== */
+
+/* Todas las vistas heredan el modo oscuro del body */
+[data-theme="dark"] {
+  /* Variables ya definidas en admin-dashboard-optimized.css */
+  color-scheme: dark;
+}
+
+/* Asegurar que los iframes también usen modo oscuro */
+[data-theme="dark"] iframe {
+  background: var(--bg-card);
+  color-scheme: dark;
+}
+
+/* Cards y contenedores en modo oscuro */
+[data-theme="dark"] .card,
+[data-theme="dark"] .kpi-card,
+[data-theme="dark"] .chart-container,
+[data-theme="dark"] .promo-analysis,
+[data-theme="dark"] .insight-card {
+  background: var(--bg-card);
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+
+/* Tablas en modo oscuro */
+[data-theme="dark"] table,
+[data-theme="dark"] .table {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] table th,
+[data-theme="dark"] .table th {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border-color: var(--border);
+}
+
+[data-theme="dark"] table td,
+[data-theme="dark"] .table td {
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] table tr:hover,
+[data-theme="dark"] .table tr:hover {
+  background: var(--bg-secondary);
+}
+
+/* Badges en modo oscuro */
+[data-theme="dark"] .badge {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .badge.badge-success {
+  background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+}
+
+[data-theme="dark"] .badge.badge-danger {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+[data-theme="dark"] .badge.badge-warning {
+  background: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+}
+
+[data-theme="dark"] .badge.badge-info {
+  background: rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+}
+
+/* ========== FIX: VISTA DE PEDIDOS OPTIMIZADA ========== */
+
+/* Mejorar contraste de las cards de pedidos */
+[data-theme="dark"] .pedido-card,
+[data-theme="dark"] [class*="pedido"],
+[data-theme="dark"] [id*="pedido"] {
+  background: var(--bg-card);
+  border-color: var(--border);
+}
+
+/* IDs de pedidos más visibles */
+[data-theme="dark"] .pedido-id,
+[data-theme="dark"] [class*="PEDIDO"] {
+  color: var(--primary-light);
+  font-weight: 700;
+}
+
+/* Estados de pedidos */
+[data-theme="dark"] .estado-pendiente {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+}
+
+[data-theme="dark"] .estado-finalizado {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+}
+
+[data-theme="dark"] .estado-cancelado {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+
+/* ========== FIX: INTEGRACIÓN DE VISTAS AL DASHBOARD ========== */
+
+/* Eliminar apariencia de "ventana separada" */
+.content-area iframe {
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: transparent;
+  width: 100%;
+  min-height: calc(100vh - var(--topbar-height, 70px) - 2rem);
+}
+
+/* Si la vista tiene fondo blanco, que ocupe todo */
+[data-theme="light"] .content-area {
+  background: var(--bg-main);
+}
+
+[data-theme="dark"] .content-area {
+  background: var(--bg-main);
+}
+
+/* ========== FIX: SIDEBAR-NAV COMPORTAMIENTO ========== */
+
+/* Asegurar que el sidebar-nav no desborde */
+.sidebar-nav {
+  overflow-y: auto;
+  overflow-x: hidden;
+  max-height: calc(100vh - var(--topbar-height, 70px) - 200px);
+}
+
+/* Scrollbar del sidebar-nav */
+.sidebar-nav::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: var(--primary);
+  border-radius: 2px;
+}
+
+/* ========== FIX: NAV-LINK ACTIVE STATE ========== */
+
+.nav-link.active {
+  color: var(--primary) !important;
+  background: linear-gradient(90deg, rgba(111, 92, 56, 0.15) 0%, transparent 100%);
+  position: relative;
+}
+
+.nav-link.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--primary);
+  border-radius: 0 4px 4px 0;
+}
+
+/* En modo oscuro */
+[data-theme="dark"] .nav-link {
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .nav-link:hover {
+  color: var(--primary-light);
+  background: rgba(111, 92, 56, 0.1);
+}
+
+[data-theme="dark"] .nav-link.active {
+  color: var(--primary-light) !important;
+  background: linear-gradient(90deg, rgba(139, 116, 83, 0.2) 0%, transparent 100%);
+}
+
+/* ========== FIX: BOTÓN DE TOGGLE EN SIDEBAR ========== */
+
+.sidebar-toggle {
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.sidebar-toggle:hover {
+  transform: scale(1.1);
+}
+
+.sidebar-toggle:active {
+  transform: scale(0.95);
+}
+
+/* Rotar icono cuando está colapsado */
+.sidebar.collapsed .sidebar-toggle i {
+  transform: rotate(180deg);
+}
+
+/* ========== FIX: USER PROFILE EN SIDEBAR COLAPSADO ========== */
+
+.sidebar.collapsed .user-profile {
+  flex-direction: column;
+  padding: 0.5rem;
+}
+
+.sidebar.collapsed .user-avatar {
+  margin-bottom: 0;
+}
+
+.sidebar.collapsed .btn-logout {
+  padding: 0.75rem;
+  justify-content: center;
+}
+
+.sidebar.collapsed .btn-logout i {
+  margin: 0;
+}
+
+/* ========== FIX: TOPBAR EN MODO OSCURO ========== */
+
+[data-theme="dark"] .topbar {
+  background: var(--bg-card);
+  border-bottom-color: var(--border);
+}
+
+[data-theme="dark"] .page-title {
+  background: linear-gradient(135deg, var(--primary-light), var(--primary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ========== FIX: BUTTONS EN MODO OSCURO ========== */
+
+[data-theme="dark"] .btn-primary {
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  color: white;
+}
+
+[data-theme="dark"] .btn-primary:hover {
+  filter: brightness(1.2);
+}
+
+[data-theme="dark"] .icon-btn {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border-color: var(--border);
+}
+
+[data-theme="dark"] .icon-btn:hover {
+  background: var(--primary);
+  color: white;
+}
+
+[data-theme="dark"] .icon-btn.active {
+  background: var(--primary);
+  color: white;
+}
+
+/* ========== FIX: SEARCH INPUTS EN MODO OSCURO ========== */
+
+[data-theme="dark"] input[type="search"],
+[data-theme="dark"] input[placeholder*="Buscar"],
+[data-theme="dark"] input[placeholder*="buscar"] {
+  background: var(--bg-secondary);
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] input[type="search"]::placeholder,
+[data-theme="dark"] input[placeholder*="Buscar"]::placeholder {
+  color: var(--text-muted);
+}
+
+/* ========== FIX: DROPDOWNS Y SELECTS EN MODO OSCURO ========== */
+
+[data-theme="dark"] select,
+[data-theme="dark"] .dropdown {
+  background: var(--bg-secondary);
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] select option {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+/* ========== FIX: MODO OSCURO EN SIDEBAR HEADER ========== */
+
+[data-theme="dark"] .sidebar-header {
+  background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+}
+
+/* ========== FIX: MODO OSCURO EN SIDEBAR FOOTER ========== */
+
+[data-theme="dark"] .sidebar-footer {
+  background: var(--bg-main);
+  border-top-color: var(--border);
+}
+
+[data-theme="dark"] .user-profile {
+  background: var(--bg-secondary);
+}
+
+[data-theme="dark"] .user-name {
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .user-email {
+  color: var(--text-muted);
+}
+
+/* ========== FIX: CLOSE BUTTON EN SIDEBAR MÓVIL ========== */
+
+@media (max-width: 768px) {
+  /* Click fuera del sidebar para cerrar */
+  .sidebar.mobile-open::before {
+    cursor: pointer;
+  }
+  
+  /* Prevenir scroll del body cuando sidebar está abierto */
+  body.sidebar-open {
+    overflow: hidden;
+  }
+}
+
+/* ========== FIX: TRANSICIONES SUAVES ========== */
+
+.sidebar,
+.sidebar *,
+.main-content,
+.nav-link,
+.icon-btn,
+.btn-primary {
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ========== FIX: Z-INDEX CORRECTO ========== */
+
+.sidebar {
+  z-index: 100;
+}
+
+.topbar {
+  z-index: 90;
+}
+
+.modal-overlay {
+  z-index: 1000;
+}
+
+.theme-toggle {
+  z-index: 10;
+}
+
+/* ========== FIX: RESPONSIVE FINAL ========== */
+
+@media (max-width: 768px) {
+  /* Main content ocupa todo el ancho */
+  .main-content {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+  
+  /* Sidebar fuera de la pantalla por defecto */
+  .sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    height: 100vh;
+  }
+}
+
+/* ========== FIX: EVITAR PARPADEOS ========== */
+
+* {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+/* ========== FIX: ACCESIBILIDAD ========== */
+
+.sidebar-toggle:focus-visible,
+.nav-link:focus-visible,
+.mobile-menu-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* ========== PRINT STYLES ========== */
+
+@media print {
+  .sidebar,
+  .topbar,
+  .sidebar-toggle,
+  .mobile-menu-btn,
+  .theme-toggle,
+  .icon-btn,
+  .btn-primary {
+    display: none !important;
+  }
+  
+  .main-content {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+}
