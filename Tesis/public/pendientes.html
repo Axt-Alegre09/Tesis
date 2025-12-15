@@ -2,12 +2,77 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <title>Gestión de Pedidos - Paniquiños Admin</title>
   <link rel="shortcut icon" href="https://jyygevitfnbwrvxrjexp.supabase.co/storage/v1/object/public/productos/paniquinosico.ico" type="image/x-icon">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <link rel="stylesheet" href="CSS/pendientes.css" />
+  
+  <!-- Script para detectar tema del padre (iframe) -->
+  <script>
+    (function() {
+      function applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+      }
+      
+      function detectParentTheme() {
+        try {
+          if (window.parent && window.parent !== window) {
+            const parentTheme = window.parent.document.documentElement.getAttribute('data-theme');
+            if (parentTheme) {
+              applyTheme(parentTheme);
+              return true;
+            }
+          }
+        } catch (e) {}
+        
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme) {
+          applyTheme(savedTheme);
+          return true;
+        }
+        
+        return false;
+      }
+      
+      detectParentTheme();
+      
+      function observeParentTheme() {
+        try {
+          if (window.parent && window.parent !== window) {
+            const observer = new MutationObserver(function(mutations) {
+              mutations.forEach(function(mutation) {
+                if (mutation.attributeName === 'data-theme') {
+                  const newTheme = window.parent.document.documentElement.getAttribute('data-theme');
+                  applyTheme(newTheme || 'light');
+                }
+              });
+            });
+            
+            observer.observe(window.parent.document.documentElement, {
+              attributes: true,
+              attributeFilter: ['data-theme']
+            });
+          }
+        } catch (e) {
+          setInterval(function() {
+            const savedTheme = localStorage.getItem('theme');
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            if (savedTheme && savedTheme !== currentTheme) {
+              applyTheme(savedTheme);
+            }
+          }, 500);
+        }
+      }
+      
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', observeParentTheme);
+      } else {
+        observeParentTheme();
+      }
+    })();
+  </script>
 </head>
 <body>
   <div class="wrapper">
@@ -57,10 +122,11 @@
       </div>
 
       <div class="filter-group search-group">
+        <label for="searchCliente">Buscar:</label>
         <input 
           type="text" 
           id="searchCliente" 
-          placeholder="Buscar por cliente, email o RUC..."
+          placeholder="Cliente, email o RUC..."
           class="search-input"
         >
         <i class="bi bi-search"></i>

@@ -1,58 +1,130 @@
-/* ==================== PARCHE FINAL - MODALES Y MODO OSCURO ==================== */
-/* Agregar AL FINAL de admin-dashboard-fixes.css o crear archivo separado */
+/* ==================== PARCHE FINAL - MODALES, MODO OSCURO E IFRAMES ==================== */
+/* ✅ Corrige modales en modo oscuro
+   ✅ Elimina efecto de "ventana dentro de ventana" en iframes
+   ✅ Hace que los iframes ocupen todo el espacio disponible
+   ✅ Unifica estilos para modo claro y oscuro */
+
+/* ========== FIX: IFRAMES SIN EFECTO DE VENTANA SEPARADA ========== */
+
+/* Eliminar el card wrapper alrededor del iframe */
+.content-area .card:has(iframe) {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+}
+
+/* El iframe ocupa todo el espacio disponible */
+.content-area iframe {
+  width: 100% !important;
+  height: calc(100vh - var(--topbar-height) - 4rem) !important;
+  min-height: 600px;
+  border: none !important;
+  border-radius: 0 !important;
+  background: var(--bg-main) !important;
+  display: block;
+}
+
+/* Ocultar títulos h2 duplicados en vistas con iframe */
+.content-area > h2:first-child,
+.content-area > h2:first-of-type {
+  display: none !important;
+}
+
+/* ========== FIX: MODO OSCURO PARA IFRAMES ========== */
+
+/* En modo oscuro, el iframe debe tener fondo oscuro */
+[data-theme="dark"] .content-area iframe {
+  background: var(--bg-main) !important;
+  color-scheme: dark;
+}
 
 /* ========== FIX: MODALES EN MODO OSCURO ========== */
 
-/* Modal overlay - fondo */
+/* Modal overlay - fondo más oscuro */
 [data-theme="dark"] .modal-overlay {
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(0, 0, 0, 0.85) !important;
 }
 
-/* Modal content - fondo y colores */
-[data-theme="dark"] .modal-content {
-  background: var(--bg-card) !important;
+/* Modal content - fondo oscuro sólido */
+[data-theme="dark"] .modal-content,
+[data-theme="dark"] #modalProducto .modal-content,
+[data-theme="dark"] [style*="background: white"],
+[data-theme="dark"] [style*="background:white"] {
+  background: #1e293b !important;
   color: var(--text-primary) !important;
+  border: 1px solid var(--border) !important;
 }
 
-/* Modal header */
-[data-theme="dark"] .modal-header {
-  border-bottom-color: var(--border) !important;
+/* Override inline styles en el modal de productos */
+[data-theme="dark"] #modalProducto > div {
+  background: #1e293b !important;
+}
+
+/* Modal header - borde inferior */
+[data-theme="dark"] .modal-header,
+[data-theme="dark"] #modalProducto > div > div:first-child {
+  border-bottom-color: #475569 !important;
+  background: #1e293b !important;
 }
 
 [data-theme="dark"] .modal-header h2,
 [data-theme="dark"] #modalProductoTitle {
-  color: var(--text-primary) !important;
+  color: #f1f5f9 !important;
 }
 
-/* Botón cerrar modal */
+/* Botón cerrar modal - X */
 [data-theme="dark"] #closeModalProducto,
-[data-theme="dark"] .modal-close {
-  color: var(--text-secondary) !important;
+[data-theme="dark"] .modal-close,
+[data-theme="dark"] .modal-content button[type="button"]:not([type="submit"]):not(#btnCancelarProducto) {
+  color: #94a3b8 !important;
   background: transparent !important;
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.2s !important;
 }
 
 [data-theme="dark"] #closeModalProducto:hover,
 [data-theme="dark"] .modal-close:hover {
-  background: var(--bg-secondary) !important;
-  color: var(--text-primary) !important;
+  background: #334155 !important;
+  color: #f1f5f9 !important;
 }
 
-/* Labels en modales */
+/* Labels en modales - más visibles */
 [data-theme="dark"] .modal-content label,
-[data-theme="dark"] #formProducto label {
-  color: var(--text-secondary) !important;
+[data-theme="dark"] #formProducto label,
+[data-theme="dark"] #modalProducto label {
+  color: #94a3b8 !important;
+  font-weight: 500 !important;
 }
 
-/* Inputs, selects, textareas en modales */
+/* Títulos del modal */
+[data-theme="dark"] .modal-content h2,
+[data-theme="dark"] #modalProductoTitle,
+[data-theme="dark"] #modalProducto h2 {
+  color: #f1f5f9 !important;
+  font-weight: 700 !important;
+}
+
+/* Inputs, selects, textareas en modales - mejor contraste */
 [data-theme="dark"] .modal-content input,
 [data-theme="dark"] .modal-content select,
 [data-theme="dark"] .modal-content textarea,
 [data-theme="dark"] #formProducto input,
 [data-theme="dark"] #formProducto select,
-[data-theme="dark"] #formProducto textarea {
-  background: var(--bg-secondary) !important;
-  border-color: var(--border) !important;
-  color: var(--text-primary) !important;
+[data-theme="dark"] #formProducto textarea,
+[data-theme="dark"] #modalProducto input,
+[data-theme="dark"] #modalProducto select,
+[data-theme="dark"] #modalProducto textarea {
+  background: #334155 !important;
+  border: 1px solid #475569 !important;
+  color: #f1f5f9 !important;
+  border-radius: 8px !important;
 }
 
 [data-theme="dark"] .modal-content input:focus,
@@ -61,8 +133,10 @@
 [data-theme="dark"] #formProducto input:focus,
 [data-theme="dark"] #formProducto select:focus,
 [data-theme="dark"] #formProducto textarea:focus {
-  background: var(--bg-card) !important;
+  background: #3b4a5f !important;
   border-color: var(--primary) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(111, 92, 56, 0.2) !important;
 }
 
 /* Placeholder en modo oscuro */
@@ -71,164 +145,194 @@
 [data-theme="dark"] #formProducto input::placeholder,
 [data-theme="dark"] #formProducto textarea::placeholder {
   color: var(--text-muted) !important;
-  opacity: 0.6;
+  opacity: 0.7;
 }
 
-/* Select background fix */
+/* Select background fix con flecha visible - mejorado */
 [data-theme="dark"] .modal-content select,
-[data-theme="dark"] #formProducto select {
-  background-color: var(--bg-secondary) !important;
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23cbd5e1' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
-  background-repeat: no-repeat;
-  background-position: right 0.75rem center;
-  background-size: 16px 12px;
-  padding-right: 2.5rem;
+[data-theme="dark"] #formProducto select,
+[data-theme="dark"] #modalProducto select,
+[data-theme="dark"] #productoCategoria {
+  background-color: #334155 !important;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23f1f5f9' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.75rem center !important;
+  background-size: 16px 12px !important;
+  padding-right: 2.5rem !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  cursor: pointer !important;
 }
 
-/* Upload area en modo oscuro */
-[data-theme="dark"] #uploadArea {
-  border-color: var(--border) !important;
-  background: var(--bg-secondary) !important;
+/* Option dentro del select */
+[data-theme="dark"] .modal-content select option,
+[data-theme="dark"] #productoCategoria option {
+  background: #334155 !important;
+  color: #f1f5f9 !important;
+  padding: 0.5rem !important;
+}
+
+/* Upload area en modo oscuro - mejor estilo */
+[data-theme="dark"] #uploadArea,
+[data-theme="dark"] [id*="upload"],
+[data-theme="dark"] [class*="upload"] {
+  border: 2px dashed #475569 !important;
+  background: #334155 !important;
+  border-radius: 12px !important;
 }
 
 [data-theme="dark"] #uploadArea:hover {
-  background: var(--bg-main) !important;
+  background: #3b4a5f !important;
   border-color: var(--primary) !important;
 }
 
-[data-theme="dark"] #uploadArea p {
-  color: var(--text-secondary) !important;
+[data-theme="dark"] #uploadArea p,
+[data-theme="dark"] #uploadArea span {
+  color: #94a3b8 !important;
 }
 
 [data-theme="dark"] #uploadArea i {
-  color: var(--text-muted) !important;
+  color: #64748b !important;
 }
 
-/* Checkbox en modo oscuro */
-[data-theme="dark"] .modal-content input[type="checkbox"] {
-  background: var(--bg-secondary) !important;
-  border-color: var(--border) !important;
+/* Preview de imagen en upload */
+[data-theme="dark"] #previewArea,
+[data-theme="dark"] [id*="preview"] {
+  background: #334155 !important;
+  border-radius: 12px !important;
 }
 
-[data-theme="dark"] .modal-content input[type="checkbox"]:checked {
+[data-theme="dark"] #previewArea p {
+  color: #94a3b8 !important;
+}
+
+/* Checkbox en modo oscuro - mejor visibilidad */
+[data-theme="dark"] .modal-content input[type="checkbox"],
+[data-theme="dark"] #modalProducto input[type="checkbox"] {
+  width: 20px !important;
+  height: 20px !important;
+  background: #334155 !important;
+  border: 2px solid #475569 !important;
+  border-radius: 4px !important;
+  accent-color: var(--primary) !important;
+  cursor: pointer !important;
+}
+
+[data-theme="dark"] .modal-content input[type="checkbox"]:checked,
+[data-theme="dark"] #modalProducto input[type="checkbox"]:checked {
   background: var(--primary) !important;
   border-color: var(--primary) !important;
 }
 
-/* Botones del modal */
+/* Texto junto al checkbox */
+[data-theme="dark"] .modal-content label:has(input[type="checkbox"]) span,
+[data-theme="dark"] #modalProducto label span:not([style*="color: var(--danger)"]) {
+  color: #f1f5f9 !important;
+}
+
+/* Botones secundarios del modal - estilo mejorado */
 [data-theme="dark"] #btnCancelarProducto,
-[data-theme="dark"] .btn-secondary {
-  background: var(--bg-secondary) !important;
-  border-color: var(--border) !important;
-  color: var(--text-primary) !important;
+[data-theme="dark"] .btn-secondary,
+[data-theme="dark"] .modal-content button[style*="background: white"],
+[data-theme="dark"] .modal-content button[style*="background:white"],
+[data-theme="dark"] #modalProducto button[style*="border: 1px"] {
+  background: #334155 !important;
+  border: 1px solid #475569 !important;
+  color: #f1f5f9 !important;
+  border-radius: 10px !important;
 }
 
 [data-theme="dark"] #btnCancelarProducto:hover,
 [data-theme="dark"] .btn-secondary:hover {
-  background: var(--bg-main) !important;
+  background: #3b4a5f !important;
+  border-color: #64748b !important;
 }
 
-/* Botón primario mantiene su color */
+/* Botón primario - dorado destacado */
 [data-theme="dark"] .modal-content button[type="submit"],
-[data-theme="dark"] .btn-primary {
-  background: linear-gradient(135deg, var(--primary), var(--primary-light)) !important;
+[data-theme="dark"] .btn-primary,
+[data-theme="dark"] #modalProducto button[style*="background: var(--primary)"] {
+  background: linear-gradient(135deg, #6f5c38, #8b7453) !important;
   color: white !important;
+  border: none !important;
+  font-weight: 600 !important;
+  box-shadow: 0 2px 8px rgba(111, 92, 56, 0.3) !important;
 }
 
-/* ========== FIX: IFRAMES EN MODO OSCURO ========== */
-
-/* Los iframes heredan el tema */
-[data-theme="dark"] iframe {
-  filter: none;
-  background: var(--bg-card);
+[data-theme="dark"] .modal-content button[type="submit"]:hover,
+[data-theme="dark"] .btn-primary:hover {
+  filter: brightness(1.1) !important;
+  box-shadow: 0 4px 12px rgba(111, 92, 56, 0.4) !important;
 }
 
-/* ========== FIX: TÍTULOS DUPLICADOS - OCULTAR COMPLETAMENTE ========== */
+/* ========== FIX: DATE/TIME INPUTS EN MODO OSCURO ========== */
 
-/* Ocultar "Gestión de Promociones" dentro del iframe */
-.content-area iframe {
-  width: 100%;
-  height: 80vh;
-  border: none;
-  border-radius: 0;
-}
-
-/* Si las vistas tienen títulos h2 duplicados, ocultarlos */
-.content-area > div > div:first-child > h2:first-of-type,
-.content-area > div > h2:first-of-type:not(.page-title):not(.chart-title):not(.titulo-principal) {
-  display: none !important;
-}
-
-/* ========== FIX: MODALES DE PROMOCIONES ========== */
-
-/* Modales específicos de promociones en modo oscuro */
-[data-theme="dark"] .modal-overlay .modal-content {
-  background: var(--bg-card) !important;
-}
-
-[data-theme="dark"] .modal-overlay .modal-content h2,
-[data-theme="dark"] .modal-overlay .modal-content h3 {
-  color: var(--text-primary) !important;
-}
-
-[data-theme="dark"] .modal-overlay .modal-content p,
-[data-theme="dark"] .modal-overlay .modal-content span,
-[data-theme="dark"] .modal-overlay .modal-content label {
-  color: var(--text-secondary) !important;
-}
-
-/* Lista de productos en modal de asignación */
-[data-theme="dark"] .modal-content .product-item,
-[data-theme="dark"] .modal-content .checkbox-item {
+[data-theme="dark"] input[type="date"],
+[data-theme="dark"] input[type="time"],
+[data-theme="dark"] input[type="datetime-local"] {
   background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
   border-color: var(--border) !important;
+  color-scheme: dark !important;
 }
 
-/* ========== FIX: RESPONSIVE DE MODALES ========== */
+/* ========== FIX: NUMBER INPUTS SIN FLECHAS ========== */
 
-@media (max-width: 768px) {
-  .modal-content {
-    width: calc(100% - 24px) !important;
-    max-width: none !important;
-    margin: 12px !important;
-  }
+[data-theme="dark"] input[type="number"] {
+  appearance: textfield !important;
+  -moz-appearance: textfield !important;
 }
 
-@media (max-width: 480px) {
-  .modal-content {
-    width: calc(100% - 16px) !important;
-    padding: 20px 16px !important;
-  }
-  
-  .modal-header {
-    padding: 1rem !important;
-  }
-  
-  #formProducto,
-  .modal-content form {
-    padding: 1rem !important;
-  }
-  
-  /* Grid de inputs en móvil */
-  .modal-content [style*="grid-template-columns"] {
-    grid-template-columns: 1fr !important;
-  }
+[data-theme="dark"] input[type="number"]::-webkit-outer-spin-button,
+[data-theme="dark"] input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none !important;
+  margin: 0 !important;
 }
 
-/* ========== FIX: TEXTO DE LABELS Y SPAN ========== */
+/* ========== FIX: ASTERISCOS ROJOS VISIBLES ========== */
 
-/* Asegurar que el asterisco rojo sea visible */
 [data-theme="dark"] .modal-content span[style*="color: var(--danger)"],
+[data-theme="dark"] .modal-content span[style*="color:var(--danger)"],
 [data-theme="dark"] label span {
   color: var(--danger) !important;
 }
 
-/* ========== FIX: CONTRASTE DE BOTONES ========== */
+/* ========== FIX CRÍTICO: OVERRIDE INLINE STYLES DEL MODAL PRODUCTOS ========== */
 
-/* Botón guardar - asegurar contraste */
-[data-theme="dark"] .modal-content button[type="submit"] i,
-[data-theme="dark"] .btn-primary i {
-  color: white !important;
+/* El modal de productos usa muchos estilos inline, necesitamos override con !important */
+[data-theme="dark"] #modalProducto [style*="background: white"],
+[data-theme="dark"] #modalProducto [style*="background:white"] {
+  background: #1e293b !important;
+}
+
+[data-theme="dark"] #modalProducto [style*="color: var(--text-secondary)"],
+[data-theme="dark"] #modalProducto [style*="font-weight: 600"] {
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] #modalProducto [style*="border: 1px solid var(--border)"] {
+  border-color: #475569 !important;
+  background: #334155 !important;
+  color: #f1f5f9 !important;
+}
+
+[data-theme="dark"] #modalProducto [style*="border: 2px dashed"] {
+  border-color: #475569 !important;
+  background: #334155 !important;
+}
+
+/* Textos dentro del área de upload */
+[data-theme="dark"] #modalProducto [style*="color: var(--text-muted)"] {
+  color: #64748b !important;
+}
+
+/* Form del modal */
+[data-theme="dark"] #formProducto {
+  background: #1e293b !important;
+}
+
+[data-theme="dark"] #formProducto > div {
+  background: transparent !important;
 }
 
 /* ========== FIX: SCROLLBAR EN MODALES ========== */
@@ -246,94 +350,93 @@
   border-radius: 4px;
 }
 
-/* ========== FIX: IMAGEN PREVIEW EN MODAL ========== */
+/* ========== FIX: PREVIEW DE IMAGEN ========== */
 
 [data-theme="dark"] #previewArea img {
   border: 1px solid var(--border);
   border-radius: 8px;
 }
 
-/* ========== FIX: MODO CLARO - ASEGURAR QUE SE VEA BIEN ========== */
-
-/* En modo claro, asegurar que los modales usen blanco */
-[data-theme="light"] .modal-content,
-.modal-content {
-  background: white !important;
-}
-
-[data-theme="light"] .modal-content input,
-[data-theme="light"] .modal-content select,
-[data-theme="light"] .modal-content textarea {
-  background: white !important;
-  border-color: #e5e5e5 !important;
-  color: #111827 !important;
-}
-
-[data-theme="light"] .modal-content label {
-  color: #6b7280 !important;
-}
-
-/* ========== FIX: NÚMERO DE PRODUCTOS EN MODAL ========== */
+/* ========== FIX: TEXTOS SECUNDARIOS ========== */
 
 [data-theme="dark"] .modal-content small,
-[data-theme="dark"] .modal-content .text-muted {
+[data-theme="dark"] .modal-content .text-muted,
+[data-theme="dark"] .modal-content p {
   color: var(--text-muted) !important;
 }
-
-/* ========== FIX: SEARCH INPUT EN MODALES ========== */
-
-[data-theme="dark"] .modal-content input[type="search"],
-[data-theme="dark"] .modal-content input[placeholder*="Buscar"] {
-  background: var(--bg-secondary) !important;
-  border-color: var(--border) !important;
-  color: var(--text-primary) !important;
-}
-
-/* ========== FIX: BOTÓN CERRAR (X) ========== */
-
-[data-theme="dark"] .modal-close,
-[data-theme="dark"] #closeModalProducto {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: var(--transition);
-}
-
-/* ========== FIX CRÍTICO: INPUTS NUMBER SIN FLECHAS EN MODO OSCURO ========== */
-
-[data-theme="dark"] input[type="number"] {
-  appearance: textfield;
-  -moz-appearance: textfield;
-}
-
-[data-theme="dark"] input[type="number"]::-webkit-outer-spin-button,
-[data-theme="dark"] input[type="number"]::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-/* ========== FIX: DATE INPUTS EN MODO OSCURO ========== */
-
-[data-theme="dark"] input[type="date"],
-[data-theme="dark"] input[type="time"],
-[data-theme="dark"] input[type="datetime-local"] {
-  background: var(--bg-secondary) !important;
-  color: var(--text-primary) !important;
-  border-color: var(--border) !important;
-  color-scheme: dark;
-}
-
-/* ========== FIX: TEXTO DE AYUDA EN MODO OSCURO ========== */
 
 [data-theme="dark"] .modal-content ul li,
 [data-theme="dark"] .modal-content ol li {
   color: var(--text-secondary) !important;
 }
 
-/* ========== RESPONSIVE FINAL - ASEGURAR MODALES EN MÓVIL ========== */
+/* ========== MODO CLARO - ASEGURAR CONSISTENCIA ========== */
+
+/* En modo claro, modales con fondo blanco */
+[data-theme="light"] .modal-content,
+:root:not([data-theme="dark"]) .modal-content {
+  background: white !important;
+}
+
+[data-theme="light"] .modal-content input,
+[data-theme="light"] .modal-content select,
+[data-theme="light"] .modal-content textarea,
+:root:not([data-theme="dark"]) .modal-content input,
+:root:not([data-theme="dark"]) .modal-content select,
+:root:not([data-theme="dark"]) .modal-content textarea {
+  background: white !important;
+  border-color: #e5e5e5 !important;
+  color: #111827 !important;
+}
+
+[data-theme="light"] .modal-content label,
+:root:not([data-theme="dark"]) .modal-content label {
+  color: #6b7280 !important;
+}
+
+/* ========== RESPONSIVE PARA MODALES ========== */
+
+@media (max-width: 768px) {
+  .modal-content {
+    width: calc(100% - 24px) !important;
+    max-width: none !important;
+    margin: 12px !important;
+  }
+  
+  /* Iframe más pequeño en tablets */
+  .content-area iframe {
+    height: calc(100vh - var(--topbar-height) - 2rem) !important;
+    min-height: 500px;
+  }
+}
+
+@media (max-width: 480px) {
+  .modal-content {
+    width: calc(100% - 16px) !important;
+    padding: 16px !important;
+    margin: 8px !important;
+  }
+  
+  .modal-header {
+    padding: 1rem !important;
+  }
+  
+  #formProducto,
+  .modal-content form {
+    padding: 1rem !important;
+  }
+  
+  /* Grid de inputs en móvil */
+  .modal-content [style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* Iframe en móvil */
+  .content-area iframe {
+    height: calc(100vh - 120px) !important;
+    min-height: 400px;
+  }
+}
 
 @media (max-width: 393px) {
   .modal-content {
@@ -352,4 +455,112 @@
     height: 32px !important;
     font-size: 1.25rem !important;
   }
+}
+
+/* ========== FIX: NOTIFICACIONES PANEL EN MODO OSCURO ========== */
+
+[data-theme="dark"] #notificationsContainer {
+  background: var(--bg-card) !important;
+  border-color: var(--border) !important;
+}
+
+[data-theme="dark"] #notificationsContainer h3 {
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .notification-item {
+  border-bottom-color: var(--border) !important;
+}
+
+[data-theme="dark"] .notification-item.unread {
+  background: rgba(111, 92, 56, 0.1) !important;
+}
+
+[data-theme="dark"] .notification-item strong {
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .notification-item p {
+  color: var(--text-secondary) !important;
+}
+
+[data-theme="dark"] .notification-item small {
+  color: var(--text-muted) !important;
+}
+
+/* ========== FIX: QUICK ACTIONS MENU EN MODO OSCURO ========== */
+
+[data-theme="dark"] .quick-action-btn {
+  background: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .quick-action-btn:hover {
+  background: var(--bg-secondary) !important;
+}
+
+/* ========== FIX: CARDS Y TABLAS EN MODO OSCURO ========== */
+
+[data-theme="dark"] .card {
+  background: var(--bg-card) !important;
+  border-color: var(--border) !important;
+}
+
+[data-theme="dark"] table th {
+  color: var(--text-secondary) !important;
+  border-bottom-color: var(--border) !important;
+}
+
+[data-theme="dark"] table td {
+  color: var(--text-primary) !important;
+  border-bottom-color: var(--border) !important;
+}
+
+[data-theme="dark"] table tr:hover {
+  background: var(--bg-secondary) !important;
+}
+
+/* ========== FIX: SEARCH INPUTS EN MODO OSCURO ========== */
+
+[data-theme="dark"] input[type="search"],
+[data-theme="dark"] input[placeholder*="Buscar"] {
+  background: var(--bg-secondary) !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] input[type="search"]::placeholder,
+[data-theme="dark"] input[placeholder*="Buscar"]::placeholder {
+  color: var(--text-muted) !important;
+}
+
+/* ========== FIX: FILTER SELECTS EN MODO OSCURO ========== */
+
+[data-theme="dark"] #filterCategoria,
+[data-theme="dark"] select {
+  background: var(--bg-secondary) !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+}
+
+/* ========== FIX: BOTONES ICON-BTN ========== */
+
+[data-theme="dark"] .icon-btn {
+  background: var(--bg-secondary) !important;
+  color: var(--text-secondary) !important;
+  border: 1px solid var(--border) !important;
+}
+
+[data-theme="dark"] .icon-btn:hover,
+[data-theme="dark"] .icon-btn.active {
+  background: var(--primary) !important;
+  color: white !important;
+  border-color: var(--primary) !important;
+}
+
+/* ========== FIX: BADGES ========== */
+
+[data-theme="dark"] .badge {
+  background: var(--danger) !important;
+  color: white !important;
 }

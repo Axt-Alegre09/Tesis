@@ -1,9 +1,14 @@
-/* ==================== PROMOS CSS ==================== */
-/* Estilos para la gestión de promociones */
+/* ==================== PROMOS CSS - MODO OSCURO/CLARO ==================== */
+/* ✅ Compatible con modo oscuro y claro
+   ✅ Sin efecto de ventana dentro de ventana
+   ✅ Integrado con el dashboard principal
+   ✅ Sin cambios de funcionalidad */
 
+/* ========== VARIABLES - MODO CLARO (default) ========== */
 :root {
   --primary: #6f5c38;
-  --primary-light: rgba(111, 92, 56, 0.1);
+  --primary-light: #8b7453;
+  --primary-rgb: 111, 92, 56;
   --success: #10b981;
   --success-light: rgba(16, 185, 129, 0.1);
   --danger: #ef4444;
@@ -12,14 +17,40 @@
   --warning-light: rgba(245, 158, 11, 0.1);
   --info: #3b82f6;
   --info-light: rgba(59, 130, 246, 0.1);
+  
+  /* Colores de fondo y texto - MODO CLARO */
+  --bg-main: #fafafa;
+  --bg-card: #ffffff;
+  --bg-secondary: #f5f5f5;
+  --bg-hover: #f0f0f0;
+  --border: #e5e7eb;
   --text-primary: #1f2937;
   --text-secondary: #6b7280;
   --text-muted: #9ca3af;
-  --border: #e5e7eb;
-  --bg-main: #f9fafb;
-  --bg-white: #ffffff;
+  
+  /* Sombras */
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07);
+  --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.15);
 }
 
+/* ========== MODO OSCURO ========== */
+[data-theme="dark"] {
+  --bg-main: #0f172a;
+  --bg-card: #1e293b;
+  --bg-secondary: #334155;
+  --bg-hover: #3b4a5f;
+  --border: #475569;
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.4);
+}
+
+/* ========== RESET Y BASE ========== */
 * {
   margin: 0;
   padding: 0;
@@ -31,16 +62,21 @@ body {
   background: var(--bg-main);
   color: var(--text-primary);
   line-height: 1.5;
+  min-height: 100vh;
+  transition: background-color 0.3s, color 0.3s;
 }
 
-/* ==================== CONTAINER ==================== */
+/* ========== CONTAINER - OCUPA TODO EL ESPACIO ========== */
 .container {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 2rem;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 1.5rem 2rem;
+  background: var(--bg-main);
+  min-height: 100vh;
 }
 
-/* ==================== HEADER ==================== */
+/* ========== HEADER ========== */
 .header {
   display: flex;
   justify-content: space-between;
@@ -53,8 +89,12 @@ body {
 .title {
   font-size: 1.75rem;
   font-weight: 700;
-  color: var(--primary);
+  color: var(--text-primary);
   margin-bottom: 0.25rem;
+}
+
+[data-theme="dark"] .title {
+  color: var(--text-primary);
 }
 
 .subtitle {
@@ -62,14 +102,14 @@ body {
   font-size: 0.95rem;
 }
 
-/* ==================== BUTTONS ==================== */
+/* ========== BUTTONS ========== */
 .btn-primary,
 .btn-secondary {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1.25rem;
-  border-radius: 8px;
+  border-radius: 10px;
   font-weight: 600;
   font-size: 0.95rem;
   cursor: pointer;
@@ -79,24 +119,25 @@ body {
 }
 
 .btn-primary {
-  background: var(--primary);
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
   color: white;
+  box-shadow: 0 2px 8px rgba(var(--primary-rgb), 0.25);
 }
 
 .btn-primary:hover {
-  background: #5a4a2e;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(111, 92, 56, 0.3);
+  filter: brightness(1.1);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(var(--primary-rgb), 0.35);
 }
 
 .btn-secondary {
-  background: transparent;
+  background: var(--bg-card);
   color: var(--text-primary);
   border: 1px solid var(--border);
 }
 
 .btn-secondary:hover {
-  background: var(--bg-main);
+  background: var(--bg-secondary);
 }
 
 .icon-btn {
@@ -114,18 +155,19 @@ body {
 
 .icon-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 
-/* ==================== CARD ==================== */
+/* ========== CARD ========== */
 .card {
-  background: var(--bg-white);
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  background: var(--bg-card);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
   overflow: hidden;
+  border: 1px solid var(--border);
 }
 
-/* ==================== TABLE ==================== */
+/* ========== TABLE ========== */
 .table-container {
   overflow-x: auto;
 }
@@ -133,18 +175,20 @@ body {
 .table {
   width: 100%;
   border-collapse: collapse;
+  background: var(--bg-card);
 }
 
 .table thead tr {
   border-bottom: 2px solid var(--border);
+  background: var(--bg-secondary);
 }
 
 .table th {
-  padding: 1rem;
+  padding: 1rem 1.25rem;
   text-align: left;
   font-weight: 600;
   color: var(--text-secondary);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -159,15 +203,21 @@ body {
 }
 
 .table tbody tr:hover {
-  background: var(--bg-main);
+  background: var(--bg-hover);
+}
+
+.table tbody tr:last-child {
+  border-bottom: none;
 }
 
 .table td {
-  padding: 1rem;
+  padding: 1rem 1.25rem;
+  color: var(--text-primary);
+  vertical-align: middle;
 }
 
 .loading-cell {
-  padding: 3rem;
+  padding: 3rem !important;
   text-align: center;
   color: var(--text-muted);
 }
@@ -186,7 +236,7 @@ body {
   to { transform: rotate(360deg); }
 }
 
-/* ==================== BADGES ==================== */
+/* ========== BADGES ========== */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -197,12 +247,12 @@ body {
   font-weight: 600;
 }
 
-/* ==================== MODAL ==================== */
+/* ========== MODAL ========== */
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(2px);
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
   display: none;
   align-items: center;
   justify-content: center;
@@ -210,20 +260,25 @@ body {
   padding: 1rem;
 }
 
+[data-theme="dark"] .modal-overlay {
+  background: rgba(0, 0, 0, 0.8);
+}
+
 .modal-overlay.active {
   display: flex;
 }
 
 .modal {
-  background: var(--bg-white);
+  background: var(--bg-card);
   border-radius: 16px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-lg);
   max-width: 600px;
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
   position: relative;
   padding: 2rem;
+  border: 1px solid var(--border);
 }
 
 .modal-large {
@@ -239,18 +294,18 @@ body {
   font-size: 1.5rem;
   color: var(--text-muted);
   cursor: pointer;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
+  border-radius: 8px;
   transition: all 0.2s;
   z-index: 1;
 }
 
 .modal-close:hover {
-  background: var(--bg-main);
+  background: var(--bg-secondary);
   color: var(--text-primary);
 }
 
@@ -258,7 +313,11 @@ body {
   font-size: 1.5rem;
   font-weight: 700;
   margin-bottom: 0.5rem;
-  color: var(--primary);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .modal-title {
+  color: var(--text-primary);
 }
 
 .modal-subtitle {
@@ -266,7 +325,7 @@ body {
   margin-bottom: 1.5rem;
 }
 
-/* ==================== FORM ==================== */
+/* ========== FORM ========== */
 .form {
   display: flex;
   flex-direction: column;
@@ -288,7 +347,7 @@ body {
 .form-label {
   font-weight: 600;
   font-size: 0.9rem;
-  color: var(--text-primary);
+  color: var(--text-secondary);
 }
 
 .form-input {
@@ -299,12 +358,25 @@ body {
   font-size: 0.95rem;
   font-family: inherit;
   transition: all 0.2s;
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .form-input {
+  background: var(--bg-secondary);
+  border-color: var(--border);
+  color: var(--text-primary);
 }
 
 .form-input:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px var(--primary-light);
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.15);
+}
+
+[data-theme="dark"] .form-input:focus {
+  background: var(--bg-hover);
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.25);
 }
 
 .form-input::placeholder {
@@ -314,6 +386,49 @@ body {
 textarea.form-input {
   resize: vertical;
   min-height: 60px;
+}
+
+select.form-input {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-color: var(--bg-card);
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 16px 12px;
+  padding-right: 2.5rem;
+  cursor: pointer;
+}
+
+[data-theme="dark"] select.form-input {
+  background-color: var(--bg-secondary);
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23f1f5f9' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 16px 12px;
+}
+
+/* Fix para select en Firefox */
+select.form-input::-ms-expand {
+  display: none;
+}
+
+/* Opciones del select */
+select.form-input option {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  padding: 0.5rem;
+}
+
+[data-theme="dark"] select.form-input option {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+/* Date inputs en modo oscuro */
+[data-theme="dark"] input[type="date"].form-input {
+  color-scheme: dark;
 }
 
 .form-help {
@@ -340,6 +455,7 @@ textarea.form-input {
   font-size: 0.9rem;
   cursor: pointer;
   user-select: none;
+  color: var(--text-primary);
 }
 
 .form-actions {
@@ -354,7 +470,7 @@ textarea.form-input {
   justify-content: center;
 }
 
-/* ==================== PRODUCTOS LIST ==================== */
+/* ========== PRODUCTOS LIST (Modal Asignar) ========== */
 .productos-list {
   display: flex;
   flex-direction: column;
@@ -363,6 +479,21 @@ textarea.form-input {
   overflow-y: auto;
   padding-right: 0.5rem;
   margin-bottom: 1rem;
+}
+
+/* Scrollbar estilizado */
+.productos-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.productos-list::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+  border-radius: 3px;
+}
+
+.productos-list::-webkit-scrollbar-thumb {
+  background: var(--primary);
+  border-radius: 3px;
 }
 
 .producto-item {
@@ -374,10 +505,11 @@ textarea.form-input {
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s;
+  background: var(--bg-card);
 }
 
 .producto-item:hover {
-  background: var(--bg-main);
+  background: var(--bg-hover);
   border-color: var(--primary);
 }
 
@@ -395,6 +527,7 @@ textarea.form-input {
 .producto-nombre {
   font-weight: 600;
   margin-bottom: 0.15rem;
+  color: var(--text-primary);
 }
 
 .producto-precio {
@@ -402,7 +535,27 @@ textarea.form-input {
   color: var(--text-muted);
 }
 
-/* ==================== RESPONSIVE ==================== */
+/* ========== BUSCADOR EN MODAL ========== */
+#searchContainerPromos input {
+  background: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border) !important;
+}
+
+[data-theme="dark"] #searchContainerPromos input {
+  background: var(--bg-secondary) !important;
+}
+
+#searchContainerPromos input:focus {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.15) !important;
+}
+
+#searchContainerPromos input::placeholder {
+  color: var(--text-muted) !important;
+}
+
+/* ========== RESPONSIVE ========== */
 @media (max-width: 768px) {
   .container {
     padding: 1rem;
@@ -429,6 +582,7 @@ textarea.form-input {
 
   .modal {
     padding: 1.5rem;
+    margin: 0.5rem;
   }
 
   .form-actions {
@@ -437,6 +591,10 @@ textarea.form-input {
 }
 
 @media (max-width: 480px) {
+  .container {
+    padding: 0.75rem;
+  }
+
   .icon-btn {
     width: 32px;
     height: 32px;
@@ -447,9 +605,18 @@ textarea.form-input {
     font-size: 0.75rem;
     padding: 0.3rem 0.6rem;
   }
+
+  .modal {
+    padding: 1rem;
+  }
+
+  .modal-title {
+    font-size: 1.25rem;
+    padding-right: 2.5rem;
+  }
 }
 
-/* ==================== UTILITIES ==================== */
+/* ========== UTILITIES ========== */
 .text-center {
   text-align: center;
 }
@@ -462,3 +629,74 @@ textarea.form-input {
 .mt-2 { margin-top: 1rem; }
 .mb-1 { margin-bottom: 0.5rem; }
 .mb-2 { margin-bottom: 1rem; }
+
+/* ========== TOAST NOTIFICATIONS (modo oscuro) ========== */
+[data-theme="dark"] .toast {
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* ========== FIX ESPECÍFICO PARA SELECT EN MODALES ========== */
+/* Asegurar que el select no tenga patrones extraños */
+.modal select,
+.modal select.form-input,
+#promoTipo {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  background-color: var(--bg-card) !important;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.75rem center !important;
+  background-size: 16px 12px !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text-primary) !important;
+  padding: 0.75rem 2.5rem 0.75rem 1rem !important;
+  border-radius: 8px !important;
+  font-size: 0.95rem !important;
+  width: 100% !important;
+  cursor: pointer !important;
+}
+
+[data-theme="dark"] .modal select,
+[data-theme="dark"] .modal select.form-input,
+[data-theme="dark"] #promoTipo {
+  background-color: var(--bg-secondary) !important;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23f1f5f9' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.75rem center !important;
+  background-size: 16px 12px !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+}
+
+.modal select:focus,
+#promoTipo:focus {
+  outline: none !important;
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.15) !important;
+}
+
+[data-theme="dark"] .modal select:focus,
+[data-theme="dark"] #promoTipo:focus {
+  background-color: var(--bg-hover) !important;
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.25) !important;
+}
+
+/* ========== ANIMACIONES ========== */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.card {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* ========== PRINT ========== */
+@media print {
+  .btn-primary,
+  .icon-btn,
+  .modal-overlay {
+    display: none !important;
+  }
+}

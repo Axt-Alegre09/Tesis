@@ -1,7 +1,8 @@
-// ==================== ADMIN DASHBOARD JS - VERSIÓN FINAL ====================
-// Cambios finales:
+// ==================== ADMIN DASHBOARD JS - VERSIÓN FINAL CORREGIDA ====================
+// Cambios:
 // 1. Email dinámico del usuario autenticado
 // 2. Chatbot removido completamente
+// 3. ✅ Vistas de promos, pedidos, catering SIN ventana duplicada
 
 import { supa } from './supabase-client.js';
 import { configuracionView, initConfiguracion } from './modules/configuracion-complete.js';
@@ -17,23 +18,16 @@ class NotificationSystem {
   }
 
   init() {
-    // Crear badge de notificaciones
     this.badge = document.getElementById('notificationsBadge');
     
-    // Crear contenedor de notificaciones si no existe
     if (!document.getElementById('notificationsContainer')) {
       this.createNotificationsContainer();
     }
     
     this.container = document.getElementById('notificationsContainer');
-    
-    // Cargar notificaciones iniciales
     this.loadNotifications();
-    
-    // Suscribirse a cambios en tiempo real
     this.subscribeToNotifications();
     
-    // Event listener para el botón
     document.getElementById('notificationsBtn')?.addEventListener('click', () => {
       this.togglePanel();
     });
@@ -49,7 +43,7 @@ class NotificationSystem {
       right: 20px;
       width: 380px;
       max-height: 600px;
-      background: white;
+      background: var(--bg-card);
       border-radius: 12px;
       box-shadow: 0 10px 40px rgba(0,0,0,0.15);
       display: none;
@@ -60,7 +54,7 @@ class NotificationSystem {
     
     container.innerHTML = `
       <div style="padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-        <h3 style="margin: 0; font-size: 1.1rem; font-weight: 600;">
+        <h3 style="margin: 0; font-size: 1.1rem; font-weight: 600; color: var(--text-primary);">
           <i class="bi bi-bell"></i> Notificaciones
         </h3>
         <button id="markAllReadBtn" style="background: none; border: none; color: var(--primary); cursor: pointer; font-size: 0.9rem;">
@@ -77,7 +71,6 @@ class NotificationSystem {
     
     document.body.appendChild(container);
     
-    // Cerrar al hacer click fuera
     document.addEventListener('click', (e) => {
       if (!container.contains(e.target) && 
           !document.getElementById('notificationsBtn')?.contains(e.target)) {
@@ -85,7 +78,6 @@ class NotificationSystem {
       }
     });
     
-    // Marcar todas como leídas
     document.getElementById('markAllReadBtn')?.addEventListener('click', () => {
       this.markAllAsRead();
     });
@@ -112,7 +104,6 @@ class NotificationSystem {
 
       const unreadCount = data.filter(n => !n.leida).length;
       
-      // Actualizar badge
       if (this.badge) {
         if (unreadCount > 0) {
           this.badge.textContent = unreadCount > 99 ? '99+' : unreadCount;
@@ -122,7 +113,6 @@ class NotificationSystem {
         }
       }
 
-      // Renderizar lista
       this.renderNotifications(data);
 
     } catch (error) {
@@ -179,7 +169,7 @@ class NotificationSystem {
             </div>
             <div style="flex: 1; min-width: 0;">
               <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.25rem;">
-                <strong style="font-size: 0.95rem;">${notif.titulo}</strong>
+                <strong style="font-size: 0.95rem; color: var(--text-primary);">${notif.titulo}</strong>
                 ${!notif.leida ? '<span style="width: 8px; height: 8px; background: var(--primary); border-radius: 50%; flex-shrink: 0;"></span>' : ''}
               </div>
               <p style="margin: 0.25rem 0; font-size: 0.9rem; color: var(--text-secondary); line-height: 1.4;">
@@ -192,7 +182,6 @@ class NotificationSystem {
       `;
     }).join('');
 
-    // Event listeners para marcar como leída
     list.querySelectorAll('.notification-item').forEach(item => {
       item.addEventListener('click', () => {
         const id = item.dataset.id;
@@ -228,7 +217,6 @@ class NotificationSystem {
   }
 
   subscribeToNotifications() {
-    // Suscribirse a cambios en tiempo real
     this.subscription = supa
       .channel('notificaciones-changes')
       .on('postgres_changes', 
@@ -247,7 +235,6 @@ class NotificationSystem {
   }
 }
 
-// Instancia global del sistema de notificaciones
 let notificationSystem = null;
 
 // ========== MODO MANTENIMIENTO ==========
@@ -290,7 +277,6 @@ class MaintenanceMode {
       this.isActive = newStatus;
       this.updateUI();
 
-      // Crear notificación
       await crearNotificacionGlobal(
         'sistema',
         'Modo Mantenimiento',
@@ -310,7 +296,6 @@ class MaintenanceMode {
       badge.style.display = this.isActive ? 'inline-block' : 'none';
     }
 
-    // Actualizar botón en configuración si existe
     const btn = document.getElementById('btnModoMantenimiento');
     if (btn) {
       btn.textContent = this.isActive ? 'Desactivar Mantenimiento' : 'Activar Mantenimiento';
@@ -319,10 +304,9 @@ class MaintenanceMode {
   }
 }
 
-// Instancia global del modo mantenimiento
 let maintenanceMode = null;
 
-// ========== VISTAS (Templates HTML) ==========
+// ========== VISTAS (Templates HTML) - CORREGIDAS ==========
 const views = {
   dashboard: `
     <div class="welcome-section" style="margin-bottom: 2rem;">
@@ -334,7 +318,6 @@ const views = {
 
     <!-- KPIs Principales -->
     <div class="grid-4" style="margin-bottom: 2rem;">
-      <!-- Ventas Hoy -->
       <div class="kpi-card">
         <div class="kpi-icon" style="background: linear-gradient(135deg, rgba(111,92,56,0.1), rgba(111,92,56,0.05)); color: var(--primary);">
           <i class="bi bi-currency-dollar"></i>
@@ -349,7 +332,6 @@ const views = {
         </div>
       </div>
 
-      <!-- Pedidos Hoy -->
       <div class="kpi-card">
         <div class="kpi-icon" style="background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(16,185,129,0.05)); color: var(--success);">
           <i class="bi bi-cart-check"></i>
@@ -361,7 +343,6 @@ const views = {
         </div>
       </div>
 
-      <!-- ChatBot IA -->
       <div class="kpi-card">
         <div class="kpi-icon" style="background: linear-gradient(135deg, rgba(59,130,246,0.1), rgba(59,130,246,0.05)); color: var(--info);">
           <i class="bi bi-robot"></i>
@@ -373,7 +354,6 @@ const views = {
         </div>
       </div>
 
-      <!-- Productos Total -->
       <div class="kpi-card">
         <div class="kpi-icon" style="background: linear-gradient(135deg, rgba(245,158,11,0.1), rgba(245,158,11,0.05)); color: var(--warning);">
           <i class="bi bi-box-seam"></i>
@@ -424,7 +404,6 @@ const views = {
         </h3>
       </div>
       <div class="insights-grid">
-        <!-- Top Producto -->
         <div class="insight-card">
           <div class="insight-icon">🏆</div>
           <div class="insight-content">
@@ -434,7 +413,6 @@ const views = {
           </div>
         </div>
 
-        <!-- ChatBot IA Stats -->
         <div class="insight-card">
           <div class="insight-icon">🤖</div>
           <div class="insight-content">
@@ -444,7 +422,6 @@ const views = {
           </div>
         </div>
 
-        <!-- Catering Automatizado -->
         <div class="insight-card">
           <div class="insight-icon">🎉</div>
           <div class="insight-content">
@@ -484,7 +461,7 @@ const views = {
   productos: `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
       <div>
-        <h2 style="font-size: 1.75rem; font-weight: 700; margin-bottom: 0.5rem;">Gestión de Productos</h2>
+        <h2 style="font-size: 1.75rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--text-primary);">Gestión de Productos</h2>
         <p style="color: var(--text-secondary);">Administra tu catálogo completo</p>
       </div>
       <button class="btn-primary" id="btnNuevoProducto">
@@ -493,7 +470,6 @@ const views = {
       </button>
     </div>
 
-    <!-- Filtros y Búsqueda -->
     <div class="card" style="margin-bottom: 1.5rem;">
       <div style="display: grid; grid-template-columns: 1fr auto auto; gap: 1rem; align-items: center;">
         <div style="position: relative;">
@@ -502,24 +478,23 @@ const views = {
             type="search" 
             id="searchProductos" 
             placeholder="Buscar productos por nombre..." 
-            style="width: 100%; padding: 0.75rem 1rem 0.75rem 2.5rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem;"
+            style="width: 100%; padding: 0.75rem 1rem 0.75rem 2.5rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; background: var(--bg-card); color: var(--text-primary);"
           >
         </div>
-        <select id="filterCategoria" style="padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem;">
+        <select id="filterCategoria" style="padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; background: var(--bg-card); color: var(--text-primary);">
           <option value="">Todas las categorías</option>
         </select>
         <div style="display: flex; gap: 0.5rem;">
-          <button id="btnViewGrid" class="icon-btn" style="background: var(--bg-main);">
+          <button id="btnViewGrid" class="icon-btn">
             <i class="bi bi-grid-3x3-gap"></i>
           </button>
-          <button id="btnViewList" class="icon-btn active" style="background: var(--primary); color: white;">
+          <button id="btnViewList" class="icon-btn active">
             <i class="bi bi-list-ul"></i>
           </button>
         </div>
       </div>
     </div>
 
-    <!-- Tabla de Productos -->
     <div class="card" id="productosTableContainer">
       <div style="overflow-x: auto;">
         <table style="width: 100%; border-collapse: collapse;">
@@ -545,31 +520,19 @@ const views = {
     </div>
   `,
 
-  promos: `
-   <h2 style="font-size: 1.75rem; font-weight: 700; margin-bottom: 2rem;">Promociones</h2>
-   <div class="card">
-      <iframe src="promos.html" style="width: 100%; height: 85vh; border: none; border-radius: 12px;"></iframe>
-  </div>
-`,
+  // ✅ CORREGIDO: Sin h2 duplicado, sin wrapper .card, iframe ocupa todo el espacio
+  promos: `<iframe src="promos.html" style="width: 100%; height: calc(100vh - 100px); min-height: 600px; border: none; display: block; background: var(--bg-main);"></iframe>`,
 
-  pedidos: `
-    <h2 style="font-size: 1.75rem; font-weight: 700; margin-bottom: 2rem;">Pedidos Pendientes</h2>
-    <div class="card">
-      <iframe src="pendientes.html" style="width: 100%; height: 80vh; border: none; border-radius: 12px;"></iframe>
-    </div>
-  `,
+  // ✅ CORREGIDO: Sin h2 duplicado, sin wrapper .card, iframe ocupa todo el espacio
+  pedidos: `<iframe src="pendientes.html" style="width: 100%; height: calc(100vh - 100px); min-height: 600px; border: none; display: block; background: var(--bg-main);"></iframe>`,
 
-  catering: `
-    <h2 style="font-size: 1.75rem; font-weight: 700; margin-bottom: 2rem;">Gestión de Catering</h2>
-    <div class="card">
-      <iframe src="catering.html" style="width: 100%; height: 80vh; border: none; border-radius: 12px;"></iframe>
-    </div>
-  `,
+  // ✅ CORREGIDO: Sin h2 duplicado, sin wrapper .card, iframe ocupa todo el espacio
+  catering: `<iframe src="catering.html" style="width: 100%; height: calc(100vh - 100px); min-height: 600px; border: none; display: block; background: var(--bg-main);"></iframe>`,
 
   clientes: `
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
       <div>
-        <h2 style="font-size: 1.75rem; font-weight: 700; margin-bottom: 0.5rem;">Gestión de Clientes</h2>
+        <h2 style="font-size: 1.75rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--text-primary);">Gestión de Clientes</h2>
         <p style="color: var(--text-secondary);" id="contadorClientes">Cargando clientes...</p>
       </div>
       <button class="btn-primary" id="btnExportarClientes">
@@ -578,7 +541,6 @@ const views = {
       </button>
     </div>
 
-    <!-- Estadísticas -->
     <div class="grid-4" style="margin-bottom: 2rem;">
       <div class="card" style="border-top: 3px solid var(--primary);">
         <div style="display: flex; align-items: center; gap: 1rem;">
@@ -587,7 +549,7 @@ const views = {
           </div>
           <div>
             <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Total Clientes</div>
-            <div style="font-size: 1.75rem; font-weight: 700;" id="totalClientes">0</div>
+            <div style="font-size: 1.75rem; font-weight: 700; color: var(--text-primary);" id="totalClientes">0</div>
           </div>
         </div>
       </div>
@@ -599,7 +561,7 @@ const views = {
           </div>
           <div>
             <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Nuevos (30 días)</div>
-            <div style="font-size: 1.75rem; font-weight: 700;" id="clientesNuevos">0</div>
+            <div style="font-size: 1.75rem; font-weight: 700; color: var(--text-primary);" id="clientesNuevos">0</div>
           </div>
         </div>
       </div>
@@ -611,7 +573,7 @@ const views = {
           </div>
           <div>
             <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Ciudad Principal</div>
-            <div style="font-size: 1.2rem; font-weight: 700;" id="ciudadTop">-</div>
+            <div style="font-size: 1.2rem; font-weight: 700; color: var(--text-primary);" id="ciudadTop">-</div>
           </div>
         </div>
       </div>
@@ -623,13 +585,11 @@ const views = {
           </div>
           <div>
             <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Con Email</div>
-            <div style="font-size: 1.75rem; font-weight: 700;" id="clientesConEmail">0</div>
+            <div style="font-size: 1.75rem; font-weight: 700; color: var(--text-primary);" id="clientesConEmail">0</div>
           </div>
         </div>
       </div>
     </div>
-
-    <!-- El resto del contenido se carga dinámicamente -->
   `,
 
   configuracion: configuracionView
@@ -637,10 +597,9 @@ const views = {
 
 // ========== INICIALIZACIÓN DEL DASHBOARD ==========
 async function initDashboard() {
-  console.log(' Inicializando Dashboard Intelligence...');
+  console.log('Inicializando Dashboard Intelligence...');
 
   try {
-    // 1. Usar la vista v_resumen_hoy
     const { data: resumenHoy, error: errorResumen } = await supa
       .from('v_resumen_hoy')
       .select('*')
@@ -663,10 +622,9 @@ async function initDashboard() {
       setDefaultValues();
     }
 
-    // 2. Cargar datos de ventas por día para los últimos 7 días
     const hoy = new Date();
     const hace7Dias = new Date(hoy);
-    hace7Dias.setDate(hoy.getDate() - 6); // Últimos 7 días incluyendo hoy
+    hace7Dias.setDate(hoy.getDate() - 6);
 
     const { data: ventasSemana } = await supa
       .from('v_ventas_por_dia')
@@ -674,7 +632,6 @@ async function initDashboard() {
       .gte('dia', hace7Dias.toISOString().split('T')[0])
       .order('dia', { ascending: true });
 
-    // Crear array de 7 días aunque no tengan ventas
     const diasCompletos = [];
     for (let i = 0; i < 7; i++) {
       const fecha = new Date(hace7Dias);
@@ -693,7 +650,6 @@ async function initDashboard() {
     initChartVentas(diasCompletos);
     initWeekGrid(diasCompletos);
 
-    // 3. Cargar métricas del chatbot
     const { data: chatbotMetrics } = await supa
       .from('v_chatbot_metricas_hoy')
       .select('*')
@@ -705,7 +661,6 @@ async function initDashboard() {
       document.getElementById('chatbotCarrito').textContent = chatbotMetrics.productos_agregados_bot || 0;
     }
 
-    // 4. Cargar top productos
     const { data: topProductos } = await supa
       .from('v_top_productos_hoy')
       .select('*')
@@ -717,7 +672,6 @@ async function initDashboard() {
       document.getElementById('topProductoVentas').textContent = `${topProductos.cantidad_vendida || 0} unidades vendidas`;
     }
 
-    // 5. Cargar stats de catering
     const { data: cateringStats } = await supa
       .from('v_catering_bot_vs_manual')
       .select('*')
@@ -729,7 +683,6 @@ async function initDashboard() {
         `${cateringStats.catering_bot || 0} de ${cateringStats.total_catering || 0} via ChatBot`;
     }
 
-    // 6. Cargar impacto de promociones
     const { data: promos } = await supa
       .from('v_impacto_promos_semana')
       .select('*')
@@ -741,7 +694,6 @@ async function initDashboard() {
       document.getElementById('promoUplift').textContent = `+${promos.incremento_porcentaje || 0}%`;
     }
 
-    // 7. Cargar total productos
     const { count: totalProductos } = await supa
       .from('productos')
       .select('*', { count: 'exact', head: true });
@@ -803,6 +755,11 @@ function initChartVentas(data) {
 
   const valores = data.map(d => parseFloat(d.total_gs) || 0);
 
+  // Detectar tema actual
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const gridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+  const textColor = isDark ? '#cbd5e1' : '#6b7280';
+
   window.dashboardChart = new Chart(ctx, {
     type: 'line',
     data: {
@@ -817,7 +774,7 @@ function initChartVentas(data) {
         pointRadius: 6,
         pointHoverRadius: 8,
         pointBackgroundColor: 'rgb(111, 92, 56)',
-        pointBorderColor: '#fff',
+        pointBorderColor: isDark ? '#1e293b' : '#fff',
         pointBorderWidth: 2,
       }]
     },
@@ -827,10 +784,12 @@ function initChartVentas(data) {
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          backgroundColor: isDark ? 'rgba(30, 41, 59, 0.95)' : 'rgba(0, 0, 0, 0.8)',
           padding: 12,
           titleFont: { size: 14, weight: 'bold' },
           bodyFont: { size: 13 },
+          titleColor: isDark ? '#f1f5f9' : '#fff',
+          bodyColor: isDark ? '#cbd5e1' : '#fff',
           callbacks: {
             label: (context) => ` ${formatGs(context.parsed.y)}`
           }
@@ -840,11 +799,13 @@ function initChartVentas(data) {
         y: {
           beginAtZero: true,
           ticks: {
+            color: textColor,
             callback: (value) => formatGs(value)
           },
-          grid: { color: 'rgba(0, 0, 0, 0.05)' }
+          grid: { color: gridColor }
         },
         x: {
+          ticks: { color: textColor },
           grid: { display: false }
         }
       }
@@ -943,7 +904,6 @@ export async function crearNotificacionGlobal(tipo, titulo, mensaje) {
     if (error) throw error;
     console.log('Notificación creada:', titulo);
     
-    // Recargar notificaciones si el sistema está inicializado
     if (notificationSystem) {
       notificationSystem.loadNotifications();
     }
@@ -956,12 +916,10 @@ export async function crearNotificacionGlobal(tipo, titulo, mensaje) {
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('Inicializando Admin Dashboard Final...');
   
-  // Limpiar modales al inicio
   document.querySelectorAll('.modal-overlay').forEach(modal => {
     modal.style.display = 'none';
   });
   
-  // Cargar email del usuario autenticado
   try {
     const { data: { user } } = await supa.auth.getUser();
     if (user && user.email) {
@@ -979,16 +937,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.error('Error cargando usuario:', error);
   }
   
-  // Inicializar sistemas
   notificationSystem = new NotificationSystem();
   notificationSystem.init();
-  
-  // CHATBOT REMOVIDO - No se inicializa
   
   maintenanceMode = new MaintenanceMode();
   maintenanceMode.init();
   
-  // Sidebar toggle
   const sidebar = document.getElementById('sidebar');
   const sidebarToggle = document.getElementById('sidebarToggle');
   const mobileMenuBtn = document.getElementById('mobileMenuBtn');
@@ -1001,7 +955,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     sidebar.classList.toggle('mobile-open');
   });
 
-  // Navigation links
   document.querySelectorAll('.nav-link').forEach(link => {
     link.addEventListener('click', (e) => {
       e.preventDefault();
@@ -1014,19 +967,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
-  // Botón de acciones rápidas
   document.getElementById('quickAddBtn')?.addEventListener('click', () => {
     const menu = document.createElement('div');
     menu.style.cssText = `
       position: fixed;
       top: 70px;
       right: 80px;
-      background: white;
+      background: var(--bg-card);
       border-radius: 12px;
       box-shadow: 0 10px 40px rgba(0,0,0,0.15);
       padding: 0.5rem;
       z-index: 1000;
       min-width: 200px;
+      border: 1px solid var(--border);
     `;
     
     menu.innerHTML = `
@@ -1053,7 +1006,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, 100);
   });
 
-  // Logout
   const logoutBtn = document.getElementById('logoutBtn');
   logoutBtn?.addEventListener('click', async () => {
     const ok = confirm('¿Seguro que querés cerrar sesión?');
@@ -1069,11 +1021,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.location.href = 'loginAdmin.html';
   });
 
-  // Cargar vista inicial
   const hash = window.location.hash.replace('#', '') || 'dashboard';
   navigateTo(hash);
 
-  // Handle browser back/forward
   window.addEventListener('hashchange', () => {
     const view = window.location.hash.replace('#', '') || 'dashboard';
     navigateTo(view);
@@ -1082,13 +1032,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   console.log('Admin Dashboard inicializado correctamente');
 });
 
+// Hacer navigateTo global para los botones de acción rápida
+window.navigateTo = navigateTo;
+
 // Agregar estilos CSS para botones de acción rápida
 const style = document.createElement('style');
 style.textContent = `
   .quick-action-btn {
     width: 100%;
     padding: 0.75rem 1rem;
-    background: white;
+    background: var(--bg-card);
     border: none;
     border-radius: 8px;
     cursor: pointer;
@@ -1098,10 +1051,11 @@ style.textContent = `
     align-items: center;
     gap: 0.75rem;
     transition: background 0.2s;
+    color: var(--text-primary);
   }
   
   .quick-action-btn:hover {
-    background: var(--bg-main);
+    background: var(--bg-secondary);
   }
   
   .quick-action-btn i {

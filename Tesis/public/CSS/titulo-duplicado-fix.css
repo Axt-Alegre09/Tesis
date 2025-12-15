@@ -1,66 +1,65 @@
 /* ==================== FIX TÍTULOS DUPLICADOS - TODAS LAS VISTAS ==================== */
-/* Agregar AL FINAL de admin-dashboard-modals-fix.css o crear archivo separado */
+/* ✅ Elimina títulos duplicados cuando hay iframes
+   ✅ Mantiene solo el título del topbar
+   ✅ Compatible con modo oscuro y claro */
 
-/* ========== OCULTAR TÍTULOS DUPLICADOS EN IFRAMES ========== */
+/* ========== REGLA PRINCIPAL: OCULTAR H2 EN VISTAS CON IFRAME ========== */
 
-/* Ocultar el h1 "Promociones", "Pedidos", "Catering" que aparece arriba del iframe */
-.content-area > h1:first-child,
-.content-area > div > h1:first-child {
+/* Ocultar el h2 "Promociones", "Pedidos", "Catering" que está ANTES del card con iframe */
+.content-area > h2 {
   display: none !important;
 }
 
-/* Ocultar títulos h2 duplicados fuera de las tarjetas blancas */
-.content-area > h2:first-child,
-.content-area > div > h2:first-child:not(.chart-title):not(.page-title) {
-  display: none !important;
+/* ========== ELIMINAR ESTILO DE CARD PARA IFRAMES ========== */
+
+/* Cuando hay un iframe dentro de un card, el card se vuelve transparente */
+.content-area > .card:has(iframe) {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
 }
 
-/* Específicamente para la vista de promociones */
-.content-area iframe + h1,
-.content-area iframe + h2 {
-  display: none !important;
-}
+/* ========== MANTENER TÍTULOS QUE SÍ QUEREMOS ========== */
 
-/* Ocultar títulos que están ANTES del iframe */
-.content-area h1:has(+ iframe),
-.content-area h2:has(+ iframe) {
-  display: none !important;
-}
-
-/* ========== ESTILO ESPECÍFICO PARA VISTAS CON IFRAME ========== */
-
-/* Cuando hay un iframe, ocultar el título padre */
-.content-area:has(iframe) > h1:first-of-type,
-.content-area:has(iframe) > h2:first-of-type {
-  display: none !important;
-}
-
-/* ========== FIX PARA ESTRUCTURA ESPECÍFICA DE PROMOCIONES ========== */
-
-/* Si la estructura es: content-area > h1 "Promociones" > iframe con "Gestión de Promociones" */
-.content-area[data-view="promos"] > h1,
-.content-area[data-view="promos"] > h2 {
-  display: none !important;
-}
-
-/* Lo mismo para pedidos, catering, etc */
-.content-area[data-view="pedidos"] > h1,
-.content-area[data-view="pedidos"] > h2,
-.content-area[data-view="catering"] > h1,
-.content-area[data-view="catering"] > h2 {
-  display: none !important;
-}
-
-/* ========== MANTENER SOLO TÍTULO DEL TOPBAR ========== */
-
-/* El único título visible debe ser el del topbar */
-#pageTitle {
+/* Títulos dentro del welcome-section (Dashboard) */
+.welcome-section h2 {
   display: block !important;
 }
 
-/* ========== COLOR DEL TÍTULO EN MODO OSCURO ========== */
+/* Títulos de secciones de gestión (Productos, Clientes) - estos NO usan iframe */
+.content-area > div:first-child:not(.card) h2 {
+  display: block !important;
+}
 
-/* Título "Promociones" en el topbar (modo oscuro) */
+/* Títulos de charts */
+.chart-title,
+.chart-header h3 {
+  display: block !important;
+}
+
+/* ========== CASOS ESPECÍFICOS ========== */
+
+/* Vista de Productos - tiene h2 visible porque NO usa iframe */
+.content-area > div[style*="display: flex"] h2 {
+  display: block !important;
+}
+
+/* Vista de Clientes - tiene h2 visible porque NO usa iframe */
+.content-area > div:has(#btnExportarClientes) h2 {
+  display: block !important;
+}
+
+/* ========== FIX: TÍTULO EN TOPBAR SIEMPRE VISIBLE ========== */
+
+#pageTitle {
+  display: block !important;
+  visibility: visible !important;
+}
+
+/* Título del topbar en modo oscuro */
 [data-theme="dark"] #pageTitle {
   background: linear-gradient(135deg, var(--primary), var(--primary-light));
   -webkit-background-clip: text;
@@ -68,72 +67,11 @@
   background-clip: text;
 }
 
-/* ========== IFRAME SIN MÁRGENES SUPERIORES ========== */
-
-/* Eliminar espacio superior cuando se oculta el título */
-.content-area iframe {
-  margin-top: 0 !important;
-}
-
-/* ========== FIX PARA MODO OSCURO EN IFRAMES ========== */
-
-/* Asegurar que el iframe tenga el fondo correcto */
-[data-theme="dark"] .content-area iframe {
-  background: var(--bg-card);
-}
-
-/* ========== SOLUCIÓN UNIVERSAL - OCULTAR PRIMER ELEMENTO DE TEXTO ========== */
-
-/* Si el content-area tiene directamente un h1 o h2, ocultarlo */
-.content-area > h1,
-.content-area > h2,
-.content-area > div:first-child > h1:first-child,
-.content-area > div:first-child > h2:first-child {
-  display: none !important;
-}
-
-/* EXCEPCIONES - Mantener títulos que SÍ queremos ver */
-
-/* Mantener título dentro de tarjetas blancas (como "Gestión de Promociones") */
-.content-area .card h1,
-.content-area .card h2,
-.content-area .modal-content h1,
-.content-area .modal-content h2,
-.content-area iframe h1,
-.content-area iframe h2 {
-  display: block !important;
-}
-
-/* Mantener títulos de charts */
-.chart-title,
-.chart-header h2,
-.chart-header h3 {
-  display: block !important;
-}
-
-/* Mantener títulos de secciones específicas */
-.welcome-section h2,
-.kpi-section h2,
-.stats-section h2 {
-  display: block !important;
-}
-
-/* ========== FIX RESPONSIVE - TÍTULOS EN MÓVIL ========== */
+/* ========== RESPONSIVE ========== */
 
 @media (max-width: 768px) {
-  /* En móvil, asegurar que solo el topbar muestre el título */
-  .content-area h1:not(.chart-title),
-  .content-area h2:not(.chart-title):not(.welcome-section h2) {
+  /* En móvil, ocultar todos los h2 excepto los específicos */
+  .content-area > h2:not(.welcome-section h2):not(.chart-title) {
     display: none !important;
   }
 }
-
-/* ========== DEBUGGING (comentar estas líneas en producción) ========== */
-
-/* Para ver qué elementos se están ocultando, descomentar esto:
-.content-area > h1,
-.content-area > h2 {
-  border: 2px solid red !important;
-  opacity: 0.5 !important;
-}
-*/  
