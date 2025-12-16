@@ -385,7 +385,7 @@ function wireCategorias() {
       
       if (filtro === "promociones") {
         tituloPrincipal.innerHTML = `
-          <i class="bi bi-tag-fill" style="color: #ff6b6b;"></i> 
+          <i class="bi bi-tag-fill" style="color: #6dc331ff;"></i> 
           Promociones Activas
         `;
         
