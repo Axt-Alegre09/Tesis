@@ -380,7 +380,37 @@ function wireCategorias() {
     boton.addEventListener("click", () => {
       botonesCategorias.forEach((b) => b.classList.remove("active"));
       boton.classList.add("active");
+      
       const filtro = slug(boton.id);
+      
+      if (filtro === "promociones") {
+        tituloPrincipal.innerHTML = `
+          <i class="bi bi-tag-fill" style="color: #ff6b6b;"></i> 
+          Promociones Activas
+        `;
+        
+        // Filtrar solo productos con promociones activas
+        const productosConPromo = CATALOGO.filter(p => p.tienePromo === true);
+        
+        if (productosConPromo.length === 0) {
+          contenedorProductos.innerHTML = `
+            <div class="empty-state">
+              <i class="bi bi-tag" style="font-size: 4rem; opacity: 0.3; color: #ff6b6b;"></i>
+              <p style="font-size: 1.2rem; font-weight: 600; margin-top: 1rem;">
+                No hay promociones activas en este momento
+              </p>
+              <p style="color: var(--text-muted);">
+                Vuelve pronto para ver nuestras ofertas especiales
+              </p>
+            </div>
+          `;
+        } else {
+          montar(productosConPromo);
+        }
+        return;
+      }
+      
+      // Filtrado normal por categorías existentes
       if (filtro && filtro !== "todos") {
         const alguno = CATALOGO.find((p) => p.categoria.id === filtro);
         tituloPrincipal.textContent =

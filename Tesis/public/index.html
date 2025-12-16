@@ -19,6 +19,76 @@
 
 
   <style>
+    /* Estilo especial para botón de Promociones */
+.boton-promociones {
+  color: rgb(81, 204, 0) !important;
+  font-weight: 600;
+  position: relative;
+  overflow: hidden;
+}
+
+.boton-promociones::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  transition: left 0.5s;
+}
+
+.boton-promociones:hover::before {
+  left: 100%;
+}
+
+.boton-promociones.active {
+  background: tr;
+  box-shadow: 0 4px 12px rgba(238, 90, 111, 0.4);
+}
+
+.boton-promociones i {
+  margin-right: 0.5rem;
+  animation: tagWiggle 2s ease-in-out infinite;
+}
+
+@keyframes tagWiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-10deg); }
+  75% { transform: rotate(10deg); }
+}
+
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  text-align: center;
+  min-height: 400px;
+}
+
+.empty-state i {
+  font-size: 4rem;
+  opacity: 0.3;
+  margin-bottom: 1rem;
+}
+
+.empty-state p {
+  margin: 0.5rem 0;
+  color: var(--text-secondary);
+}
+
+.empty-state .btn-primary {
+  margin-top: 1.5rem;
+  padding: 0.75rem 2rem;
+  font-weight: 600;
+  border-radius: 8px;
+}
+
+
+
     /* Overlay de cierre de sesión */
     #logoutOverlay {
       position: fixed;
@@ -306,6 +376,7 @@
           <li><button id="confiteria" class="boton-menu boton-categoria">Confitería</button></li>
           <li><button id="panificados" class="boton-menu boton-categoria">Panificados</button></li>
           <li><button id="rosticeria" class="boton-menu boton-categoria">Rostisería</button></li>
+          <li><button id="promociones" class="boton-menu boton-categoria boton-promociones"><i class="bi bi-tag-fill"></i> Promociones</button></li>
           <li><a class="boton-menu boton-carrito" href="carrito.html"><i class="bi bi-cart-fill"></i> Carrito <span
                 id="numerito" class="numerito">0</span></a></li>
         </ul>
