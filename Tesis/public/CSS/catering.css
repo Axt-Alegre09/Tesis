@@ -830,3 +830,137 @@ select.form-input {
     break-inside: avoid;
   }
 }
+
+/* ==================================================
+   FIX PARA SELECT DE ESTADO EN MODAL
+   ================================================== */
+
+/* Resetear estilos del select y agregar estilos personalizados */
+.form-input[type="select"],
+select.form-input,
+#f_estado {
+  /* Resetear apariencia nativa */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  
+  /* Estilos base */
+  width: 100%;
+  padding: 0.75rem 2.5rem 0.75rem 1rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--text-primary);
+  background-color: var(--input-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  
+  /* Flecha personalizada con background-image */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23888' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1rem;
+}
+
+/* Hover state */
+.form-input[type="select"]:hover,
+select.form-input:hover,
+#f_estado:hover {
+  border-color: var(--primary);
+  background-color: var(--input-bg-hover, var(--input-bg));
+}
+
+/* Focus state */
+.form-input[type="select"]:focus,
+select.form-input:focus,
+#f_estado:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(218, 165, 32, 0.1);
+  background-color: var(--input-bg);
+}
+
+/* Disabled state */
+.form-input[type="select"]:disabled,
+select.form-input:disabled,
+#f_estado:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: var(--bg-secondary);
+}
+
+/* Estilos para modo oscuro */
+[data-theme="dark"] .form-input[type="select"],
+[data-theme="dark"] select.form-input,
+[data-theme="dark"] #f_estado {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23aaa' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+}
+
+/* Estilos para las opciones del select */
+.form-input[type="select"] option,
+select.form-input option,
+#f_estado option {
+  padding: 0.5rem;
+  background-color: var(--input-bg);
+  color: var(--text-primary);
+}
+
+/* Alternativa: Si el problema persiste, ocultar completamente la flecha nativa */
+.form-input[type="select"]::-ms-expand,
+select.form-input::-ms-expand,
+#f_estado::-ms-expand {
+  display: none;
+}
+
+/* ==================================================
+   VARIABLES CSS (Si no están definidas en tu CSS principal)
+   ================================================== */
+:root {
+  --input-bg: #f8f9fa;
+  --input-bg-hover: #f1f3f5;
+  --border-color: #dee2e6;
+  --primary: #daa520;
+  --text-primary: #1a1a1a;
+}
+
+[data-theme="dark"] {
+  --input-bg: #2a2e35;
+  --input-bg-hover: #33373e;
+  --border-color: #3d4149;
+  --text-primary: #e8e9ea;
+}
+
+/* ==================================================
+   ESTILOS ADICIONALES PARA MEJORAR LA EXPERIENCIA
+   ================================================== */
+
+/* Contenedor del grupo de formulario para el estado */
+#statusCol {
+  position: relative;
+}
+
+/* Label mejorado */
+#statusCol label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* Animación suave al mostrar/ocultar */
+#statusCol {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+#statusCol[style*="display: none"] {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+#statusCol[style*="display: block"] {
+  opacity: 1;
+  transform: translateY(0);
+}
