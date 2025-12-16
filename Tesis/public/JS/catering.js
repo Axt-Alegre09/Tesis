@@ -1,15 +1,14 @@
 // JS/catering.js
-// Panel de Administración de Catering - Versión Final
+// Panel de Administración de Catering - Versión Adaptada con Modo Oscuro
 // Compatible con las funciones RPC de Supabase
 import { supabase, requireAuth } from "./ScriptLogin.js";
 
 /* ========= Estado Global ========= */
 let allReservas = [];
 let filteredReservas = [];
-let currentFilter = 'all';
+let currentFilter = 'agendado'; // CAMBIADO: Filtro inicial ahora es 'agendado' en lugar de 'all'
 let selectedId = null;
 let isEditMode = false;
-
 
 /* ========= Elementos del DOM ========= */
 const elements = {
@@ -45,7 +44,7 @@ const elements = {
   btnModalDelete: document.getElementById('btnModalDelete'),
   
   // Pills de filtro
-  filterPills: document.querySelectorAll('.filter-pills .pill')
+  filterPills: document.querySelectorAll('.pill')
 };
 
 /* ========= Utilidades ========= */
@@ -88,36 +87,7 @@ const getStatusText = (status) => {
 };
 
 const getStatusClass = (status) => {
-  const classMap = {
-    'agendado': 'pending',
-    'en_curso': 'in-progress',
-    'finalizado': 'completed',
-    'cancelado': 'cancelled'
-  };
-  return classMap[status] || 'pending';
-};
-
-// Normalizar estado para el select del formulario
-const normalizeStatusForForm = (status) => {
-  // El select usa valores: pending, in-progress, completed
-  const statusMap = {
-    'agendado': 'pending',
-    'en_curso': 'in-progress',
-    'finalizado': 'completed',
-    'cancelado': 'cancelled'
-  };
-  return statusMap[status] || 'pending';
-};
-
-// Convertir del select al formato de BD
-const statusToBackend = (selectValue) => {
-  const statusMap = {
-    'pending': 'agendado',
-    'in-progress': 'en_curso',
-    'completed': 'finalizado',
-    'cancelled': 'cancelado'
-  };
-  return statusMap[selectValue] || 'agendado';
+  return status || 'agendado';
 };
 
 /* ========= Toast Notifications ========= */
@@ -127,7 +97,10 @@ function showToast(message, type = 'success') {
   
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
-  toast.textContent = message;
+  toast.innerHTML = `
+    <i class="bi bi-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+    ${message}
+  `;
   
   toastArea.appendChild(toast);
   
@@ -170,7 +143,9 @@ function openModal(mode = 'new', data = null) {
     elements.drawerTitle.textContent = mode === 'new' ? 'Nueva Reserva' : 'Editar Reserva';
   }
   if (elements.btnModalSave) {
-    elements.btnModalSave.textContent = mode === 'new' ? 'Agendar' : 'Guardar Cambios';
+    elements.btnModalSave.innerHTML = mode === 'new' 
+      ? '<i class="bi bi-check-lg"></i> Agendar' 
+      : '<i class="bi bi-check-lg"></i> Guardar Cambios';
   }
   
   // Mostrar/ocultar columna de estado y botón eliminar
@@ -178,7 +153,7 @@ function openModal(mode = 'new', data = null) {
     elements.statusCol.style.display = mode === 'edit' ? 'block' : 'none';
   }
   if (elements.btnModalDelete) {
-    elements.btnModalDelete.style.display = mode === 'edit' ? 'inline-block' : 'none';
+    elements.btnModalDelete.style.display = mode === 'edit' ? 'inline-flex' : 'none';
   }
   
   // Limpiar o llenar formulario
@@ -198,7 +173,7 @@ function openModal(mode = 'new', data = null) {
     if (elements.f_invitados) elements.f_invitados.value = data.invitados || '';
     if (elements.f_fecha) elements.f_fecha.value = data.fecha || '';
     if (elements.f_hora) elements.f_hora.value = formatTime(data.hora);
-    if (elements.f_estado) elements.f_estado.value = normalizeStatusForForm(data.estado);
+    if (elements.f_estado) elements.f_estado.value = data.estado || 'agendado';
   }
   
   // Mostrar modal
@@ -216,7 +191,7 @@ function closeModal() {
 /* ========= Data Loading ========= */
 async function loadReservas() {
   try {
-    console.log('Cargando reservas...');
+    console.log('📋 Cargando reservas...');
     
     const { data, error } = await supabase
       .from('reservas_catering')
@@ -225,17 +200,17 @@ async function loadReservas() {
       .order('hora', { ascending: false });
     
     if (error) {
-      console.error('Error al cargar reservas:', error);
+      console.error('❌ Error al cargar reservas:', error);
       throw error;
     }
     
     allReservas = data || [];
-    console.log(`${allReservas.length} reservas cargadas`);
+    console.log(`✅ ${allReservas.length} reservas cargadas`);
     
     applyFilters();
     
   } catch (error) {
-    console.error('Error cargando reservas:', error);
+    console.error('❌ Error cargando reservas:', error);
     showToast('Error al cargar las reservas. Revisa la conexión.', 'error');
     allReservas = [];
     applyFilters();
@@ -250,14 +225,7 @@ function applyFilters() {
     // Filtro por estado
     let matchesStatus = true;
     if (currentFilter !== 'all') {
-      const status = reserva.estado;
-      if (currentFilter === 'pending') {
-        matchesStatus = status === 'agendado';
-      } else if (currentFilter === 'in-progress') {
-        matchesStatus = status === 'en_curso';
-      } else if (currentFilter === 'completed') {
-        matchesStatus = status === 'finalizado';
-      }
+      matchesStatus = reserva.estado === currentFilter;
     }
     
     // Filtro por búsqueda
@@ -280,14 +248,15 @@ function applyFilters() {
 function updateCounts() {
   const counts = {
     all: allReservas.length,
-    pending: allReservas.filter(r => r.estado === 'agendado').length,
-    'in-progress': allReservas.filter(r => r.estado === 'en_curso').length,
-    completed: allReservas.filter(r => r.estado === 'finalizado').length
+    agendado: allReservas.filter(r => r.estado === 'agendado').length,
+    en_curso: allReservas.filter(r => r.estado === 'en_curso').length,
+    finalizado: allReservas.filter(r => r.estado === 'finalizado').length,
+    cancelado: allReservas.filter(r => r.estado === 'cancelado').length
   };
   
   elements.filterPills.forEach(pill => {
     const filter = pill.dataset.filter;
-    const countEl = pill.querySelector('.count');
+    const countEl = pill.querySelector('.pill-count');
     if (countEl) {
       countEl.textContent = counts[filter] || 0;
     }
@@ -307,54 +276,61 @@ function renderTable() {
   if (elements.emptyMsg) elements.emptyMsg.style.display = 'none';
   
   const rows = filteredReservas.map(reserva => {
-    const row = document.createElement('tr');
-    
     // Indicador visual si es del chatbot
     const esChatBot = reserva.ruc === 'CHAT-BOT';
     
-    row.innerHTML = `
-      <td>
-        <div class="cell-content">
-          <span class="text-main">
-            ${reserva.razonsocial || 'Sin nombre'}
-            ${esChatBot ? '🤖' : ''}
+    return `
+      <tr>
+        <td>
+          <div class="cell-content">
+            <span class="text-main">
+              ${reserva.razonsocial || 'Sin nombre'}
+              ${esChatBot ? ' 🤖' : ''}
+            </span>
+            ${reserva.email ? `<span class="text-sub">${reserva.email}</span>` : ''}
+          </div>
+        </td>
+        <td>
+          <div class="cell-content">
+            <span class="text-main">${reserva.telefono || '-'}</span>
+            ${reserva.lugar ? `<span class="text-sub">${reserva.lugar}</span>` : ''}
+          </div>
+        </td>
+        <td>
+          <div class="date-time">
+            <span class="text-main">${formatDate(reserva.fecha)}</span>
+            <span class="text-sub">${formatTime(reserva.hora)}</span>
+          </div>
+        </td>
+        <td>
+          <div class="cell-content">
+            <span class="text-main">${reserva.tipoevento || '-'}</span>
+            ${reserva.tipocomida ? `<span class="text-sub">${reserva.tipocomida}</span>` : ''}
+          </div>
+        </td>
+        <td class="text-center">
+          <span class="text-main">${reserva.invitados || '-'}</span>
+        </td>
+        <td class="text-center">
+          <span class="status-badge ${getStatusClass(reserva.estado)}">
+            ${getStatusText(reserva.estado)}
           </span>
-          <span class="text-sub">${reserva.email || ''}</span>
-        </div>
-      </td>
-      <td>${reserva.telefono || '-'}</td>
-      <td>
-        <div class="date-time">
-          <span>${formatDate(reserva.fecha)}</span>
-          <span class="text-sub">${formatTime(reserva.hora)}</span>
-        </div>
-      </td>
-      <td>${reserva.invitados || '-'}</td>
-      <td>
-        <span class="status-badge ${getStatusClass(reserva.estado)}">
-          ${getStatusText(reserva.estado)}
-        </span>
-      </td>
-      <td class="col-actions">
-        <button class="btn-action edit" data-id="${reserva.id}" title="Editar">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
-            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
-          </svg>
-        </button>
-        <button class="btn-action delete" data-id="${reserva.id}" title="Cancelar">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-          </svg>
-        </button>
-      </td>
+        </td>
+        <td class="text-center">
+          <div class="action-btns">
+            <button class="btn-action edit" data-id="${reserva.id}" title="Editar">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <button class="btn-action delete" data-id="${reserva.id}" title="Cancelar">
+              <i class="bi bi-trash"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
     `;
-    
-    return row;
-  });
+  }).join('');
   
-  elements.tableBody.innerHTML = '';
-  rows.forEach(row => elements.tableBody.appendChild(row));
+  elements.tableBody.innerHTML = rows;
 }
 
 /* ========= CRUD Operations ========= */
@@ -364,7 +340,8 @@ async function saveReserva() {
     const requiredFields = [
       { element: elements.f_nombre, name: 'Nombre' },
       { element: elements.f_fecha, name: 'Fecha' },
-      { element: elements.f_hora, name: 'Hora' }
+      { element: elements.f_hora, name: 'Hora' },
+      { element: elements.f_invitados, name: 'Invitados' }
     ];
     
     for (const field of requiredFields) {
@@ -377,7 +354,7 @@ async function saveReserva() {
     
     if (isEditMode && selectedId) {
       // ===== MODO EDICIÓN =====
-      console.log('Actualizando reserva ID:', selectedId);
+      console.log('✏️ Actualizando reserva ID:', selectedId);
       
       // Obtener la reserva actual para verificar si cambió la fecha
       const currentReserva = allReservas.find(r => r.id === selectedId);
@@ -408,12 +385,12 @@ async function saveReserva() {
         p_email: elements.f_email?.value?.trim() || null
       };
       
-      console.log('Datos a actualizar:', updateData);
+      console.log('📤 Datos a actualizar:', updateData);
       
       const { data: editData, error: editError } = await supabase.rpc('catering_editar', updateData);
       
       if (editError) {
-        console.error('Error en catering_editar:', editError);
+        console.error('❌ Error en catering_editar:', editError);
         
         // Manejar error de cupo lleno
         if (editError.message?.includes('Cupo lleno')) {
@@ -427,9 +404,9 @@ async function saveReserva() {
       }
       
       // Si cambió el estado, actualizarlo
-      const newStatus = statusToBackend(elements.f_estado.value);
+      const newStatus = elements.f_estado.value;
       if (currentReserva && currentReserva.estado !== newStatus) {
-        console.log('Actualizando estado de', currentReserva.estado, 'a', newStatus);
+        console.log('🔄 Actualizando estado de', currentReserva.estado, 'a', newStatus);
         
         const { data: statusData, error: statusError } = await supabase.rpc('catering_set_estado', {
           p_id: selectedId,
@@ -437,13 +414,13 @@ async function saveReserva() {
         });
         
         if (statusError) {
-          console.error('Error en catering_set_estado:', statusError);
+          console.error('❌ Error en catering_set_estado:', statusError);
           showToast('Datos actualizados pero hubo un problema con el estado', 'warning');
         } else {
-          showToast('Reserva actualizada exitosamente', 'success');
+          showToast('✅ Reserva actualizada exitosamente', 'success');
         }
       } else {
-        showToast('Reserva actualizada exitosamente', 'success');
+        showToast('✅ Reserva actualizada exitosamente', 'success');
       }
       
     } else {
@@ -472,12 +449,12 @@ async function saveReserva() {
         p_email: elements.f_email?.value?.trim() || null
       };
       
-      console.log('Datos a crear:', createData);
+      console.log('📤 Datos a crear:', createData);
       
       const { data, error } = await supabase.rpc('catering_agendar', createData);
       
       if (error) {
-        console.error('Error en catering_agendar:', error);
+        console.error('❌ Error en catering_agendar:', error);
         
         // Manejar error de cupo lleno
         if (error.message?.includes('Cupo lleno')) {
@@ -490,14 +467,14 @@ async function saveReserva() {
         return;
       }
       
-      showToast('Reserva creada exitosamente', 'success');
+      showToast('✅ Reserva creada exitosamente', 'success');
     }
     
     closeModal();
     await loadReservas();
     
   } catch (error) {
-    console.error('Error guardando reserva:', error);
+    console.error('❌ Error guardando reserva:', error);
     showToast('Error inesperado. Revisa la consola.', 'error');
   }
 }
@@ -514,13 +491,13 @@ async function deleteReserva(id) {
     
     if (error) throw error;
     
-    showToast('Reserva cancelada exitosamente', 'success');
+    showToast('✅ Reserva cancelada exitosamente', 'success');
     closeModal();
     await loadReservas();
     
   } catch (error) {
-    console.error('Error cancelando reserva:', error);
-    showToast('Error al cancelar la reserva', 'error');
+    console.error('❌ Error cancelando reserva:', error);
+    showToast('❌ Error al cancelar la reserva', 'error');
   }
 }
 
@@ -596,7 +573,12 @@ elements.f_fecha?.addEventListener('change', async () => {
   
   // Mostrar info temporal
   const info = document.createElement('small');
-  info.style.color = cupoInfo.disponible > 0 ? 'green' : 'red';
+  info.style.cssText = `
+    display: block;
+    margin-top: 0.5rem;
+    color: ${cupoInfo.disponible > 0 ? 'var(--success)' : 'var(--danger)'};
+    font-weight: 600;
+  `;
   info.textContent = mensaje;
   
   const parent = elements.f_fecha.parentElement;
@@ -616,12 +598,13 @@ elements.f_fecha?.addEventListener('change', async () => {
     // Cargar datos iniciales
     await loadReservas();
     
-    console.log('Panel de Catering inicializado correctamente');
-    console.log('Estados disponibles: agendado, en_curso, finalizado, cancelado');
-    console.log('Límites: 2 servicios/día (L-V), 3 servicios/día (S-D)');
+    console.log('✅ Panel de Catering inicializado correctamente');
+    console.log('📊 Estados disponibles: agendado, en_curso, finalizado, cancelado');
+    console.log('📅 Límites: 2 servicios/día (L-V), 3 servicios/día (S-D)');
+    console.log('🎯 Filtro inicial: Agendados');
     
   } catch (error) {
-    console.error('Error al inicializar:', error);
+    console.error('❌ Error al inicializar:', error);
     // Si el error es de autenticación, redirigir al login
     if (error.message?.includes('auth') || error.message?.includes('session')) {
       window.location.href = 'login.html';
